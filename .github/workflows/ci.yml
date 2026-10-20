@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  host:
+    # The host is Windows-only today; every job below runs on the same OS so the binary
+    # that the clients test is the binary that would ship.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets
+      - run: cargo test --workspace
+      - run: cargo build -p gpui-bridge-host --release
+      - run: target/release/gpui-bridge-host.exe --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpui-bridge-host-win32-x64
+          path: target/release/gpui-bridge-host.exe
+          if-no-files-found: error
+
+  clients:
+    needs: host
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: gpui-bridge-host-win32-x64
+          # Where the clients look in a checkout.
+          path: target/release
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:node
+      - run: pnpm test:react
+      - run: pnpm test:python
+      - name: Type-check the examples
+        run: pnpm --filter gpui-bridge-examples typecheck
+
+  pack:
+    needs: host
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: gpui-bridge-host-win32-x64
+          path: target/release
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Pack the npm client (stages the host asset)
+        run: pnpm --dir packages/client-node pack
+      - name: Build the platform-tagged wheel
+        run: node scripts/stage-host.mjs --to python; python packages/client-python/build_wheel.py
+      - name: The tarball carries the host
+        run: |
+          tar -tf packages/client-node/gpui-bridge-*.tgz | Select-String 'bin/gpui-bridge-host.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            packages/client-node/*.tgz
+            packages/client-python/dist/*.whl

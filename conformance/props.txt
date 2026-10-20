@@ -1,0 +1,48 @@
+# Section 5: prop validation, null removal and event subscriptions.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Button","props":{"label":"Save","variant":"primary"},"events":["click"]}
+> {"op":"create","id":2,"type":"Button","props":{"disabled":"yes"}}
+> {"op":"create","id":3,"type":"Button","props":{"variant":"huge"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# null removes a prop; unknown props are ignored; a bad value rejects the whole setProps.
+> {"op":"setProps","id":1,"props":{"variant":null,"sparkle":true}}
+> {"op":"setProps","id":1,"props":{"label":3,"disabled":true}}
+> {"op":"create","id":4,"type":"Checkbox","props":{"checked":"true"}}
+> {"op":"create","id":5,"type":"Input","props":{"value":"hi","controlled":true},"events":["change","submit"]}
+> {"op":"create","id":6,"type":"text","props":{"content":5}}
+> {"op":"setEvents","id":1,"events":[]}
+> {"op":"setEvents","id":9,"events":["click"]}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"unknown_node","op":"setEvents"}
+# Icon: name must be one of the bundled icons.
+> {"op":"create","id":7,"type":"Icon","props":{"name":"folder","class":"size-4 text-muted-foreground"}}
+> {"op":"create","id":8,"type":"Icon","props":{"name":"no-such-icon"}}
+> {"op":"create","id":10,"type":"Icon","props":{"name":"../folder"}}
+> {"op":"setProps","id":7,"props":{"name":"file-text"}}
+> {"op":"setProps","id":7,"props":{"name":7}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+# Image: src is a string, fit one of the object-fit values.
+> {"op":"create","id":11,"type":"Image","props":{"src":"C:\\pictures\\cat.png","fit":"cover","class":"w-32 h-32 rounded-lg"}}
+> {"op":"create","id":12,"type":"Image","props":{"src":"cat.png","fit":"stretch"}}
+> {"op":"create","id":13,"type":"Image","props":{"src":42}}
+> {"op":"setProps","id":11,"props":{"fit":null,"src":"dog.webp"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# Image: `data` is standard base64 of the bytes (no `data:` prefix); a bad payload is rejected.
+> {"op":"create","id":14,"type":"Image","props":{"data":"aGVsbG8=","fit":"contain"}}
+> {"op":"create","id":15,"type":"Image","props":{"data":"not base64!"}}
+> {"op":"create","id":16,"type":"Image","props":{"data":42}}
+> {"op":"setProps","id":14,"props":{"data":null}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

@@ -1,0 +1,60 @@
+# Section 12: shortcuts, menu item shortcuts, keyDown, doubleClick and focus.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"create","id":2,"type":"MenuBar","props":{"menus":[{"label":"File","items":[{"id":"save","label":"Save","shortcut":"ctrl-s"},{"id":"print","label":"Print","shortcut":"ctrl-p","disabled":true},{"label":"Export","items":[{"id":"pdf","label":"PDF","shortcut":"ctrl-shift-e"}]}]}]},"events":["menu"]}
+> {"op":"create","id":3,"type":"div","events":["keyDown","click","doubleClick"]}
+> {"op":"create","id":4,"type":"Input","events":["keyDown"]}
+> {"op":"create","id":5,"type":"Button","props":{"label":"OK"}}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":3}
+> {"op":"append","parent":1,"child":4}
+> {"op":"append","parent":1,"child":5}
+> {"op":"window","root":1}
+> {"op":"shortcuts","keys":["f5","ctrl-shift-p"]}
+> {"op":"commit"}
+# A registered shortcut is reported with the window; a menu shortcut chooses its item.
+> {"op":"simulate","event":"key","value":"f5"}
+< {"type":"shortcut","keys":"f5","window":1}
+> {"op":"simulate","event":"key","value":"ctrl-shift-p"}
+< {"type":"shortcut","keys":"ctrl-shift-p","window":1}
+> {"op":"simulate","event":"key","value":"ctrl-s"}
+< {"type":"event","id":2,"event":"menu","value":"save"}
+> {"op":"simulate","event":"key","value":"ctrl-shift-e"}
+< {"type":"event","id":2,"event":"menu","value":"pdf"}
+# Modifiers must match exactly; a disabled item's shortcut and an unknown key do nothing.
+> {"op":"simulate","event":"key","value":"shift-f5"}
+> {"op":"simulate","event":"key","value":"ctrl-p"}
+> {"op":"simulate","event":"key","value":"ctrl-q"}
+# keyDown on a focusable div or an Input, doubleClick (which also sends click).
+> {"op":"simulate","id":3,"event":"keyDown","value":"escape"}
+< {"type":"event","id":3,"event":"keyDown","value":"escape"}
+> {"op":"simulate","id":4,"event":"keyDown","value":"down"}
+< {"type":"event","id":4,"event":"keyDown","value":"down"}
+> {"op":"simulate","id":3,"event":"doubleClick"}
+< {"type":"event","id":3,"event":"click"}
+< {"type":"event","id":3,"event":"doubleClick"}
+# Shortcuts are replaced as a whole; an invalid key rejects the message.
+> {"op":"shortcuts","keys":["ctrl-k"]}
+> {"op":"commit"}
+> {"op":"simulate","event":"key","value":"f5"}
+> {"op":"simulate","event":"key","value":"ctrl-k"}
+< {"type":"shortcut","keys":"ctrl-k","window":1}
+> {"op":"shortcuts","keys":["ctrl-"]}
+> {"op":"shortcuts","keys":"ctrl-k"}
+< {"type":"error","code":"invalid_json","op":"shortcuts"}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_json","op":"shortcuts"}
+# Errors: a key event with a bad key, keyDown on a type without it, a bad menu shortcut, focus on what cannot take it.
+> {"op":"simulate","event":"key","value":"ctrl-"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":5,"event":"keyDown","value":"a"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"create","id":10,"type":"MenuBar","props":{"menus":[{"label":"F","items":[{"id":"a","label":"A","shortcut":"ctrl-"}]}]}}
+> {"op":"focus","id":4}
+> {"op":"focus","id":5}
+> {"op":"focus","id":99}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_operation","op":"focus"}
+< {"type":"error","code":"unknown_node","op":"focus"}

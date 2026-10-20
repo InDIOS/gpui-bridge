@@ -1,0 +1,6 @@
+# pnpm does not read `workspaces` from package.json: the workspace lives here.
+# `packages/client-python` is intentionally absent: it is built by setuptools, not pnpm.
+packages:
+  - packages/client-node
+  - packages/client-react
+  - examples

@@ -1,0 +1,5 @@
+# Section 2: hello is answered with ready; a repeated hello is answered again.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}

@@ -1,0 +1,15 @@
+{
+  // Compiles the React examples (JSX) to dist/react/, which `pnpm dev react/todo` runs.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "rootDir": ".",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["react"]
+}

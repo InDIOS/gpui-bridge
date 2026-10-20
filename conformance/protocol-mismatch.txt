@@ -1,0 +1,3 @@
+# Section 2: an unsupported version is rejected and the host exits.
+> {"op":"hello","protocol":99}
+< {"type":"error","code":"protocol_mismatch","op":"hello"}

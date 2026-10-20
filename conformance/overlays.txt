@@ -1,0 +1,41 @@
+# Section 14: Dialog, notify and tooltip.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"create","id":2,"type":"Dialog","props":{"open":true,"title":"Rename","okText":"Save","cancelText":"Cancel","width":400,"class":"gap-3"},"events":["ok","cancel"]}
+> {"op":"create","id":3,"type":"Input","props":{"value":"notes.txt"}}
+> {"op":"create","id":4,"type":"div","props":{"tooltip":"Settings"}}
+> {"op":"create","id":5,"type":"Button","props":{"label":"Save","tooltip":"Ctrl+S"}}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":4}
+> {"op":"append","parent":1,"child":5}
+> {"op":"window","root":1}
+> {"op":"commit"}
+# Answering the dialog closes it (open becomes false), so answering again is an error.
+> {"op":"simulate","id":2,"event":"ok"}
+< {"type":"event","id":2,"event":"ok"}
+> {"op":"simulate","id":2,"event":"cancel"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# The client opens it again; Cancel (also Escape, the X, a click outside) answers cancel.
+> {"op":"setProps","id":2,"props":{"open":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":2,"event":"cancel"}
+< {"type":"event","id":2,"event":"cancel"}
+# notify is an action; without a window there is nothing to show, but it is still validated.
+> {"op":"notify","window":1,"id":"saved","type":"success","title":"Saved","message":"notes.txt","autohide":false,"system":true}
+> {"op":"notify","message":"Plain"}
+> {"op":"notify","title":"No message"}
+< {"type":"error","code":"invalid_json","op":"notify"}
+> {"op":"notify","message":"x","type":"fatal"}
+< {"type":"error","code":"invalid_json","op":"notify"}
+# Invalid props.
+> {"op":"create","id":10,"type":"Dialog","props":{"open":"yes"}}
+> {"op":"create","id":11,"type":"Dialog","props":{"width":0}}
+> {"op":"create","id":12,"type":"div","props":{"tooltip":5}}
+> {"op":"create","id":13,"type":"Button","props":{"tooltip":true}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

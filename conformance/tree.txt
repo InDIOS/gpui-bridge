@@ -1,0 +1,36 @@
+# Section 4: a failing operation is dropped with an error; the rest of the batch applies.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"create","id":0,"type":"div"}
+> {"op":"create","id":2,"type":"marquee"}
+> {"op":"create","id":3,"type":"text","props":{"content":"a"}}
+> {"op":"create","id":4,"type":"div"}
+> {"op":"append","parent":1,"child":42}
+> {"op":"append","parent":1,"child":4}
+> {"op":"append","parent":4,"child":3}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"create"}
+< {"type":"error","code":"invalid_operation","op":"create"}
+< {"type":"error","code":"unknown_type","op":"create"}
+< {"type":"error","code":"unknown_node","op":"append"}
+# Cycles: a node cannot go inside itself or a descendant.
+> {"op":"append","parent":4,"child":4}
+> {"op":"append","parent":4,"child":1}
+# insertBefore needs `before` to be a child of `parent` (3 is a child of 4, not 1).
+> {"op":"insertBefore","parent":1,"child":3,"before":3}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"append"}
+< {"type":"error","code":"invalid_operation","op":"append"}
+< {"type":"error","code":"invalid_operation","op":"insertBefore"}
+# Moving a node with a parent is allowed (3 moves from 4 to 1).
+> {"op":"append","parent":1,"child":3}
+> {"op":"insertBefore","parent":1,"child":3,"before":4}
+> {"op":"commit"}
+# remove deletes the descendants too.
+> {"op":"append","parent":4,"child":3}
+> {"op":"remove","id":4}
+> {"op":"setProps","id":3,"props":{"content":"b"}}
+> {"op":"commit"}
+< {"type":"error","code":"unknown_node","op":"setProps"}

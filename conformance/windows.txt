@@ -1,0 +1,26 @@
+# Section 3: several windows, each with a client-assigned id; `window` without `id` is window 1.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"create","id":2,"type":"div"}
+> {"op":"window","title":"Main","root":1}
+> {"op":"window","id":2,"title":"Settings","width":400,"height":300,"root":2}
+> {"op":"commit"}
+# A node is the root of one window at a time; window ids are positive.
+> {"op":"window","id":3,"root":1}
+> {"op":"window","id":0,"root":2}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"window"}
+< {"type":"error","code":"invalid_operation","op":"window"}
+# The theme is app-wide, whichever window message carries it.
+> {"op":"window","id":2,"theme":"dark"}
+> {"op":"commit"}
+# closeWindow (applied on commit) sends no windowClosed; the window can be opened again.
+> {"op":"closeWindow","id":2}
+> {"op":"closeWindow","id":2}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"closeWindow"}
+> {"op":"window","id":3,"root":2}
+> {"op":"closeWindow","id":"two"}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_json","op":"closeWindow"}

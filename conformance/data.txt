@@ -1,0 +1,75 @@
+# Section 15: VirtualList, Table and Tabs, their props and events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"VirtualList","props":{"rowHeight":28,"class":"h-64"}}
+> {"op":"create","id":2,"type":"text","props":{"content":"Row 1"}}
+> {"op":"create","id":3,"type":"div","events":["click"]}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":3}
+> {"op":"create","id":4,"type":"Table","props":{"columns":[{"key":"name","name":"Name","width":200,"sortable":true},{"key":"size","name":"Size","align":"right"}],"rows":[{"name":"a.txt","size":12},{"name":"b.txt","size":"3 KB"},{"name":"c.txt","size":null}],"stripe":true},"events":["change","doubleClick","sort"]}
+> {"op":"create","id":5,"type":"Tabs","props":{"tabs":[{"value":"list","label":"List"},{"value":"table","label":"Table"},{"value":"off","label":"Off","disabled":true}],"value":"list","variant":"underline"},"events":["change"]}
+> {"op":"commit"}
+# Rows of a VirtualList are ordinary nodes with their own events.
+> {"op":"simulate","id":3,"event":"click"}
+< {"type":"event","id":3,"event":"click"}
+# Table: selecting a row reports its index into `rows`; the same row again is not a change.
+> {"op":"simulate","id":4,"event":"change","value":1}
+< {"type":"event","id":4,"event":"change","value":1}
+> {"op":"simulate","id":4,"event":"change","value":1}
+# A double click selects the row, then reports it.
+> {"op":"simulate","id":4,"event":"doubleClick","value":2}
+< {"type":"event","id":4,"event":"change","value":2}
+< {"type":"event","id":4,"event":"doubleClick","value":2}
+# Escape clears the selection.
+> {"op":"simulate","id":4,"event":"change","value":null}
+< {"type":"event","id":4,"event":"change","value":null}
+# Sorting is the app's: the host reports the column and direction, the app sends `rows` again.
+> {"op":"simulate","id":4,"event":"sort","value":{"column":"name","direction":"desc"}}
+< {"type":"event","id":4,"event":"sort","value":{"column":"name","direction":"desc"}}
+> {"op":"simulate","id":4,"event":"sort","value":{"column":"size","direction":"asc"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":4,"event":"sort","value":{"column":"name","direction":"up"}}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":4,"event":"change","value":3}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Controlled: the host reports the row but keeps the client's `selected`.
+> {"op":"setProps","id":4,"props":{"controlled":true,"selected":0}}
+> {"op":"commit"}
+> {"op":"simulate","id":4,"event":"change","value":2}
+< {"type":"event","id":4,"event":"change","value":2}
+> {"op":"simulate","id":4,"event":"change","value":2}
+< {"type":"event","id":4,"event":"change","value":2}
+# A `selected` past the end selects nothing: clearing it is no change.
+> {"op":"setProps","id":4,"props":{"controlled":false,"selected":9}}
+> {"op":"commit"}
+> {"op":"simulate","id":4,"event":"change","value":null}
+# Tabs: like a RadioGroup over `tabs`.
+> {"op":"simulate","id":5,"event":"change","value":"table"}
+< {"type":"event","id":5,"event":"change","value":"table"}
+> {"op":"simulate","id":5,"event":"change","value":"table"}
+> {"op":"simulate","id":5,"event":"change","value":"off"}
+> {"op":"simulate","id":5,"event":"change","value":"chart"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# A Table can take the focus.
+> {"op":"focus","id":4}
+> {"op":"commit"}
+# Malformed props are invalid_props.
+> {"op":"create","id":10,"type":"VirtualList","props":{"rowHeight":0}}
+> {"op":"create","id":11,"type":"Table","props":{"columns":[{"key":"a"}]}}
+> {"op":"create","id":12,"type":"Table","props":{"columns":[{"key":"a","name":"A","align":"middle"}]}}
+> {"op":"create","id":13,"type":"Table","props":{"rows":[["a","b"]]}}
+> {"op":"create","id":14,"type":"Table","props":{"rows":[{"a":{"b":1}}]}}
+> {"op":"create","id":15,"type":"Table","props":{"selected":-1}}
+> {"op":"create","id":16,"type":"Table","props":{"selected":1.5}}
+> {"op":"create","id":17,"type":"Tabs","props":{"tabs":[{"value":"a"}]}}
+> {"op":"create","id":18,"type":"Tabs","props":{"variant":"round"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

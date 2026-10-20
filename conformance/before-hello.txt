@@ -1,0 +1,10 @@
+# Section 2: everything before hello is ignored without an answer.
+> {not json
+> {"op":"create","id":1,"type":"div"}
+> {"op":"commit"}
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+# The pre-hello create was dropped, so node 1 does not exist.
+> {"op":"remove","id":1}
+> {"op":"commit"}
+< {"type":"error","code":"unknown_node","op":"remove"}

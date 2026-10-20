@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo test --workspace
+      - name: Build the host once
+        run: cargo build -p gpui-bridge-host --release
+
+      - name: Publish the clients (the host is staged by prepack / build_wheel.py)
+        shell: pwsh
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+        run: |
+          if (-not $env:NODE_AUTH_TOKEN) { Write-Host "NPM_TOKEN missing: skipping npm"; exit 0 }
+
+          pnpm --dir packages/client-node pack
+          pnpm --dir packages/client-node publish --no-git-checks
+          pnpm --dir packages/client-react publish --no-git-checks
+
+          node scripts/stage-host.mjs --to python
+          python packages/client-python/build_wheel.py
+          if ($env:TWINE_PASSWORD) {
+            python -m pip install --quiet twine
+            twine upload packages/client-python/dist/*.whl
+          } else {
+            Write-Host "TWINE_PASSWORD missing: wheel built but not uploaded"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            packages/client-node/*.tgz
+            packages/client-python/dist/*.whl

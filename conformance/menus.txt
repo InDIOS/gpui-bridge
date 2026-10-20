@@ -1,0 +1,60 @@
+# Section 10: context menus on div, MenuBar, and the menu event.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"class":"flex flex-col"}}
+> {"op":"create","id":2,"type":"MenuBar","props":{"menus":[{"label":"File","items":[{"id":"open","label":"Open","icon":"folder-open"},{"separator":true},{"id":"quit","label":"Quit"}]},{"label":"View","items":[{"id":"wrap","label":"Word wrap","checked":true},{"label":"Zoom","items":[{"id":"zoom-in","label":"Zoom in"}]},{"label":"Panels","disabled":true,"items":[{"id":"left","label":"Left"}]}]}]},"events":["menu"]}
+> {"op":"create","id":3,"type":"div","props":{"contextMenu":[{"id":"copy","label":"Copy"},{"id":"paste","label":"Paste","disabled":true}]},"events":["menu","click"]}
+> {"op":"create","id":4,"type":"div","props":{"contextMenu":[{"id":"copy","label":"Copy"}]}}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":3}
+> {"op":"append","parent":1,"child":4}
+> {"op":"window","title":"Menus","root":1}
+> {"op":"commit"}
+# Choosing an item sends the node's menu event with the item id; submenus included.
+> {"op":"simulate","id":2,"event":"menu","value":"open"}
+< {"type":"event","id":2,"event":"menu","value":"open"}
+> {"op":"simulate","id":2,"event":"menu","value":"zoom-in"}
+< {"type":"event","id":2,"event":"menu","value":"zoom-in"}
+> {"op":"simulate","id":3,"event":"menu","value":"copy"}
+< {"type":"event","id":3,"event":"menu","value":"copy"}
+# A disabled item, or one in a disabled submenu, does nothing; node 4 did not ask for menu.
+> {"op":"simulate","id":3,"event":"menu","value":"paste"}
+> {"op":"simulate","id":2,"event":"menu","value":"left"}
+> {"op":"simulate","id":4,"event":"menu","value":"copy"}
+# An item the node does not have, a node without menus, a missing value.
+> {"op":"simulate","id":3,"event":"menu","value":"open"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"menu","value":"copy"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"menu"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# setProps replaces the whole list; null removes it.
+> {"op":"setProps","id":3,"props":{"contextMenu":[{"id":"cut","label":"Cut"}]}}
+> {"op":"setProps","id":4,"props":{"contextMenu":null}}
+> {"op":"commit"}
+> {"op":"simulate","id":3,"event":"menu","value":"cut"}
+< {"type":"event","id":3,"event":"menu","value":"cut"}
+> {"op":"simulate","id":3,"event":"menu","value":"copy"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed lists are invalid_props.
+> {"op":"create","id":10,"type":"div","props":{"contextMenu":{"id":"copy","label":"Copy"}}}
+> {"op":"create","id":11,"type":"div","props":{"contextMenu":[{"id":"copy"}]}}
+> {"op":"create","id":12,"type":"div","props":{"contextMenu":[{"label":"Copy"}]}}
+> {"op":"create","id":13,"type":"div","props":{"contextMenu":[{"id":7,"label":"Copy"}]}}
+> {"op":"create","id":14,"type":"div","props":{"contextMenu":[{"id":"a","label":"A","disabled":"no"}]}}
+> {"op":"create","id":15,"type":"div","props":{"contextMenu":[{"id":"a","label":"A","icon":"no-such-icon"}]}}
+> {"op":"create","id":16,"type":"div","props":{"contextMenu":[{"label":"Sub","items":[{"label":"Deep"}]}]}}
+> {"op":"create","id":17,"type":"MenuBar","props":{"menus":[{"items":[]}]}}
+> {"op":"create","id":18,"type":"MenuBar","props":{"menus":[{"label":"File"}]}}
+> {"op":"create","id":19,"type":"Button","props":{"contextMenu":[{"id":"a","label":"A"}]}}
+> {"op":"create","id":20,"type":"div","props":{"contextMenu":[]}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

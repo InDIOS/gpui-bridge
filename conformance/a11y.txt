@@ -1,0 +1,29 @@
+# Section 16: the `a11y` prop (id, role, label and ARIA-like state) on any node.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"a11y":{"id":"save","role":"button","label":"Save","keyshortcuts":"ctrl-s"},"class":"p-2"},"events":["click"]}
+> {"op":"create","id":2,"type":"text","props":{"content":"Total","a11y":{"role":"status","label":"Total"}}}
+> {"op":"create","id":3,"type":"Button","props":{"label":"Add","a11y":{"description":"Adds one"}}}
+> {"op":"create","id":4,"type":"Slider","props":{"value":30,"a11y":{"role":"slider","label":"Volume","value":"30","min":0,"max":100,"step":5,"orientation":"horizontal"}}}
+> {"op":"create","id":5,"type":"Checkbox","props":{"checked":true,"a11y":{"checked":"mixed"}}}
+> {"op":"commit"}
+# A click still works on an accessible div.
+> {"op":"simulate","id":1,"event":"click"}
+< {"type":"event","id":1,"event":"click"}
+# A typo in a key, an unknown role and a wrong type are invalid_props.
+> {"op":"create","id":10,"type":"div","props":{"a11y":{"lable":"typo"}}}
+> {"op":"create","id":11,"type":"div","props":{"a11y":{"role":"widget"}}}
+> {"op":"create","id":12,"type":"div","props":{"a11y":{"checked":"yes"}}}
+> {"op":"create","id":13,"type":"div","props":{"a11y":{"level":0}}}
+> {"op":"create","id":14,"type":"div","props":{"a11y":"button"}}
+> {"op":"create","id":15,"type":"Button","props":{"a11y":{"selected":"yes"}}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# `null` removes the prop, like any other.
+> {"op":"setProps","id":1,"props":{"a11y":null}}
+> {"op":"commit"}

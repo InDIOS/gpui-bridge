@@ -1,0 +1,27 @@
+{
+  "name": "gpui-bridge",
+  "version": "0.1.0",
+  "description": "Node.js client for the gpui-bridge native UI host",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test test/*.test.ts",
+    "prepack": "tsc && node ../../scripts/stage-host.mjs --to node",
+    "postpack": "node -e \"require('fs').rmSync('bin',{recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ]
+}

@@ -1,0 +1,27 @@
+# Section 3: every window field is optional; updates send only what changes.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"class":"flex flex-col gap-2 p-4 bg-background unknown-class"}}
+> {"op":"window","title":"Test","width":400,"height":300,"root":1,"theme":"dark"}
+> {"op":"commit"}
+> {"op":"window","title":"Renamed"}
+> {"op":"window","theme":"light"}
+> {"op":"commit"}
+# A gpui-component theme file; a mode it does not define keeps the default theme.
+> {"op":"window","themeSet":{"name":"Brand","themes":[{"name":"Brand Dark","mode":"dark","radius":12,"font_family":"Segoe UI","colors":{"primary.background":"#ff6600","background":"neutral-950"}}]}}
+> {"op":"commit"}
+# A wrongly typed field inside the theme file rejects the whole message.
+> {"op":"window","themeSet":{"themes":[{"mode":"sepia"}]}}
+< {"type":"error","code":"invalid_json","op":"window"}
+> {"op":"window","themeSet":{"themes":"none"}}
+< {"type":"error","code":"invalid_json","op":"window"}
+# frameless is a boolean; windowControl one of drag, minimize, maximize, close (div only).
+> {"op":"window","frameless":true}
+> {"op":"window","frameless":"yes"}
+< {"type":"error","code":"invalid_json","op":"window"}
+> {"op":"create","id":2,"type":"div","props":{"windowControl":"drag"}}
+> {"op":"create","id":3,"type":"div","props":{"windowControl":"close"}}
+> {"op":"create","id":4,"type":"div","props":{"windowControl":"fullscreen"}}
+> {"op":"create","id":5,"type":"Button","props":{"windowControl":"close"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}

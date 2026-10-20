@@ -1,0 +1,25 @@
+# Rust (workspace target/)
+/target/
+
+# Node
+node_modules/
+packages/*/dist/
+examples/dist/
+# The host asset that `pnpm pack` puts in the tarball (scripts/stage-host.mjs).
+packages/client-node/bin/
+
+# Python
+__pycache__/
+*.pyc
+packages/client-python/dist/
+packages/client-python/build/
+*.egg-info/
+packages/client-python/gpui_bridge/bin/
+
+# Packaging
+*.tgz
+*.whl
+
+# Editor
+.vscode/
+.editorconfig

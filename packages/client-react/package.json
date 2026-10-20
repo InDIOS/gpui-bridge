@@ -1,0 +1,34 @@
+{
+  "name": "gpui-bridge-react",
+  "version": "0.1.0",
+  "description": "React renderer for gpui-bridge native UIs",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test dist/test/*.test.js",
+    "prepack": "tsc"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "peerDependencies": {
+    "gpui-bridge": "^0.1.0",
+    "react": "^19.3.0"
+  },
+  "dependencies": {
+    "react-reconciler": "0.34.0"
+  },
+  "devDependencies": {
+    "gpui-bridge": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-reconciler": "^0.34.0",
+    "react": "19.3.0",
+    "typescript": "7.0.2"
+  },
+  "files": [
+    "dist/src"
+  ]
+}

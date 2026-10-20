@@ -1,0 +1,5 @@
+# The host uses edition 2024 (Rust 1.85+). `components` keeps rustfmt and clippy
+# available for `cargo fmt --check` / `cargo clippy`, which CI runs.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

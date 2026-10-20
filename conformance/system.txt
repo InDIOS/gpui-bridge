@@ -1,0 +1,37 @@
+# Section 13: system actions. Without a window, dialogs and the clipboard answer null.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+# Actions run when they arrive, without a commit.
+> {"op":"openDialog","request":1,"files":true,"multiple":true,"prompt":"Open"}
+< {"type":"result","request":1,"paths":null}
+> {"op":"saveDialog","request":2,"directory":"C:\\","name":"new.txt"}
+< {"type":"result","request":2,"path":null}
+> {"op":"readClipboard","request":3}
+< {"type":"result","request":3,"text":null}
+> {"op":"writeClipboard","text":"hello"}
+> {"op":"openUrl","url":"https://example.com"}
+> {"op":"openPath","path":"C:\\nothing.txt"}
+# Malformed actions are invalid_json; a dialog must allow files or directories.
+> {"op":"openDialog"}
+< {"type":"error","code":"invalid_json","op":"openDialog"}
+> {"op":"openDialog","request":4,"files":false}
+< {"type":"error","code":"invalid_json","op":"openDialog","request":4}
+> {"op":"readClipboard","request":"six"}
+< {"type":"error","code":"invalid_json","op":"readClipboard"}
+> {"op":"saveDialog","request":7,"name":5}
+< {"type":"error","code":"invalid_json","op":"saveDialog","request":7}
+> {"op":"openDialog","request":5,"files":false,"directories":true}
+< {"type":"result","request":5,"paths":null}
+> {"op":"writeClipboard","text":5}
+< {"type":"error","code":"invalid_json","op":"writeClipboard"}
+> {"op":"openUrl"}
+< {"type":"error","code":"invalid_json","op":"openUrl"}
+# Files dropped on a div that asked for drop.
+> {"op":"create","id":1,"type":"div","events":["drop"]}
+> {"op":"create","id":2,"type":"div"}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"drop","value":["C:\\a.txt","C:\\b.png"]}
+< {"type":"event","id":1,"event":"drop","paths":["C:\\a.txt","C:\\b.png"]}
+> {"op":"simulate","id":2,"event":"drop","value":["C:\\a.txt"]}
+> {"op":"simulate","id":1,"event":"drop","value":"C:\\a.txt"}
+< {"type":"error","code":"invalid_json","op":"simulate"}

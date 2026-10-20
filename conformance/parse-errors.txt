@@ -1,0 +1,20 @@
+# Section 6: malformed lines are answered at once (no commit needed) and the host keeps going.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {not json
+< {"type":"error","code":"invalid_json"}
+> [1,2]
+< {"type":"error","code":"invalid_json"}
+> {"id":1}
+< {"type":"error","code":"unknown_op"}
+> {"op":"explode"}
+< {"type":"error","code":"unknown_op","op":"explode"}
+> {"op":"create","type":"div"}
+< {"type":"error","code":"invalid_json","op":"create"}
+> {"op":"remove","id":"three"}
+< {"type":"error","code":"invalid_json","op":"remove"}
+> {"op":"window","theme":"sepia"}
+< {"type":"error","code":"invalid_json","op":"window"}
+# Unknown fields are ignored: no answer.
+> {"op":"create","id":1,"type":"div","shiny":true}
+> {"op":"commit"}

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpui-bridge"
+version = "0.1.0"
+description = "Python client for the gpui-bridge native UI host"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: Microsoft :: Windows",
+  "Topic :: Software Development :: User Interfaces",
+]
+
+[tool.setuptools]
+packages = ["gpui_bridge"]
+
+[tool.setuptools.package-data]
+gpui_bridge = ["bin/*"]

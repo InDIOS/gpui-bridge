@@ -1,0 +1,26 @@
+{
+  "name": "gpui-bridge-monorepo",
+  "private": true,
+  "description": "Native desktop UIs driven from another language: Rust host + Node, React and Python clients",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "bootstrap": "pnpm install && cargo build -p gpui-bridge-host && pnpm build",
+    "host:build": "cargo build -p gpui-bridge-host",
+    "host:release": "cargo build -p gpui-bridge-host --release",
+    "build": "pnpm --filter gpui-bridge build && pnpm --filter gpui-bridge-react build",
+    "dev": "node scripts/dev.mjs",
+    "test": "pnpm test:host && pnpm test:node && pnpm test:react && pnpm test:python",
+    "test:host": "cargo test --workspace",
+    "test:node": "pnpm --filter gpui-bridge test",
+    "test:react": "pnpm --filter gpui-bridge-react test",
+    "test:python": "python -m unittest discover -s packages/client-python -t packages/client-python",
+    "conformance": "cargo test -p gpui-bridge-host --test conformance",
+    "stage": "node scripts/stage-host.mjs",
+    "pack:node": "pnpm host:release && node scripts/stage-host.mjs --to node && pnpm --dir packages/client-node pack",
+    "wheel": "pnpm host:release && node scripts/stage-host.mjs --to python && python packages/client-python/build_wheel.py",
+    "bench": "pwsh -File benchmarks/run.ps1"
+  }
+}

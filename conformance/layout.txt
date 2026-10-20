@@ -1,0 +1,59 @@
+# Section 17: form and layout components (NumberInput, OtpInput, Form, Field, GroupBox,
+# DescriptionList, StatusBar, Toolbar, Resizable) and the Calendar.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Form","props":{"direction":"vertical"}}
+> {"op":"create","id":2,"type":"Field","props":{"label":"Name","description":"As it will be shown","required":true},"events":["change"]}
+> {"op":"create","id":3,"type":"Input","props":{"placeholder":"Ana"}}
+> {"op":"create","id":4,"type":"NumberInput","props":{"value":"12","placeholder":"Quantity"},"events":["change","submit"]}
+> {"op":"create","id":5,"type":"OtpInput","props":{"length":6,"masked":true},"events":["change"]}
+> {"op":"create","id":6,"type":"Calendar","props":{"value":"2024-08-03","months":2,"weekStartsOn":"monday"},"events":["change"]}
+> {"op":"create","id":7,"type":"GroupBox","props":{"title":"Details","variant":"outline"}}
+> {"op":"create","id":8,"type":"DescriptionList","props":{"items":[{"label":"Plan","value":"Pro"},{"label":"Seats","value":"5","span":2}],"columns":2,"bordered":true}}
+> {"op":"create","id":9,"type":"StatusBar","props":{"left":"Ready","right":"UTF-8"}}
+> {"op":"create","id":10,"type":"Toolbar"}
+> {"op":"create","id":11,"type":"Button","props":{"label":"Bold","variant":"ghost"}}
+> {"op":"create","id":12,"type":"Resizable","props":{"axis":"horizontal","sizes":[220]}}
+> {"op":"create","id":13,"type":"div","props":{"class":"flex-1","a11y":{"role":"region","label":"Sidebar"}}}
+> {"op":"create","id":14,"type":"div","props":{"class":"flex-1","a11y":{"role":"region","label":"Content"}}}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":7,"child":8}
+> {"op":"append","parent":10,"child":11}
+> {"op":"append","parent":12,"child":13}
+> {"op":"append","parent":12,"child":14}
+> {"op":"commit"}
+# Edits, submits and the day chosen in the Calendar.
+> {"op":"simulate","id":4,"event":"change","value":"13"}
+< {"type":"event","id":4,"event":"change","value":"13"}
+> {"op":"simulate","id":4,"event":"submit","value":"13"}
+< {"type":"event","id":4,"event":"submit","value":"13"}
+> {"op":"simulate","id":5,"event":"change","value":"123456"}
+< {"type":"event","id":5,"event":"change","value":"123456"}
+> {"op":"simulate","id":5,"event":"submit","value":"123456"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":6,"event":"change","value":"2024-09-01"}
+< {"type":"event","id":6,"event":"change","value":"2024-09-01"}
+> {"op":"simulate","id":6,"event":"change","value":"2024-09-01"}
+> {"op":"simulate","id":6,"event":"change","value":"tomorrow"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# Malformed props are invalid_props.
+> {"op":"create","id":20,"type":"Form","props":{"direction":"diagonal"}}
+> {"op":"create","id":21,"type":"DescriptionList","props":{"items":[{"label":"Plan"}]}}
+> {"op":"create","id":22,"type":"DescriptionList","props":{"items":[{"label":"Plan","value":"Pro","span":0}]}}
+> {"op":"create","id":23,"type":"Resizable","props":{"axis":"diagonal"}}
+> {"op":"create","id":24,"type":"Resizable","props":{"sizes":[0,220]}}
+> {"op":"create","id":25,"type":"OtpInput","props":{"length":-1}}
+> {"op":"create","id":26,"type":"NumberInput","props":{"value":12}}
+> {"op":"create","id":27,"type":"GroupBox","props":{"variant":"fancy"}}
+> {"op":"create","id":28,"type":"StatusBar","props":{"left":1}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

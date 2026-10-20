@@ -1,0 +1,73 @@
+# Section 6 events, played with `simulate` (section 9; --no-window only).
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","events":["click"]}
+> {"op":"create","id":2,"type":"div"}
+> {"op":"create","id":3,"type":"Button","props":{"label":"Go"},"events":["click"]}
+> {"op":"create","id":4,"type":"Button","props":{"label":"Off","disabled":true},"events":["click"]}
+> {"op":"create","id":5,"type":"Checkbox","events":["change"]}
+> {"op":"create","id":6,"type":"Checkbox","props":{"controlled":true},"events":["change"]}
+> {"op":"create","id":7,"type":"Input","events":["change","submit"]}
+> {"op":"create","id":8,"type":"text","props":{"content":"hi"}}
+> {"op":"commit"}
+# Events are opt-in: only subscribed, enabled nodes report.
+> {"op":"simulate","id":1,"event":"click"}
+< {"type":"event","id":1,"event":"click"}
+> {"op":"simulate","id":2,"event":"click"}
+> {"op":"simulate","id":3,"event":"click"}
+< {"type":"event","id":3,"event":"click"}
+> {"op":"simulate","id":4,"event":"click"}
+# Synced checkbox: the host keeps the state, so a second click unchecks it.
+> {"op":"simulate","id":5,"event":"change"}
+< {"type":"event","id":5,"event":"change","checked":true}
+> {"op":"simulate","id":5,"event":"change"}
+< {"type":"event","id":5,"event":"change","checked":false}
+# Controlled checkbox: the host only reports; the state changes when the client sets it.
+> {"op":"simulate","id":6,"event":"change"}
+< {"type":"event","id":6,"event":"change","checked":true}
+> {"op":"simulate","id":6,"event":"change"}
+< {"type":"event","id":6,"event":"change","checked":true}
+> {"op":"setProps","id":6,"props":{"checked":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":6,"event":"change"}
+< {"type":"event","id":6,"event":"change","checked":false}
+# Input: change and submit carry the text.
+> {"op":"simulate","id":7,"event":"change","value":"buy milk"}
+< {"type":"event","id":7,"event":"change","value":"buy milk"}
+> {"op":"simulate","id":7,"event":"submit","value":"buy milk"}
+< {"type":"event","id":7,"event":"submit","value":"buy milk"}
+# simulate acts on the committed tree: a pending setEvents or create does not count yet.
+> {"op":"setEvents","id":2,"events":["click"]}
+> {"op":"create","id":9,"type":"Button","events":["click"]}
+> {"op":"simulate","id":2,"event":"click"}
+> {"op":"simulate","id":9,"event":"click"}
+< {"type":"error","code":"unknown_node","op":"simulate"}
+> {"op":"commit"}
+> {"op":"simulate","id":2,"event":"click"}
+< {"type":"event","id":2,"event":"click"}
+> {"op":"simulate","id":9,"event":"click"}
+< {"type":"event","id":9,"event":"click"}
+# Errors: unknown node, an event the type does not have, missing fields.
+> {"op":"simulate","id":99,"event":"click"}
+< {"type":"error","code":"unknown_node","op":"simulate"}
+> {"op":"simulate","id":8,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":4,"event":"submit"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":7,"event":"change"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":1}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# The user closing windows: each reports its id; the host exits after the last one (code 0) and ignores the rest.
+> {"op":"window","root":1}
+> {"op":"window","id":2,"root":3}
+> {"op":"commit"}
+> {"op":"simulate","event":"windowClosed","id":2}
+< {"type":"windowClosed","id":2}
+> {"op":"simulate","event":"windowClosed","id":2}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"click"}
+< {"type":"event","id":3,"event":"click"}
+> {"op":"simulate","event":"windowClosed"}
+< {"type":"windowClosed","id":1}
+> {"op":"commit"}

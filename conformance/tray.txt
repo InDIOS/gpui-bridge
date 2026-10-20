@@ -1,0 +1,47 @@
+# Section 11: the system tray icon, its events, and how it keeps the host running.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+# Nothing to remove or click yet.
+> {"op":"removeTray"}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"removeTray"}
+> {"op":"simulate","event":"trayClick"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed tray messages are invalid_json.
+> {"op":"tray","tooltip":5}
+< {"type":"error","code":"invalid_json","op":"tray"}
+> {"op":"tray","menu":[{"label":"No id"}]}
+> {"op":"tray","menu":{"id":"quit","label":"Quit"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_json","op":"tray"}
+< {"type":"error","code":"invalid_json","op":"tray"}
+# A tray with a menu (same items as contextMenu); a click and menu choices are reported.
+> {"op":"tray","icon":"no-such-icon.png","tooltip":"My app","menu":[{"id":"show","label":"Show"},{"label":"More","items":[{"id":"about","label":"About"}]},{"id":"pause","label":"Pause","disabled":true},{"separator":true},{"id":"quit","label":"Quit"}]}
+> {"op":"commit"}
+> {"op":"simulate","event":"trayClick"}
+< {"type":"tray","event":"click"}
+> {"op":"simulate","event":"trayMenu","value":"about"}
+< {"type":"tray","event":"menu","value":"about"}
+# A disabled item does nothing; an unknown one or a missing value is an error.
+> {"op":"simulate","event":"trayMenu","value":"pause"}
+> {"op":"simulate","event":"trayMenu","value":"nope"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","event":"trayMenu"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# An update merges: the menu stays when only the tooltip changes.
+> {"op":"tray","tooltip":"My app (busy)"}
+> {"op":"commit"}
+> {"op":"simulate","event":"trayMenu","value":"quit"}
+< {"type":"tray","event":"menu","value":"quit"}
+# With a tray, closing the last window does not end the host.
+> {"op":"create","id":1,"type":"div"}
+> {"op":"window","title":"Main","root":1}
+> {"op":"commit"}
+> {"op":"simulate","event":"windowClosed"}
+< {"type":"windowClosed","id":1}
+> {"op":"simulate","event":"trayClick"}
+< {"type":"tray","event":"click"}
+# Removing the tray with no window open ends the host: the last line would answer an error otherwise.
+> {"op":"removeTray"}
+> {"op":"commit"}
+> {"op":"simulate","event":"trayClick"}

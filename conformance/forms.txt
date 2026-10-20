@@ -1,0 +1,66 @@
+# Section 5: form controls (Switch, RadioGroup, Select, Slider, Textarea), their props and change events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Switch","props":{"label":"Wi-Fi","checked":true},"events":["change"]}
+> {"op":"create","id":2,"type":"RadioGroup","props":{"options":[{"value":"s","label":"Small"},{"value":"m","label":"Medium"},{"value":"l","label":"Large","disabled":true}],"value":"s","direction":"horizontal"},"events":["change"]}
+> {"op":"create","id":3,"type":"Select","props":{"options":[{"value":"uy","label":"Uruguay"},{"value":"ar","label":"Argentina"}],"placeholder":"Country","searchable":true},"events":["change"]}
+> {"op":"create","id":4,"type":"Slider","props":{"min":0,"max":10,"step":0.5,"value":2},"events":["change"]}
+> {"op":"create","id":5,"type":"Textarea","props":{"placeholder":"Notes","value":"line 1"},"events":["change"]}
+> {"op":"commit"}
+# Synced (default): each change is kept in the host, so the same choice again is not a change.
+> {"op":"simulate","id":1,"event":"change"}
+< {"type":"event","id":1,"event":"change","checked":false}
+> {"op":"simulate","id":2,"event":"change","value":"m"}
+< {"type":"event","id":2,"event":"change","value":"m"}
+> {"op":"simulate","id":2,"event":"change","value":"m"}
+> {"op":"simulate","id":3,"event":"change","value":"ar"}
+< {"type":"event","id":3,"event":"change","value":"ar"}
+> {"op":"simulate","id":4,"event":"change","value":7.5}
+< {"type":"event","id":4,"event":"change","value":7.5}
+> {"op":"simulate","id":5,"event":"change","value":"line 1\nline 2"}
+< {"type":"event","id":5,"event":"change","value":"line 1\nline 2"}
+# A disabled option does nothing; an unknown option, a value out of range or of the wrong type is an error.
+> {"op":"simulate","id":2,"event":"change","value":"l"}
+> {"op":"simulate","id":2,"event":"change","value":"xl"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"change","value":"br"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":4,"event":"change","value":11}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":4,"event":"change","value":"5"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":5,"event":"submit","value":"x"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Controlled: the host reports the request but keeps the client's value, so asking again reports again.
+> {"op":"setProps","id":3,"props":{"controlled":true,"value":"uy"}}
+> {"op":"commit"}
+> {"op":"simulate","id":3,"event":"change","value":"ar"}
+< {"type":"event","id":3,"event":"change","value":"ar"}
+> {"op":"simulate","id":3,"event":"change","value":"ar"}
+< {"type":"event","id":3,"event":"change","value":"ar"}
+# Disabled controls send nothing.
+> {"op":"setProps","id":4,"props":{"disabled":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":4,"event":"change","value":1}
+# Malformed props are invalid_props.
+> {"op":"create","id":10,"type":"RadioGroup","props":{"options":[{"value":"a"}]}}
+> {"op":"create","id":11,"type":"RadioGroup","props":{"options":{"value":"a","label":"A"}}}
+> {"op":"create","id":12,"type":"RadioGroup","props":{"direction":"diagonal"}}
+> {"op":"create","id":13,"type":"Select","props":{"options":[{"value":1,"label":"One"}]}}
+> {"op":"create","id":14,"type":"Select","props":{"searchable":"yes"}}
+> {"op":"create","id":15,"type":"Slider","props":{"value":"5"}}
+> {"op":"create","id":16,"type":"Slider","props":{"step":0}}
+> {"op":"create","id":17,"type":"Switch","props":{"checked":1}}
+> {"op":"create","id":18,"type":"Textarea","props":{"value":5}}
+> {"op":"create","id":19,"type":"Select","props":{"options":[{"value":"a","label":"A","disabled":"no"}]}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

@@ -1,0 +1,66 @@
+# Section 17: basic components (Alert, Badge, Tag, Kbd, Progress, Spinner, Skeleton, Rating,
+# Pagination, Collapsible, Accordion, Avatar, Stepper), their props and their events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Alert","props":{"message":"Saved","title":"Done","variant":"success","closable":true},"events":["close"]}
+> {"op":"create","id":2,"type":"Badge","props":{"count":120,"max":99}}
+> {"op":"create","id":3,"type":"Tag","props":{"label":"beta","variant":"info","outline":true}}
+> {"op":"create","id":4,"type":"Kbd","props":{"keys":"ctrl-s"}}
+> {"op":"create","id":5,"type":"Progress","props":{"value":40,"loading":false}}
+> {"op":"create","id":6,"type":"Spinner"}
+> {"op":"create","id":7,"type":"Skeleton","props":{"secondary":true}}
+> {"op":"create","id":8,"type":"Rating","props":{"value":2,"max":5},"events":["change"]}
+> {"op":"create","id":9,"type":"Pagination","props":{"page":1,"total":10},"events":["change"]}
+> {"op":"create","id":10,"type":"Collapsible","props":{"open":true}}
+> {"op":"create","id":11,"type":"Accordion","props":{"multiple":true,"items":[{"id":"a","title":"First","content":"Body","open":true},{"id":"b","title":"Second"}]},"events":["change"]}
+> {"op":"create","id":12,"type":"Avatar","props":{"name":"Ana"}}
+> {"op":"create","id":13,"type":"Stepper","props":{"value":"one","items":[{"value":"one","label":"One"},{"value":"two","label":"Two","disabled":true}]},"events":["change"]}
+> {"op":"commit"}
+# Synced (default): the choice is kept in the host, so the same one again is not a change.
+> {"op":"simulate","id":8,"event":"change","value":4}
+< {"type":"event","id":8,"event":"change","value":4}
+> {"op":"simulate","id":8,"event":"change","value":4}
+> {"op":"simulate","id":9,"event":"change","value":3}
+< {"type":"event","id":9,"event":"change","value":3}
+> {"op":"simulate","id":9,"event":"change","value":3}
+# Out of range is a bad message; a disabled step does nothing.
+> {"op":"simulate","id":8,"event":"change","value":6}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":9,"event":"change","value":11}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":13,"event":"change","value":"two"}
+> {"op":"simulate","id":13,"event":"change","value":"three"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# A section toggles: open, close; an unknown one is an error.
+> {"op":"simulate","id":11,"event":"change","value":"b"}
+< {"type":"event","id":11,"event":"change","value":"b"}
+> {"op":"simulate","id":11,"event":"change","value":"b"}
+< {"type":"event","id":11,"event":"change","value":"b"}
+> {"op":"simulate","id":11,"event":"change","value":"z"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"close"}
+< {"type":"event","id":1,"event":"close"}
+# A component with events it does not have.
+> {"op":"simulate","id":2,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed props are invalid_props.
+> {"op":"create","id":20,"type":"Alert","props":{"variant":"loud"}}
+> {"op":"create","id":21,"type":"Rating","props":{"value":-1}}
+> {"op":"create","id":22,"type":"Pagination","props":{"total":"ten"}}
+> {"op":"create","id":23,"type":"Accordion","props":{"items":[{"id":"a"}]}}
+> {"op":"create","id":24,"type":"Accordion","props":{"items":[{"id":"a","title":"A","open":"yes"}]}}
+> {"op":"create","id":25,"type":"Stepper","props":{"items":[{"value":"a"}]}}
+> {"op":"create","id":26,"type":"Kbd","props":{"keys":5}}
+> {"op":"create","id":27,"type":"Progress","props":{"value":"half"}}
+> {"op":"create","id":28,"type":"Badge","props":{"count":1.5}}
+> {"op":"create","id":29,"type":"Spinner","props":{"variant":"fast"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
