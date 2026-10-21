@@ -957,6 +957,12 @@ Python 3.12, Rust 1.99.1):
 verde de CI en `dev` y `main`, proteger `main` exigiendo CI y revisión, y crear los secretos
 `NPM_TOKEN` y `TWINE_*` solo cuando se decida publicar (M5).
 
+- **CI en verde (2026-10-21).** El primer run falló solo en `pack`: PowerShell no expande globs
+  para comandos nativos, así que `tar.exe` recibía `packages/client-node/gpui-bridge-*.tgz` literal.
+  El step ahora lista el tarball con `Get-ChildItem`, falla si falta `bin/gpui-bridge-host.exe` o
+  `bin/host.json` y comprueba lo mismo en el wheel. Tras el arreglo, `dev` pasó en `host`, `clients`
+  y `pack`. Proteger `main` sigue pendiente, para cuando el repositorio sea público.
+
 ### Fase 28 — Ventanas: posición, tamaño mínimo, minimizar/restaurar y eventos (2026-10-21)
 
 Primer hito de la hoja de ruta M0–M6 ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1). No sube
@@ -1027,6 +1033,9 @@ restaurar sin cerrar; eventos de foco, redimensionado, movimiento y visibilidad,
   vea en 80,80, que no baje de 320x220, que el texto de geometría siga al redimensionado y que el
   botón minimice y restaure. Lo automático cubre el protocolo y los eventos; el dibujo, el mouse y
   el tamaño mínimo en pantalla no.
+- **Prueba visual del usuario (2026-10-21).** `pnpm dev windows` pasó los tres puntos: la ventana
+  abre en 80,80, no baja de 320x220, el texto de geometría sigue al redimensionado y el botón
+  minimiza y restaura a 1 s. Con eso M0 y M1 quedan cerrados en la hoja de ruta.
 - **Fuera de este paso:** mover o redimensionar la ventana desde el cliente después de abrirla
   (`x`/`y`/`minWidth`/`minHeight` se leen solo al abrir, y avisan por stderr si cambian), ocultar
   de verdad (GPUI no lo expone), estado maximizado/pantalla completa en el protocolo, y eventos de
