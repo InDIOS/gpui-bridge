@@ -1,11 +1,11 @@
 <p align="center">
-  <img width="611" height="367" alt="Gemini_Generated_Image_w1inolw1inolw1in" src="https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259" />
+  <img width="611" height="367" alt="gpui-bridge logo" src="https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259" />
 </p>
 
 <h1 align="center">gpui-bridge</h1>
 
 Native desktop UIs with [GPUI](https://www.gpui.rs/) (the UI framework of the Zed editor) and
-[gpui-kit](https://github.com/longbridge/gpui-kit), driven from another language.
+[gpui-kit](https://gpui-kit.com/), driven from another language.
 
 A Rust **host** owns the window, the event loop and the component tree. A **client** in your
 language describes the UI as operations on that tree (create a node, set props, append a
