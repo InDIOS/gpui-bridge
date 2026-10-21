@@ -2,6 +2,26 @@
   "name": "gpui-bridge-react",
   "version": "0.1.0",
   "description": "React renderer for gpui-bridge native UIs",
+  "license": "MIT",
+  "author": "gpui-bridge contributors",
+  "keywords": [
+    "gpui",
+    "gpui-component",
+    "native",
+    "desktop",
+    "ui",
+    "react",
+    "renderer"
+  ],
+  "homepage": "https://github.com/InDIOS/gpui-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InDIOS/gpui-bridge.git",
+    "directory": "packages/client-react"
+  },
+  "bugs": {
+    "url": "https://github.com/InDIOS/gpui-bridge/issues"
+  },
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -17,6 +37,8 @@
     "gpui-bridge": "^0.1.0",
     "react": "^19.3.0"
   },
+  "os": ["win32"],
+  "cpu": ["x64"],
   "dependencies": {
     "react-reconciler": "0.34.0"
   },

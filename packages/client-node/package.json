@@ -2,6 +2,26 @@
   "name": "gpui-bridge",
   "version": "0.1.0",
   "description": "Node.js client for the gpui-bridge native UI host",
+  "license": "MIT",
+  "author": "gpui-bridge contributors",
+  "keywords": [
+    "gpui",
+    "gpui-component",
+    "native",
+    "desktop",
+    "ui",
+    "node",
+    "typescript"
+  ],
+  "homepage": "https://github.com/InDIOS/gpui-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InDIOS/gpui-bridge.git",
+    "directory": "packages/client-node"
+  },
+  "bugs": {
+    "url": "https://github.com/InDIOS/gpui-bridge/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -52,9 +52,14 @@ ignored); `pnpm-workspace.yaml` holds the pnpm workspace and the only lockfile.
 ## Checks before a commit
 
 ```sh
-cargo clippy --workspace --all-targets
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
 pnpm test
+pnpm --filter gpui-bridge-examples typecheck
 ```
+
+CI (`.github/workflows/ci.yml`) runs exactly these plus the packaging job, on the Rust version
+pinned in `rust-toolchain.toml`.
 
 Packaging changes also need `pnpm pack:node` and `pnpm wheel`, then installing the tarball and the
 wheel **outside the repository** and running an example without `GPUI_BRIDGE_HOST`.

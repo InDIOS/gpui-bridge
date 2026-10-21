@@ -900,3 +900,60 @@ fuera y se dejó el análisis en [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONE
 No se tocó código en este paso: la lista de tipos de nodo sigue en 40 (PROTOCOL.md §5). El
 documento quedó enlazado desde la §8 del plan y desde el README.
 
+### Extra — Estabilización del repositorio (2026-10-21)
+
+El repositorio pasó a tener `origin` (<https://github.com/InDIOS/gpui-bridge>). Antes de elegir el
+siguiente hito se cerró lo que faltaba para que un checkout y CI sean reproducibles y para que los
+paquetes puedan publicarse sin arreglos manuales. No cambia el protocolo ni el host.
+
+**Verificación de partida** (todo en verde en esta máquina, Windows x64, Node 24.22, pnpm 12.4.2,
+Python 3.12, Rust 1.99.1):
+
+- `cargo test --workspace`: 48 unitarios, la transcripción de conformidad y `no_window`.
+- `cargo clippy --workspace --all-targets -- -D warnings` y `cargo fmt --all -- --check`, limpios.
+- `pnpm test:node` 17/17, `pnpm test:react` 14/14, `pnpm test:python` 17/17.
+- `pnpm --filter gpui-bridge-examples typecheck`, limpio.
+- `gpui-bridge-host --version` → `0.1.0 (windows-x86_64, protocol 1)`, en debug y en release.
+
+**Cambios**
+
+- **Metadatos de publicación:** `license`, `author`, `keywords`, `homepage`, `repository` (con
+  `directory`) y `bugs` en los dos `package.json`; `authors`, `keywords`, `[project.urls]` y más
+  classifiers en `pyproject.toml`. `gpui-bridge-react` declara `os: ["win32"]` y `cpu: ["x64"]`
+  como el cliente de Node, para fallar al instalar en vez de al abrir una ventana.
+- **Enlaces:** `OWNER` reemplazado por `InDIOS` en los README de los paquetes; `RELEASING.md` ya
+  no pide ese reemplazo y explica dónde vive el nombre del repositorio.
+- **`.gitattributes` nuevo:** `* text=auto eol=lf` (el índice ya estaba en LF, pero 51 archivos
+  llegaban al working tree en CRLF en Windows) y binarios declarados (`*.png`, `*.exe`, `*.whl`,
+  `*.tgz`), para que un checkout en macOS/Linux produzca los mismos bytes y las transcripciones de
+  `conformance/` se comparen igual.
+- **Rust fijado:** `rust-toolchain.toml` pasa de `stable` a `1.99.1`, la versión con la que se
+  verificó; CI usa la misma (`RUST_VERSION` en `ci.yml`). Se suben juntas.
+- **CI:** `cargo fmt --all -- --check` (el `rust-toolchain.toml` decía que CI lo corría y no era
+  cierto), `clippy ... -- -D warnings`, `--locked` en clippy/test/build, `timeout-minutes` por job
+  y `concurrency` para cancelar runs viejos de la misma rama.
+- **`CONTRIBUTING.md`:** los checks previos a un commit son los que corre CI, más el type-check de
+  los ejemplos.
+- **Plantillas de GitHub:** `.github/PULL_REQUEST_TEMPLATE.md` repite las reglas de
+  `CONTRIBUTING.md` como checklist (protocolo, fmt, clippy, tests, empaquetado, historial) y
+  `.github/ISSUE_TEMPLATE/bug_report.md` pide `bin/host.json`, la versión del cliente y los logs
+  de stderr.
+- **Plan §8:** se agregó la hoja de ruta propuesta (M0–M6) con criterios de aceptación e impacto en
+  el protocolo; los puntos del backlog anterior quedan como catálogo en §8.2.
+
+**Verificación del empaquetado** (fuera del repositorio, sin `GPUI_BRIDGE_HOST`):
+
+- `pnpm pack:node` → `gpui-bridge-0.1.0.tgz` (7.8 MB) con `bin/gpui-bridge-host.exe` y
+  `bin/host.json` (`0.1.0`, protocolo 1, `win32-x64`). Instalado con npm en una carpeta temporal:
+  `createApp({ headless: true })`, dos `commit` y `close()` → handshake y salida 0.
+- `pnpm wheel` → `gpui_bridge-0.1.0-py3-none-win_amd64.whl` (7.8 MB), instalado en un venv
+  temporal: `App(headless=True)`, dos `commit` y `close()` → salida 0.
+- La primera pasada del wheel falló y eso evitó un bug publicado: el classifier
+  `License :: OSI Approved :: MIT License` choca con `license = "MIT"` + `license-files` de
+  PEP 639 (setuptools ≥ 77 lo rechaza). Se quitó el classifier; la expresión de licencia queda
+  como única fuente.
+
+**Pendiente fuera del repositorio** (no se puede hacer desde un commit): confirmar el primer run
+verde de CI en `dev` y `main`, proteger `main` exigiendo CI y revisión, y crear los secretos
+`NPM_TOKEN` y `TWINE_*` solo cuando se decida publicar (M5).
+

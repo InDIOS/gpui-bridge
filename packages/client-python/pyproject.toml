@@ -10,11 +10,25 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [{ name = "gpui-bridge contributors" }]
+keywords = ["gpui", "gpui-component", "native", "desktop", "ui"]
 classifiers = [
-  "Programming Language :: Python :: 3",
+  "Development Status :: 3 - Alpha",
+  "Environment :: Win32 (MS Windows)",
   "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: User Interfaces",
 ]
+
+[project.urls]
+Homepage = "https://github.com/InDIOS/gpui-bridge#readme"
+Repository = "https://github.com/InDIOS/gpui-bridge"
+Issues = "https://github.com/InDIOS/gpui-bridge/issues"
+Protocol = "https://github.com/InDIOS/gpui-bridge/blob/main/docs/PROTOCOL.md"
 
 [tool.setuptools]
 packages = ["gpui_bridge"]

@@ -45,9 +45,10 @@ with; include it in a bug report.
 
 ## Links
 
-- [Protocol specification](https://github.com/OWNER/gpui-bridge/blob/main/docs/PROTOCOL.md),
+- [Protocol specification](https://github.com/InDIOS/gpui-bridge/blob/main/docs/PROTOCOL.md),
   for writing a client in another language.
 - [React renderer](https://www.npmjs.com/package/gpui-bridge-react) on top of this client.
-- Examples and the rest of the repository: see the project README.
+- Examples and the rest of the repository:
+  [InDIOS/gpui-bridge](https://github.com/InDIOS/gpui-bridge).
 
 Protocol version 1. MIT licensed.

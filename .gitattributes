@@ -1,0 +1,10 @@
+# Normalize line endings in the repository, so a Windows checkout and a macOS/Linux
+# checkout produce the same bytes (the conformance transcripts are compared line by line).
+* text=auto eol=lf
+
+# Binary assets: never convert, never diff.
+*.png binary
+*.ico binary
+*.exe binary
+*.whl binary
+*.tgz binary

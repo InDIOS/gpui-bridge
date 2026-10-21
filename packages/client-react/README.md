@@ -35,6 +35,7 @@ asset, then a Cargo build in a checkout. `render` accepts the same host options.
 ## Links
 
 - [gpui-bridge](https://www.npmjs.com/package/gpui-bridge), the underlying client.
-- [React examples](https://github.com/OWNER/gpui-bridge/tree/main/examples/react).
+- [React examples](https://github.com/InDIOS/gpui-bridge/tree/main/examples/react).
+- [Source and issues](https://github.com/InDIOS/gpui-bridge).
 
 Protocol version 1. MIT licensed.

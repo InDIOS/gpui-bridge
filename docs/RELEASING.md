@@ -46,9 +46,11 @@ CI (`release.yml`) does 1–4 for tags and publishes when `NPM_TOKEN` and `TWINE
 
 ## Before the first public release
 
-- Replace `OWNER` in the package READMEs with the GitHub organization (links).
 - Package names are `gpui-bridge`, `gpui-bridge-react` and `gpui-bridge` (PyPI): renaming them is a
   breaking change for every README and example, so decide now.
+- Metadata is already pointed at <https://github.com/InDIOS/gpui-bridge> (`repository`,
+  `homepage`, `bugs` in both `package.json`, `[project.urls]` in `pyproject.toml`). If the
+  organization or repository name changes, update those three files plus the package READMEs.
 - The host is Windows-only today. Adding macOS/Linux means a host build per platform, one asset
   folder per platform in `bin/` (the client already resolves `bin/<platform>-<arch>/`), and
   per-platform wheel tags. Consider per-platform npm packages (`optionalDependencies`) when the
