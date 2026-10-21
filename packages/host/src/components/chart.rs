@@ -169,9 +169,9 @@ pub fn sync<V: 'static>(
     }
 }
 
-/// The most category labels an axis draws, spread evenly: gpui-component labels every point by
-/// default, and a thousand of them overlap into a solid bar.
-const MAX_LABELS: usize = 12;
+/// Category labels an axis draws unless `xTicks` says otherwise, spread evenly: gpui-component
+/// labels every point by default, and a thousand of them overlap into a solid bar.
+const TICKS: usize = 12;
 
 fn flag(node: &Node, key: &str, default: bool) -> bool {
     node.props
@@ -187,17 +187,24 @@ fn number(node: &Node, key: &str) -> Option<f64> {
         .filter(|value| value.is_finite())
 }
 
+/// `xTicks`: 0 draws none, and one at or above the number of points labels them all.
+fn ticks(node: &Node) -> usize {
+    node.props
+        .get("xTicks")
+        .and_then(Value::as_u64)
+        .map_or(TICKS, |count| count as usize)
+}
+
 fn name(node: &Node) -> Option<&str> {
     node.props.get("name").and_then(Value::as_str)
 }
 
-/// A line: `curve` (`linear`, `natural` or `step`), `dot`, `xAxis`, `yAxis`, `grid`,
+/// A line: `curve` (`linear`, `natural` or `step`), `dot`, `xAxis`, `xTicks`, `yAxis`, `grid`,
 /// `yMin`/`yMax` and `interactive`.
 fn line_chart(id: NodeId, node: &Node, data: Vec<Datum>, stroke: Hsla) -> AnyElement {
-    let labels = data.len().min(MAX_LABELS);
     let mut chart = LineChart::new(data)
         .id(("chart", id))
-        .x_tick_count(labels)
+        .x_tick_count(ticks(node))
         .x(|datum: &Datum| datum.label.clone())
         .y(|datum: &Datum| datum.value)
         .stroke(stroke)
@@ -224,13 +231,12 @@ fn line_chart(id: NodeId, node: &Node, data: Vec<Datum>, stroke: Hsla) -> AnyEle
     chart.into_any_element()
 }
 
-/// Bars: `horizontal`, `xAxis` (the label axis), `yAxis` (the value axis), `grid` and
+/// Bars: `horizontal`, `xAxis` and `xTicks` (the label axis), `yAxis` (the value axis), `grid` and
 /// `interactive`.
 fn bar_chart(id: NodeId, node: &Node, data: Vec<Datum>, fill: Hsla) -> AnyElement {
-    let labels = data.len().min(MAX_LABELS);
     let mut chart = BarChart::new(data)
         .id(("chart", id))
-        .band_tick_count(labels)
+        .band_tick_count(ticks(node))
         .band(|datum: &Datum| datum.label.clone())
         .value(|datum: &Datum| datum.value)
         .fill(move |_: &Datum, _: Bounds<f32>, _: Bounds<f32>, _: BarAlignment| fill)
@@ -288,7 +294,7 @@ pub fn build(id: NodeId, node: &Node, slot: &ChartSlot, theme: &Theme) -> AnyEle
 #[cfg(test)]
 mod tests {
     // Not `super::*`: gpui's own `test` attribute would shadow the standard one.
-    use super::{Kind, check_data, parse};
+    use super::{Kind, TICKS, check_data, parse, ticks};
     use crate::schema::NodeType;
     use crate::tree::Node;
     use serde_json::{Value, json};
@@ -326,6 +332,13 @@ mod tests {
         assert_eq!(data[999].label.as_ref(), "p999");
         assert_eq!(data[999].value, 999.);
         assert_eq!(data[999].index, 999);
+    }
+
+    #[test]
+    fn x_ticks_defaults_to_twelve() {
+        assert_eq!(ticks(&node(json!({}))), TICKS);
+        assert_eq!(ticks(&node(json!({"xTicks": 0}))), 0);
+        assert_eq!(ticks(&node(json!({"xTicks": 5}))), 5);
     }
 
     #[test]

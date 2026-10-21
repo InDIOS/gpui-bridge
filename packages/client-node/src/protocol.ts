@@ -769,6 +769,8 @@ export interface ChartProps {
   horizontal?: boolean;
   /** The category axis (of a line or the bars); default true. */
   xAxis?: boolean;
+  /** How many category labels, spread evenly; default 12, 0 none. */
+  xTicks?: number;
   /** The value axis; default false. */
   yAxis?: boolean;
   /** The grid lines; default true. */

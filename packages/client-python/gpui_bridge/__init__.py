@@ -408,7 +408,7 @@ class App:
 
     def chart(self, **props) -> Node:
         """A chart: `chart` (line, bar, pie), `data` ([{"label", "value"}]), `color`, `name`,
-        plus the options of each plot (`curve`, `dot`, `horizontal`, `xAxis`, `yAxis`, `grid`,
+        plus the options of each plot (`curve`, `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `grid`,
         `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`). It has no events."""
         return self._create("Chart", props)
 

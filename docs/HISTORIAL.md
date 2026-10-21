@@ -1174,8 +1174,9 @@ profundo.
   niveles (2047 items).
 - **Tres fallos que destapó la prueba en ventana real** y que ningún test sin ventana ve:
   - **Las 1000 etiquetas del eje x** se dibujaban todas (gpui-component etiqueta cada punto por
-    defecto) y formaban una barra negra. El host fija ahora `x_tick_count`/`band_tick_count` a
-    12 como máximo, repartidas del primer punto al último; sin prop nueva.
+    defecto) y formaban una barra negra. El host pasa ahora `x_tick_count`/`band_tick_count`:
+    12 etiquetas por defecto, repartidas del primer punto al último, y el prop `xTicks` (entero
+    desde 0) deja al cliente elegir el número (0 ninguna; uno mayor que los puntos, todas).
   - **`padAngle` está en radianes** (`Pie` de gpui-base trabaja sobre `TAU`). El ejemplo y la
     transcripción usaban `2` (≈115°), que se tragaba toda porción menor: solo se veía la de
     Rust, aunque el hover sí encontraba las otras. Se documenta la unidad y el ejemplo pasa a
@@ -1188,8 +1189,8 @@ profundo.
   «Toggle sidebar» lo pliega a iconos; «Refresh the series» reenvía los 1000 puntos (0,6 ms en
   el cliente) y la línea se redibuja; el árbol de 10 niveles se ve con tres niveles abiertos y un
   clic expande `b`. Sin pánicos en el stderr del host.
-- **Verificación automática:** 57 unitarios del host, las 22 transcripciones de `conformance/`,
+- **Verificación automática:** 58 unitarios del host, las 22 transcripciones de `conformance/`,
   `no_window`, 21 tests de Node, 17 de React y 21 de Python; `clippy -D warnings`, `fmt` y el
   type-check de los ejemplos, limpios.
-- **Fuera de este paso:** varias series por gráfico, leyenda, gráficos de área/radar/velas, un
-  prop para el número de etiquetas del eje, y eventos de clic en puntos o porciones.
+- **Fuera de este paso:** varias series por gráfico, leyenda, gráficos de área/radar/velas y
+  eventos de clic en puntos o porciones.

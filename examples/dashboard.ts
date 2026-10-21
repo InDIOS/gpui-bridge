@@ -58,6 +58,7 @@ const line = app.chart({
   data: series(seed),
   curve: "natural",
   yAxis: true,
+  xTicks: 6,
   a11y: { label: "Request rate, 1000 points" },
   class: "h-56 w-full border border-border rounded-md",
 });

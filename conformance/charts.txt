@@ -2,7 +2,7 @@
 > {"op":"hello","protocol":1}
 < {"type":"ready","protocol":1}
 > {"op":"create","id":1,"type":"Sidebar","props":{"items":[{"label":"General","items":[{"id":"dashboard","label":"Dashboard","icon":"layout-dashboard"},{"id":"inbox","label":"Inbox","icon":"inbox"},{"id":"soon","label":"Soon","disabled":true}]},{"items":[{"id":"settings","label":"Settings","open":true,"children":[{"id":"theme","label":"Theme"}]}]}],"value":"dashboard"},"events":["change"]}
-> {"op":"create","id":2,"type":"Chart","props":{"chart":"line","data":[{"label":"Mon","value":12},{"label":"Tue","value":18},{"label":"Wed","value":9}],"color":"primary","name":"Visits","dot":true,"yAxis":true}}
+> {"op":"create","id":2,"type":"Chart","props":{"chart":"line","data":[{"label":"Mon","value":12},{"label":"Tue","value":18},{"label":"Wed","value":9}],"color":"primary","name":"Visits","dot":true,"yAxis":true,"xTicks":2}}
 > {"op":"create","id":3,"type":"Chart","props":{"chart":"bar","data":[{"label":"Mon","value":12},{"label":"Tue","value":18}],"horizontal":true,"color":"chart-3"}}
 > {"op":"create","id":4,"type":"Chart","props":{"chart":"pie","data":[{"label":"Rust","value":60},{"label":"TypeScript","value":30}],"innerRadius":40,"padAngle":0.03}}
 > {"op":"commit"}
@@ -37,7 +37,9 @@
 > {"op":"create","id":17,"type":"Chart","props":{"color":"chart-9"}}
 > {"op":"create","id":18,"type":"Chart","props":{"curve":"wobbly"}}
 > {"op":"create","id":19,"type":"Chart","props":{"yMin":"low"}}
+> {"op":"create","id":20,"type":"Chart","props":{"xTicks":-1}}
 > {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
