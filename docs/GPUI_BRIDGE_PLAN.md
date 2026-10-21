@@ -242,9 +242,10 @@ Acordado el 2026-10-19: primero se cierran los cabos sueltos que quedaron sin ve
 estado en [HISTORIAL.md](HISTORIAL.md), "Extra — Cabos sueltos"), de a uno y con revisión entre
 cada uno; recién después se elige de esta lista. Se para después de cada iteración.
 
-Sin orden acordado para el resto; se eligen con el usuario y se hacen con las reglas de la §2.
+Desde el 2026-10-21 el orden lo marca la hoja de ruta de §8.1; lo que no está en ella (§8.2) se
+elige con el usuario y se hace con las reglas de la §2.
 
-### 8.1 Hoja de ruta propuesta (2026-10-21)
+### 8.1 Hoja de ruta (aprobada el 2026-10-21)
 
 Estado de partida verificado el 2026-10-21: 48 tests unitarios del host, la transcripción de
 conformidad y la prueba `no_window` en verde; 17 tests de Node, 14 de React y 17 de Python;
@@ -253,16 +254,16 @@ los ejemplos, limpios. Los "cabos sueltos" de las fases 17–27 están cerrados
 ([HISTORIAL.md](HISTORIAL.md)). El repositorio ya tiene `origin`
 (<https://github.com/InDIOS/gpui-bridge>).
 
-La tabla es una **propuesta de orden**, no una decisión tomada: se aprueba, y después se programa
-un hito por iteración, con revisión y parada entre cada uno (regla 6).
+El orden de la tabla está aprobado y se programa un hito por iteración, con revisión y parada
+entre cada uno (regla 6). **Hechos: M0–M3. Siguiente: M4.**
 
 | Hito | Contenido | Criterio de aceptación | Protocolo |
 |---|---|---|---|
-| **M0 — Estabilizar el repositorio** | Lo hecho en este cambio: metadatos de publicación en los tres paquetes, enlaces al repositorio, `.gitattributes` (LF en todo el árbol), versión de Rust fijada en `rust-toolchain.toml` y en CI, `cargo fmt --check` y `clippy -D warnings` en CI, `--locked` en los comandos de Cargo, cancelación de runs viejos. Pendiente fuera del repo: protección de rama en `main`, secretos `NPM_TOKEN`/`TWINE_*` si se publica. | CI en verde en `dev` y `main`; `pnpm pack:node` y `pnpm wheel` producen artefactos que se instalan y abren un ejemplo **fuera** del repositorio. | sin cambios |
-| **M1 — Ventanas** | Ocultar y mostrar ventanas sin cerrarlas, posición inicial, tamaño mínimo, eventos de foco y de redimensionado de ventana. | `PROTOCOL.md` §3 actualizado, transcripción propia en `conformance/`, ejemplo en `examples/windows.ts` y prueba en ventana real. | sí: extiende `window` (§3); compatible hacia atrás si los campos son opcionales |
-| **M2 — Componentes, tanda 1** | `Tree`, `Diff`, `Carousel` ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9). | Props validadas (árboles y patch incluidos), selección/expansión reaplicadas al reconstruir, transcripción, ejemplo y ventana real; clientes Node, React y Python en el mismo cambio. | no: props nuevas, sin subir `PROTOCOL_VERSION` |
-| **M3 — Componentes, tanda 2** | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`). | Lo anterior más una prueba con series de 1000 puntos y árbol profundo. | no |
-| **M4 — Multiplataforma** | Compilar y probar el host en macOS y Linux; un asset por plataforma en `bin/`; tags de wheel por plataforma; evaluar `optionalDependencies` por plataforma en npm. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno; relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
+| **M0 — Estabilizar el repositorio** — **hecho** («Fase 28») | Lo hecho en este cambio: metadatos de publicación en los tres paquetes, enlaces al repositorio, `.gitattributes` (LF en todo el árbol), versión de Rust fijada en `rust-toolchain.toml` y en CI, `cargo fmt --check` y `clippy -D warnings` en CI, `--locked` en los comandos de Cargo, cancelación de runs viejos. Pendiente fuera del repo: protección de rama en `main`, secretos `NPM_TOKEN`/`TWINE_*` si se publica. | CI en verde en `dev` y `main`; `pnpm pack:node` y `pnpm wheel` producen artefactos que se instalan y abren un ejemplo **fuera** del repositorio. | sin cambios |
+| **M1 — Ventanas** — **hecho** («Fase 28») | Ocultar y mostrar ventanas sin cerrarlas, posición inicial, tamaño mínimo, eventos de foco y de redimensionado de ventana. | `PROTOCOL.md` §3 actualizado, transcripción propia en `conformance/`, ejemplo en `examples/windows.ts` y prueba en ventana real. | sí: extiende `window` (§3); compatible hacia atrás si los campos son opcionales |
+| **M2 — Componentes, tanda 1** — **hecho** («Fase 29») | `Tree`, `Diff`, `Carousel` ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9). | Props validadas (árboles y patch incluidos), selección/expansión reaplicadas al reconstruir, transcripción, ejemplo y ventana real; clientes Node, React y Python en el mismo cambio. | no: props nuevas, sin subir `PROTOCOL_VERSION` |
+| **M3 — Componentes, tanda 2** — **hecho** («Fase 30») | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`), con `xTicks`/`yTicks` para el número de etiquetas de cada eje. | Lo anterior más una prueba con series de 1000 puntos y árbol profundo. | no |
+| **M4 — Multiplataforma** — **siguiente** | Compilar y probar el host en macOS y Linux; un asset por plataforma en `bin/`; tags de wheel por plataforma; evaluar `optionalDependencies` por plataforma en npm. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno; relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
 | **M5 — Primera publicación** | Versión semver (0.2.0 o 1.0.0, a decidir), `CHANGELOG.md`, npm y PyPI, firma de código del host de Windows. | Instalación desde los registros, sin `GPUI_BRIDGE_HOST`, abriendo un ejemplo; `gpui-bridge-host --version` coincide con `bin/host.json`. | no: el protocolo sigue en 1 |
 | **M6 — Tanda 3 y cierre de calidad** | `Command`, `Settings`, repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro. | Lo de M2 más `change` con `{key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | `change` con objeto (campo `data` opcional) |
 
@@ -270,9 +271,10 @@ un hito por iteración, con revisión y parada entre cada uno (regla 6).
 > verde en los tres jobs y ventanas verificadas en ventana real. **M2 hecho** («Fase 29»):
 > protocolo, host, los tres clientes, `conformance/advanced.txt`, ejemplo, 52+19+16+19 tests en
 > verde y prueba en ventana real (selección y expansión del árbol, selección de líneas del diff y
-> carrusel con flechas y puntos). **M3 hecho** («Fase 30»): `Sidebar` y `Chart`, 58+21+17+21
-> tests en verde y prueba en ventana real con una serie de 1000 puntos y un árbol de 10 niveles.
-> M4–M6 sin empezar. Proteger `main` queda fuera de M0, para cuando el repositorio sea público.
+> carrusel con flechas y puntos). **M3 hecho** («Fase 30»): `Sidebar` y `Chart` (con `xTicks` y
+> `yTicks` para las etiquetas de los ejes), 58+21+17+21 tests en verde y prueba en ventana real
+> con una serie de 1000 puntos y un árbol de 10 niveles. **M4 es el siguiente**; M5 y M6 sin
+> empezar. Proteger `main` queda fuera de M0, para cuando el repositorio sea público.
 
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y
@@ -288,11 +290,12 @@ que se dibuja o se toca, y parada para revisión antes del siguiente.
 
 Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 decide el orden.
 
-> **Componentes que faltan:** el 2026-10-20 se documentó por qué `Dock`, `Command`, `Settings`,
-> `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar` no están todavía, qué costaría cada uno
-> y su impacto en host, protocolo y clientes: ver
-> [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). Resumen: no
-> falta tamaño sino modelo; `Editor` y `Speech` siguen fuera por dependencias.
+> **Componentes que faltan:** el 2026-10-20 se documentó por qué faltaban `Dock`, `Command`,
+> `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar`, qué costaría cada uno y su
+> impacto en host, protocolo y clientes: ver
+> [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). `Tree`,
+> `Diff` y `Carousel` (M2) y `Sidebar` y `Chart` (M3) ya están; quedan `Command` y `Settings`
+> (M6), `List` y `Dock`. `Editor` y `Speech` siguen fuera por dependencias.
 
 - Componentes: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"):
   Basic (`Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`,
@@ -300,11 +303,11 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
   `OtpInput`, `Form`, `Field`), Layout (`GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`,
   `Resizable`) y Advanced (`Calendar`), con `Accordion` y el redimensionado dentro de lo que el
   árbol puede expresar. Lo que queda se detalla en
-  [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` son los
-  siguientes por relación valor/coste; después `Sidebar` y `Chart`; `List`, `Command` y
-  `Settings` según necesidad; `Dock` solo con un ADR. El editor de código (pide `tree-sitter`,
+  [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` (**hecho**,
+  M2) y `Sidebar` y `Chart` (**hecho**, M3); `Command` y `Settings` en M6; `List` según
+  necesidad; `Dock` solo con un ADR. El editor de código (pide `tree-sitter`,
   que engorda el host), markdown (`TextView`) y el selector de color siguen pendientes.
-- Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana.
+- Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana. **Hecho el 2026-10-21** (M1, HISTORIAL.md, «Fase 28»).
 - Rendimiento: redibujar solo los nodos que cambiaron (atajo de la fase 22). Medido el 2026-10-19 (HISTORIAL.md, "Medición"): el transporte no es el cuello de botella, el host aplica ~25 µs por nodo y cualquier animación satura un núcleo; el `batch` de operaciones no hace falta. **Hecho el 2026-10-20** (HISTORIAL.md, "Extra — Rendimiento: redibujado incremental"): un nodo con `animate-*` se dibuja en una vista propia, los cuadros van a lo sumo a 60 por segundo y el texto no se realoca por cuadro; la ventana en reposo sigue sin gastar CPU. Lo que queda: GPUI marca como sucios también los ancestros de la vista que se notifica, así que la ventana sigue recorriendo el árbol en cada cuadro (~54 ms por cuadro con 20 000 nodos en debug); con `VirtualList` el recorrido es de las filas visibles.
 - Imágenes remotas: no se agrega HTTP al host (la decodificación pesa un orden de magnitud más que el transporte). El cliente baja el archivo y manda una ruta —lo más barato— o los bytes en una línea si hace falta. **Hecho el 2026-10-20** (HISTORIAL.md, "Extra — Imágenes por bytes"): `Image.data` acepta base64 estándar; el host lo decodifica una vez a un archivo por nodo (mismos formatos y animaciones que `src`) y lo borra con el nodo o con el árbol. `src` sigue siendo lo más barato para archivos locales.
 - Accesibilidad: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"): todo nodo acepta `a11y` (`id`, `role`, `label`, `description`, `keyshortcuts` y el estado ARIA: `checked`, `selected`, `expanded`, `disabled`, `value`, `min`/`max`/`step`, `level`, `orientation`), validado y aplicado a la tecnología asistiva; la raíz de la ventana se informa como `window` con su título, que era el aviso de GPUI. Lo que queda: un repaso de lo que anuncia un lector de pantalla real (no hay uno en el entorno de pruebas) y roles automáticos más finos en los componentes que no dejan ponerlos desde fuera.
