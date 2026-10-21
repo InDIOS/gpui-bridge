@@ -71,6 +71,19 @@ interpreted safely.
   keeps its resize borders, shadow and taskbar title; the app draws its own title bar with
   `windowControl` divs (section 5). Read only when the window opens: a later change is
   ignored, with a warning on stderr.
+- `x`, `y` (optional): the window's initial position, in logical pixels, from the top-left
+  corner of the screen. Read only when the window opens (a later change warns on stderr).
+  With neither, the window opens centered; with only one, the other is 0.
+- `minWidth`, `minHeight` (optional): the smallest size the user can resize the window to.
+  Read only when the window opens; a missing one leaves that axis unconstrained.
+- `minimized` (optional): `true` minimizes the window on the next `commit`, `false` restores
+  it and brings it to the front. It is an **action, not a remembered state**: send it again
+  to act again, and the user can restore or minimize the window at any time. A window that is
+  not open is not an error; the host warns on stderr. GPUI (0.3.9) has no "hide" for an open
+  window, so `minimized` is the way to take one out of sight without closing it.
+- `events` (optional): the window events the client wants (see "Window events" below). It
+  **replaces** the previous list, so `[]` unsubscribes, and an unknown name is `invalid_json`.
+  Like node events, they are opt-in; `windowClosed` is always sent.
 - `themeSet` (optional): a gpui-component theme file, used in place of the default theme.
   `theme` picks its first theme with that `mode`; a mode it does not define uses the default
   theme. Each `themeSet` replaces the previous one, so `{"themes":[]}` restores the defaults.
@@ -88,6 +101,30 @@ interpreted safely.
   `neutral-200`. A missing field uses gpui-component's built-in value, and so does a color
   value that does not parse, without an error. A field with the wrong type, or a `mode`
   other than `light`/`dark`, rejects the message with `invalid_json`.
+
+### Window events
+
+```json
+{"op":"window","id":2,"events":["focus","resize"]}
+{"type":"windowEvent","id":2,"event":"focus"}
+{"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
+{"type":"windowEvent","id":2,"event":"move","x":160,"y":80,"width":400,"height":300}
+{"type":"windowEvent","id":2,"event":"visibility","visible":false}
+```
+
+| event | when | fields |
+|---|---|---|
+| `focus` | the window gained the system focus (an opening window reports it too) | — |
+| `blur` | the window lost it | — |
+| `resize` | the size changed, by the user or by `width`/`height` | `x`, `y`, `width`, `height` |
+| `move` | only the position changed | `x`, `y`, `width`, `height` |
+| `visibility` | the platform stopped or resumed presenting the window (minimizing, covering it, display sleep) | `visible` |
+
+Only changes are sent: opening a window does not report its initial size or position (they
+are the ones the client asked for). `resize` and `move` carry the full bounds, so a client can
+persist a window's geometry with either. They are sent while the user drags or resizes, at the
+platform's pace; a client that only needs the final size can debounce. Events for a window
+whose `events` list does not include them are not sent at all.
 
 ## 4. Tree operations
 
@@ -234,6 +271,7 @@ and Advanced groups are described in section 17.
 {"type":"event","id":11,"event":"change","value":7.5}
 {"type":"event","id":13,"event":"sort","value":{"column":"name","direction":"asc"}}
 {"type":"windowClosed","id":2}
+{"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
 {"type":"tray","event":"menu","value":"quit"}
 {"type":"shortcut","keys":"ctrl-s","window":1}
 {"type":"notification","id":"saved","window":1}
@@ -247,6 +285,9 @@ the selection is cleared, or the `sort` object of section 15).
 `windowClosed` is sent only when the user closes a window, with the window's `id` (1 for
 the main window); after the last open window the host exits. A window the client closes with
 `closeWindow` does not produce it. If the client closes stdin, the host exits without sending it.
+
+`windowEvent` carries a window event the client opted into with `window.events` (section 3);
+its `event` is `focus`, `blur`, `resize`, `move` or `visibility`.
 
 `message` is human-readable and not part of the contract; match on `code` (and `op`).
 

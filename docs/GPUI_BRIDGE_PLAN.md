@@ -266,6 +266,10 @@ un hito por iteración, con revisión y parada entre cada uno (regla 6).
 | **M5 — Primera publicación** | Versión semver (0.2.0 o 1.0.0, a decidir), `CHANGELOG.md`, npm y PyPI, firma de código del host de Windows. | Instalación desde los registros, sin `GPUI_BRIDGE_HOST`, abriendo un ejemplo; `gpui-bridge-host --version` coincide con `bin/host.json`. | no: el protocolo sigue en 1 |
 | **M6 — Tanda 3 y cierre de calidad** | `Command`, `Settings`, repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro. | Lo de M2 más `change` con `{key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | `change` con objeto (campo `data` opcional) |
 
+> **Estado (2026-10-21):** M0 en curso (falta el primer CI verde); **M1 hecho**
+> ([HISTORIAL.md](HISTORIAL.md), «Fase 28»), con la prueba en ventana real pendiente; M2–M6 sin
+> empezar.
+
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y
 M3 son incrementales y de riesgo bajo; M4 va **antes** de M5 porque publicar solo Windows

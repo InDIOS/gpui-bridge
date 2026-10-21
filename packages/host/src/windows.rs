@@ -64,6 +64,10 @@ pub fn sync_windows(session: &Entity<Session>, windows: &RefCell<Windows>, cx: &
             .update(cx, |_, window, _| window.remove_window());
     }
 
+    // `minimized` is an action (PROTOCOL.md section 3): applied after opening or updating the
+    // window, so `{"minimized":true}` works in the same commit that opens it.
+    let requests = session.update(cx, |session, _| session.tree.take_window_requests());
+
     for (id, spec) in specs {
         let opened = windows
             .borrow()
@@ -90,6 +94,24 @@ pub fn sync_windows(session: &Entity<Session>, windows: &RefCell<Windows>, cx: &
                 }
             }
             Some(_) => {}
+        }
+    }
+
+    for (id, minimized) in requests {
+        let Some(handle) = windows.borrow().open.get(&id).map(|window| window.handle) else {
+            log::warn!("'minimized' for window {id}, which is not open; ignored");
+            continue;
+        };
+        let result = handle.update(cx, |_, window, _| {
+            if minimized {
+                window.minimize_window();
+            } else {
+                // Restores a minimized window and brings it to the front.
+                window.activate_window();
+            }
+        });
+        if let Err(err) = result {
+            log::warn!("failed to apply 'minimized' to window {id}: {err:#}");
         }
     }
 }
@@ -132,6 +154,26 @@ fn size_of(spec: &WindowSpec) -> Size<Pixels> {
     )
 }
 
+/// Where the window opens: at `x`/`y` when either was given, centered otherwise.
+fn bounds_of(spec: &WindowSpec, cx: &mut App) -> WindowBounds {
+    let size = size_of(spec);
+    match (spec.x, spec.y) {
+        (None, None) => WindowBounds::centered(size, cx),
+        (x, y) => WindowBounds::Windowed(Bounds {
+            origin: point(px(x.unwrap_or(0.0)), px(y.unwrap_or(0.0))),
+            size,
+        }),
+    }
+}
+
+/// `minWidth`/`minHeight`; a missing one leaves that axis unconstrained.
+fn min_size_of(spec: &WindowSpec) -> Option<Size<Pixels>> {
+    match (spec.min_width, spec.min_height) {
+        (None, None) => None,
+        (width, height) => Some(size(px(width.unwrap_or(0.0)), px(height.unwrap_or(0.0)))),
+    }
+}
+
 fn open_window(
     session: &Entity<Session>,
     id: ClientWindowId,
@@ -139,7 +181,8 @@ fn open_window(
     cx: &mut App,
 ) -> Option<AnyWindowHandle> {
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::centered(size_of(spec), cx)),
+        window_bounds: Some(bounds_of(spec, cx)),
+        window_min_size: min_size_of(spec),
         titlebar: Some(TitlebarOptions {
             title: Some(spec.title.clone().unwrap_or_default().into()),
             // Hides the system title bar; the window keeps its resize borders, shadow and taskbar title.
@@ -164,6 +207,12 @@ fn open_window(
 fn update_window(handle: AnyWindowHandle, applied: &WindowSpec, spec: &WindowSpec, cx: &mut App) {
     if spec.frameless.unwrap_or(false) != applied.frameless.unwrap_or(false) {
         log::warn!("'frameless' only applies when the window opens; ignored");
+    }
+    if (spec.x, spec.y) != (applied.x, applied.y) {
+        log::warn!("'x'/'y' only apply when the window opens; ignored");
+    }
+    if (spec.min_width, spec.min_height) != (applied.min_width, applied.min_height) {
+        log::warn!("'minWidth'/'minHeight' only apply when the window opens; ignored");
     }
     let result = handle.update(cx, |_, window, _| {
         if spec.title != applied.title {

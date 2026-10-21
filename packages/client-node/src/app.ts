@@ -14,6 +14,7 @@ import {
   type NodeType,
   type TableSort,
   type ThemeSet,
+  type WindowEventName,
   type WindowId,
   type WindowTheme,
 } from "./protocol.js";
@@ -50,11 +51,34 @@ export interface WindowOptions {
   title?: string;
   width?: number;
   height?: number;
+  /** Initial position. Only read when the window opens. */
+  x?: number;
+  y?: number;
+  /** Minimum size the user can resize to. Only read when the window opens. */
+  minWidth?: number;
+  minHeight?: number;
   root?: UINode<NodeType>;
   theme?: WindowTheme;
   themeSet?: ThemeSet;
   /** No system title bar (draw your own with `windowControl` divs). Only read when the window opens. */
   frameless?: boolean;
+  /** Minimizes (`true`) or restores (`false`) on the next commit. An action, not a remembered state. */
+  minimized?: boolean;
+  /** Window events to receive; `AppWindow.on` sets this for you. Replaces the previous list. */
+  events?: WindowEventName[];
+}
+
+/** A window event (PROTOCOL.md section 3); only the ones the window subscribed to arrive. */
+export interface WindowEventPayload {
+  id: WindowId;
+  event: WindowEventName;
+  /** `move` and `resize`: the window's bounds. */
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  /** `visibility`: whether the window is being presented. */
+  visible?: boolean;
 }
 
 /** A toast (PROTOCOL.md section 14). */
@@ -109,6 +133,8 @@ interface AppEvents {
   error: HostError;
   /** The user closed a window. */
   windowClosed: { id: WindowId };
+  /** A window event the client subscribed to (`window.events`, or `AppWindow.on` for that window). */
+  windowEvent: WindowEventPayload;
   /** The user clicked a toast that has an `id`. */
   notification: { id: string; window: WindowId };
   /** A key registered with `shortcuts()` was pressed in window `window`. */
@@ -197,6 +223,9 @@ export class UINode<T extends NodeType> {
 /** A window other than the main one (`App.createWindow`). */
 export class AppWindow {
   private readonly closedListeners = new Set<() => void>();
+  private readonly eventListeners = new Map<WindowEventName, Set<(payload: WindowEventPayload) => void>>();
+  /** The subscription list last sent, to avoid one message per listener. */
+  private eventNames = "";
 
   /** @internal */
   constructor(
@@ -215,20 +244,52 @@ export class AppWindow {
     this.app.queueCloseWindow(this.id);
   }
 
-  /** The user closed the window. */
-  on(event: "closed", listener: () => void): this {
-    this.closedListeners.add(listener);
+  /** The user closed the window, or a window event (which the window subscribes to on commit). */
+  on(event: "closed", listener: () => void): this;
+  on(event: WindowEventName, listener: (payload: WindowEventPayload) => void): this;
+  on(event: "closed" | WindowEventName, listener: (() => void) | ((payload: WindowEventPayload) => void)): this {
+    if (event === "closed") {
+      this.closedListeners.add(listener as () => void);
+      return this;
+    }
+    const listeners = this.eventListeners.get(event) ?? new Set<(payload: WindowEventPayload) => void>();
+    listeners.add(listener as (payload: WindowEventPayload) => void);
+    this.eventListeners.set(event, listeners);
+    this.syncEvents();
     return this;
   }
 
-  off(event: "closed", listener: () => void): this {
-    this.closedListeners.delete(listener);
+  off(event: "closed", listener: () => void): this;
+  off(event: WindowEventName, listener: (payload: WindowEventPayload) => void): this;
+  off(event: "closed" | WindowEventName, listener: (() => void) | ((payload: WindowEventPayload) => void)): this {
+    if (event === "closed") {
+      this.closedListeners.delete(listener as () => void);
+      return this;
+    }
+    const listeners = this.eventListeners.get(event);
+    listeners?.delete(listener as (payload: WindowEventPayload) => void);
+    if (listeners?.size === 0) this.eventListeners.delete(event);
+    this.syncEvents();
     return this;
   }
 
   /** @internal */
   handleClosed(): void {
     for (const listener of this.closedListeners) listener();
+  }
+
+  /** @internal */
+  handleWindowEvent(payload: WindowEventPayload): void {
+    for (const listener of this.eventListeners.get(payload.event) ?? []) listener(payload);
+  }
+
+  /** Sends the subscription list only when the set of subscribed events changes. */
+  private syncEvents(): void {
+    const events = [...this.eventListeners.keys()];
+    const names = events.join(",");
+    if (names === this.eventNames) return;
+    this.eventNames = names;
+    this.app.queueWindow(this.id, { events });
   }
 }
 
@@ -238,6 +299,7 @@ export class App {
   private readonly listeners: { [K in keyof AppEvents]: Set<(payload: AppEvents[K]) => void> } = {
     error: new Set(),
     windowClosed: new Set(),
+    windowEvent: new Set(),
     shortcut: new Set(),
     notification: new Set(),
     tray: new Set(),
@@ -623,6 +685,20 @@ export class App {
         this.windows.get(message.id)?.handleClosed();
         this.emit("windowClosed", { id: message.id });
         return;
+      case "windowEvent": {
+        const payload: WindowEventPayload = {
+          id: message.id,
+          event: message.event,
+          x: message.x,
+          y: message.y,
+          width: message.width,
+          height: message.height,
+          visible: message.visible,
+        };
+        this.windows.get(message.id)?.handleWindowEvent(payload);
+        this.emit("windowEvent", payload);
+        return;
+      }
       case "result":
         this.requests.get(message.request)?.resolve(message);
         this.requests.delete(message.request);

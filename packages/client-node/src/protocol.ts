@@ -49,6 +49,9 @@ export type NodeType =
   | "Calendar";
 export type WindowTheme = "light" | "dark";
 
+/** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
+export type WindowEventName = "focus" | "blur" | "resize" | "move" | "visibility";
+
 /**
  * A gpui-component theme file (PROTOCOL.md section 3). Field names are the file's own
  * (snake_case, dotted color keys such as `"primary.background"`).
@@ -74,7 +77,27 @@ export type Props = Record<string, unknown>;
 /** Messages from the client (host stdin). */
 export type ClientMessage =
   | { op: "hello"; protocol: number }
-  | { op: "window"; id?: WindowId; title?: string; width?: number; height?: number; root?: NodeId; theme?: WindowTheme; themeSet?: ThemeSet; frameless?: boolean }
+  | {
+      op: "window";
+      id?: WindowId;
+      title?: string;
+      width?: number;
+      height?: number;
+      /** Initial position; read when the window opens. */
+      x?: number;
+      y?: number;
+      /** Minimum size the user can resize to; read when the window opens. */
+      minWidth?: number;
+      minHeight?: number;
+      root?: NodeId;
+      theme?: WindowTheme;
+      themeSet?: ThemeSet;
+      frameless?: boolean;
+      /** Minimizes (`true`) or restores (`false`) on commit; an action, not a remembered state. */
+      minimized?: boolean;
+      /** Window events the client wants; replaces the previous list. */
+      events?: WindowEventName[];
+    }
   | { op: "create"; id: NodeId; type: NodeType; props?: Props; events?: string[] }
   | { op: "append"; parent: NodeId; child: NodeId }
   | { op: "insertBefore"; parent: NodeId; child: NodeId; before: NodeId }
@@ -118,6 +141,8 @@ export type HostMessage =
   | { type: "ready"; protocol: number }
   | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
+  /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
+  | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
   | { type: "tray"; event: "click" | "menu"; value?: string }
   | { type: "shortcut"; keys: string; window: WindowId }
   | { type: "notification"; id: string; window: WindowId }

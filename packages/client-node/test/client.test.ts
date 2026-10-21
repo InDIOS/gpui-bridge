@@ -384,6 +384,31 @@ test("a host crash is reported clearly", async () => {
   assert.throws(() => app.commit(), (err: unknown) => err instanceof HostExitedError && /host exited/.test(err.message));
 });
 
+test("window events are opt-in: the window subscribes and both the window and the app receive them", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  app.window({ root: app.div(), events: ["resize"] });
+  app.commit();
+  const settings = app.createWindow({ root: app.div() });
+  const resized: number[] = [];
+  settings.on("resize", (payload) => resized.push(payload.width ?? 0));
+  app.commit();
+
+  const all: string[] = [];
+  app.on("windowEvent", (payload) => all.push(`${payload.id}:${payload.event}:${payload.width ?? "-"}`));
+  app.handleMessage({ type: "windowEvent", id: settings.id, event: "resize", x: 10, y: 20, width: 300, height: 200 });
+  app.handleMessage({ type: "windowEvent", id: 1, event: "resize", x: 0, y: 0, width: 420, height: 320 });
+  // An event this window did not subscribe to still reaches the app-level listener.
+  app.handleMessage({ type: "windowEvent", id: settings.id, event: "focus" });
+
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(resized, [300]);
+  assert.deepEqual(all, [`${settings.id}:resize:300`, "1:resize:420", `${settings.id}:focus:-`]);
+});
+
 test("a missing host binary fails with a helpful message", async () => {
   await assert.rejects(createApp({ hostPath: "does-not-exist.exe" }), /host not found at does-not-exist\.exe/);
 });

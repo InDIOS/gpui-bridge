@@ -18,6 +18,7 @@ import type {
   TabsProps as WireTabsProps,
   UINode,
   WindowControl,
+  WindowEventPayload,
 } from "gpui-bridge";
 
 /** A `ref` gets the node (`ref.current.focus()`). */
@@ -222,12 +223,30 @@ export interface WindowProps {
   title?: string;
   width?: number;
   height?: number;
+  /** Initial position; only read when the window opens. */
+  x?: number;
+  y?: number;
+  /** Minimum size the user can resize to; only read when the window opens. */
+  minWidth?: number;
+  minHeight?: number;
+  /** Minimizes (`true`) or restores (`false`) on the next commit. */
+  minimized?: boolean;
   /** No system title bar; only read when the window opens. */
   frameless?: boolean;
   /** Classes of the window's root div (default `size-full`). */
   class?: string;
   /** The user closed the window. Unmount the `Window` (or React keeps an element for a window that is gone). */
   onClose?: () => void;
+  /** The window gained the system focus. */
+  onFocus?: (event: WindowEventPayload) => void;
+  /** The window lost the system focus. */
+  onBlur?: (event: WindowEventPayload) => void;
+  /** The user resized the window: the payload has `x`, `y`, `width`, `height`. */
+  onResize?: (bounds: WindowEventPayload) => void;
+  /** The user moved the window: the payload has `x`, `y`, `width`, `height`. */
+  onMove?: (bounds: WindowEventPayload) => void;
+  /** The window is being presented or not (`visible`); minimizing reports it too. */
+  onVisibility?: (event: WindowEventPayload) => void;
   children?: ReactNode;
 }
 

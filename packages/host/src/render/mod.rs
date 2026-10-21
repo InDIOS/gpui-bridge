@@ -29,9 +29,10 @@ use crate::components::{
     self, accordion, basic, button, checkbox, layout, menu, radio, switch, tabs,
 };
 use crate::keys;
-use crate::protocol::{NodeId, WindowId as ClientWindowId};
+use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
 use crate::schema::NodeType;
 use crate::styles::{self, Class, ScrollAxis, StyleCache};
+use crate::transport;
 use crate::tree::{Node, Tree};
 use gpui_kit::component::input::{InputMode, TextareaMode};
 
@@ -85,6 +86,12 @@ pub struct RootView {
     focusables: HashMap<NodeId, FocusHandle>,
     /// The Dialog node shown in gpui-component's dialog layer, if any.
     open_dialog: Option<NodeId>,
+    /// Last window state reported to the client, so `focus`/`blur` and friends are only sent on
+    /// changes. `None` until the first observer call, which primes it (see `track_window`).
+    window_active: Option<bool>,
+    window_visible: Option<bool>,
+    /// Last bounds reported, as `x, y, width, height`.
+    window_bounds: Option<(f32, f32, f32, f32)>,
     _observe_session: Subscription,
 }
 
@@ -128,12 +135,108 @@ impl RootView {
             focus: cx.focus_handle(),
             focusables: HashMap::new(),
             open_dialog: None,
+            window_active: None,
+            window_visible: None,
+            window_bounds: None,
             _observe_session,
         };
         // Root focus first, so a `focus` request in the commit that opens the window overrides it.
         this.focus.focus(window, cx);
         this.sync_inputs(window, cx);
+        this.track_window(window, cx);
         this
+    }
+
+    /// Reports `focus`/`blur`, `resize`/`move` and `visibility` to the client when it asked for
+    /// them in `window.events` (PROTOCOL.md section 3). The observers call back once when
+    /// registered, with the current state: that call primes the stored state, and only a real
+    /// change is sent (an opening window does report `focus`, so the app knows it is active).
+    /// The subscriptions are detached: they live as long as this view, which lives as long as
+    /// its window.
+    fn track_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        cx.observe_window_activation(window, |this, window, cx| {
+            let active = window.is_window_active();
+            let Some(previous) = this.window_active.replace(active) else {
+                // First call: the state is primed. An opening window reports `focus`, so the
+                // app knows it is active without asking.
+                if active {
+                    this.send_window_event("focus", None, None, cx);
+                }
+                return;
+            };
+            if previous != active {
+                this.send_window_event(if active { "focus" } else { "blur" }, None, None, cx);
+            }
+        })
+        .detach();
+
+        cx.observe_window_bounds(window, |this, window, cx| {
+            let bounds = window.bounds();
+            let state = (
+                f32::from(bounds.origin.x),
+                f32::from(bounds.origin.y),
+                f32::from(bounds.size.width),
+                f32::from(bounds.size.height),
+            );
+            let Some(previous) = this.window_bounds.replace(state) else {
+                return;
+            };
+            if previous == state {
+                return;
+            }
+            // A drag-resize changes both; report the size, then the position on the next change.
+            let event = if (previous.2, previous.3) != (state.2, state.3) {
+                "resize"
+            } else {
+                "move"
+            };
+            this.send_window_event(event, Some(state), None, cx);
+        })
+        .detach();
+
+        cx.observe_window_visibility(window, |this, visibility, _window, cx| {
+            let visible = visibility.is_visible();
+            let Some(previous) = this.window_visible.replace(visible) else {
+                // First call primes it; minimizing or covering the window reports `Hidden` later.
+                return;
+            };
+            if previous != visible {
+                this.send_window_event("visibility", None, Some(visible), cx);
+            }
+        })
+        .detach();
+    }
+
+    /// Sends one window event, if this window subscribed to it. `bounds` is
+    /// `x, y, width, height`, for `move` and `resize`.
+    fn send_window_event(
+        &self,
+        event: &str,
+        bounds: Option<(f32, f32, f32, f32)>,
+        visible: Option<bool>,
+        cx: &mut Context<Self>,
+    ) {
+        if !self
+            .session
+            .read(cx)
+            .tree
+            .wants_window_event(self.window_id, event)
+        {
+            return;
+        }
+        let (x, y, width, height) = match bounds {
+            Some((x, y, width, height)) => (Some(x), Some(y), Some(width), Some(height)),
+            None => (None, None, None, None),
+        };
+        transport::send(&HostMessage::WindowEvent {
+            id: self.window_id,
+            event: event.to_owned(),
+            x,
+            y,
+            width,
+            height,
+            visible,
+        });
     }
 
     /// Keeps one state per Input, Textarea, Select and Slider in this window. Text values

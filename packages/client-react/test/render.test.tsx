@@ -500,3 +500,34 @@ test("the new components render with their props and report their events", async
   assert.deepEqual(errors, []);
 });
 
+test("Window handlers opt into window events and receive their payload", async () => {
+  const resized: number[] = [];
+  const moved: Array<[number | undefined, number | undefined]> = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Text>main</Text>
+      <Window
+        title="Settings"
+        onResize={(bounds) => resized.push(bounds.width ?? 0)}
+        onMove={(bounds) => moved.push([bounds.x, bounds.y])}
+      >
+        <Text>inside</Text>
+      </Window>
+    </Div>,
+  );
+
+  const windowOps = sent.filter(
+    (m): m is Extract<ClientMessage, { op: "window" }> => m.op === "window" && m.id !== undefined,
+  );
+  const subscribed = windowOps.at(-1)!;
+  assert.deepEqual([...subscribed.events!].sort(), ["move", "resize"]);
+  const id = windowOps[0].id!;
+
+  app.handleMessage({ type: "windowEvent", id, event: "resize", x: 40, y: 60, width: 512, height: 384 });
+  app.handleMessage({ type: "windowEvent", id, event: "move", x: 20, y: 30, width: 512, height: 384 });
+  assert.deepEqual(resized, [512]);
+  assert.deepEqual(moved, [[20, 30]]);
+  assert.deepEqual(errors, []);
+  await app.close();
+});
+

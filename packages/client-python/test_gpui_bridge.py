@@ -342,6 +342,33 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(closed, [2, 20])
         self.assertEqual([(e.code, e.op) for e in errors], [("invalid_operation", "window")])
 
+    def test_window_events_are_opt_in_and_dispatched(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+
+        window = app.create_window(root=app.div())
+        resized, seen = [], []
+        window.on("resize", resized.append)
+        app.on_window_event = seen.append
+        # The subscription travels as `window.events`, and replaces the previous list.
+        self.assertEqual(app._pending[-1]["events"], ["resize"])
+        with self.assertRaises(ValueError):
+            window.on("hover", print)
+        app.commit()
+
+        app._dispatch({"type": "windowEvent", "id": window.id, "event": "resize", "width": 500, "height": 400})
+        self.assertEqual([message["width"] for message in resized], [500])
+        self.assertEqual([message["event"] for message in seen], ["resize"])
+
+        # The last unsubscribe sends an empty list, so the host stops sending them.
+        window.off("resize")
+        self.assertEqual(app._pending[-1]["events"], [])
+        app.commit()
+
+        app.close()
+        self.assertEqual(errors, [])
+
     def test_host_crash_is_reported_clearly(self):
         app = App(headless=True)
         app._proc.kill()

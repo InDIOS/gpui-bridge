@@ -957,3 +957,60 @@ Python 3.12, Rust 1.99.1):
 verde de CI en `dev` y `main`, proteger `main` exigiendo CI y revisión, y crear los secretos
 `NPM_TOKEN` y `TWINE_*` solo cuando se decida publicar (M5).
 
+### Fase 28 — Ventanas: posición, tamaño mínimo, minimizar/restaurar y eventos (2026-10-21)
+
+Primer hito de la hoja de ruta M0–M6 ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1). No sube
+`PROTOCOL_VERSION`: son campos **opcionales** de `window` y un mensaje nuevo del host, así que un
+host viejo ignora los campos y un cliente viejo nunca los pide.
+
+**Criterios de aceptación:** posición inicial y tamaño mínimo aplicados al abrir; minimizar y
+restaurar sin cerrar; eventos de foco, redimensionado, movimiento y visibilidad, opt-in;
+`PROTOCOL.md` §3 y §6, transcripción propia, ejemplo y prueba en ventana real.
+
+**Estado:** completada la parte automática; **falta la prueba en ventana real** (ver abajo).
+
+- **API de GPUI verificada en la fuente instalada** (`gpui-pre-0.3.9`, regla 2):
+  `WindowOptions::window_bounds` con `WindowBounds::Windowed(Bounds)`, `WindowOptions::window_min_size`,
+  `Window::minimize_window()`, `Window::activate_window()` (restaura si está minimizada),
+  `Context::observe_window_bounds/activation/visibility`. **No hay `hide()` por ventana**: `App::hide`
+  oculta la aplicación y `hide_window` no existe, así que "ocultar sin cerrar" se resuelve con
+  `minimized`, y restaurar con `activate_window`. Queda dicho en PROTOCOL.md §3.
+- **Protocolo (§3):** `window` acepta `x`, `y` (posición inicial, píxeles lógicos; se leen al abrir,
+  como `frameless`), `minWidth`/`minHeight` (tamaño mínimo; también al abrir), `minimized` (acción:
+  `true` minimiza, `false` restaura y trae al frente; no se recuerda entre commits) y `events`
+  (lista que **reemplaza** la anterior; `[]` desuscribe). Nombres: `focus`, `blur`, `resize`, `move`,
+  `visibility`; uno desconocido es `invalid_json`.
+- **Protocolo (§6):** mensaje `{"type":"windowEvent","id":…,"event":…}`. `move` y `resize` llevan
+  `x`,`y`,`width`,`height`; `visibility` lleva `visible`. Solo se envían los suscritos, y solo
+  cambios: la ventana que abre reporta `focus` si arranca activa, pero no reporta su tamaño ni su
+  posición iniciales (son los que pidió el cliente). `resize` cuando cambió el tamaño; `move`
+  cuando solo cambió la posición.
+- **Host:** `WindowSpec` gana `x`, `y`, `min_width`, `min_height` y `events`; las peticiones de
+  `minimized` van en una cola aparte (`take_window_requests`) que `sync_windows` aplica **después**
+  de abrir o actualizar, así que `{"minimized":true}` funciona en el mismo commit que abre la
+  ventana. `RootView` registra tres observadores (`activation`, `bounds`, `visibility`), los primea
+  con la primera llamada para no mandar ruido y filtra con `tree.wants_window_event`. Los
+  observadores se `detach()`: viven lo que vive la vista, que vive lo que vive la ventana.
+- **Clientes:** Node `WindowOptions` con los campos nuevos, `AppWindow.on/off` para los cinco
+  eventos (manda la lista de `events` solo cuando cambia el conjunto de suscripciones) y
+  `App.on("windowEvent")` para la ventana principal o para todas; Python `Window.on/off` (con
+  `ValueError` para un nombre desconocido) y `App.on_window_event`; React `<Window onFocus onBlur
+  onResize onMove onVisibility>` (suscripción por prop, se da de baja al quitarla) y los campos
+  nuevos en `WindowOptions`, que la ventana principal recibe por `render(element, { window })`.
+- **Ejemplo:** `examples/windows.ts` abre en 80,80 con mínimo 320x220, muestra el tamaño en un
+  texto que actualiza `resize` y tiene un botón "Minimize for 1 s" que minimiza y restaura.
+- **Verificación automática:** 49 unitarios del host (nuevo: eventos y peticiones de `minimized`;
+  el test de `window` cubre la lectura de los campos nuevos), la transcripción nueva
+  `conformance/window-events.txt` (campos válidos, nombre de evento desconocido, tipos erróneos,
+  lista vacía), las 19 transcripciones restantes, `no_window`, 18 tests de Node, 15 de React y 18
+  de Python; `clippy -D warnings`, `fmt` y el type-check de los ejemplos, limpios.
+- **Pendiente (regla 7):** abrir `pnpm dev windows` en una ventana real y comprobar que la ventana
+  abre en 80,80, que no baja de 320x220, que el texto de geometría sigue al redimensionado, que el
+  botón minimiza y a los 1 s restaura, y que `focus`/`blur` llegan al cambiar de ventana. No se
+  pudo hacer en esta sesión (sin interacción con el escritorio); los tests cubren el protocolo, no
+  el dibujo ni el mouse.
+- **Fuera de este paso:** mover o redimensionar la ventana desde el cliente después de abrirla
+  (`x`/`y`/`minWidth`/`minHeight` se leen solo al abrir, y avisan por stderr si cambian), ocultar
+  de verdad (GPUI no lo expone), estado maximizado/pantalla completa en el protocolo, y eventos de
+  DPI o de pantalla.
+

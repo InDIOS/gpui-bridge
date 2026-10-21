@@ -10,9 +10,23 @@ const app = await createApp({ debug: process.argv.includes("--debug") });
 
 const main = app.div({ class: "flex flex-col gap-3 p-6 size-full bg-background text-foreground" });
 const status = app.text({ content: "Settings closed", class: "text-sm text-muted-foreground" });
+// Written by the `resize` event subscribed below; a resize reports the whole bounds.
+const geometry = app.text({ content: "Window: 420x300", class: "text-xs text-muted-foreground" });
 const note = app.input({ placeholder: "Type in the main window" });
 const open = app.button({ label: "Open settings", variant: "primary" });
-main.append(app.text({ content: "Main window", class: "text-lg font-bold" }), note, open, status);
+const minimize = app.button({ label: "Minimize for 1 s" });
+main.append(app.text({ content: "Main window", class: "text-lg font-bold" }), note, open, minimize, geometry, status);
+
+// `minimized` is an action, not a remembered state: `true` minimizes now, `false` restores and
+// brings the window to the front. GPUI has no "hide" for an open window.
+minimize.on("click", () => {
+  app.window({ minimized: true });
+  app.commit();
+  setTimeout(() => {
+    app.window({ minimized: false });
+    app.commit();
+  }, 1000);
+});
 
 let settings: AppWindow | undefined;
 let dark = false;
@@ -58,7 +72,26 @@ function openSettings() {
 
 open.on("click", openSettings);
 app.on("windowClosed", ({ id }) => console.log(`windowClosed ${id}`));
+// Window events are opt-in (`events` in the window message; `AppWindow.on` sets it for another
+// window). The host reports only changes, so the initial size is the one asked for.
+app.on("windowEvent", ({ event, width, height }) => {
+  if (event === "resize") {
+    geometry.set({ content: `Window: ${Math.round(width ?? 0)}x${Math.round(height ?? 0)}` });
+    app.commit();
+  }
+});
 // Same idea in the commit that opens the first window.
 note.focus();
-app.window({ title: "Main", width: 420, height: 300, root: main });
+app.window({
+  title: "Main",
+  width: 420,
+  height: 300,
+  // Position and minimum size are read when the window opens.
+  x: 80,
+  y: 80,
+  minWidth: 320,
+  minHeight: 220,
+  root: main,
+  events: ["resize", "focus", "blur"],
+});
 app.commit();

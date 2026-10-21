@@ -42,8 +42,9 @@ built or tested there). Protocol version 1.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
   readers through AccessKit; the window root and the controls name themselves too.
-- **Windows:** several windows, frameless windows with a custom title bar, light/dark and
-  custom themes.
+- **Windows:** several windows, frameless windows with a custom title bar, initial position,
+  minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
+  `visibility`), light/dark and custom themes.
 - **Interaction:** context menus and a menu bar with shortcuts, app shortcuts, `keyDown`,
   focus, double click, tooltips, toasts, dropping files.
 - **System:** tray icon with a native menu, open/save dialogs, clipboard, opening URLs and
