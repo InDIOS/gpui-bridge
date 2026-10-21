@@ -1004,11 +1004,29 @@ restaurar sin cerrar; eventos de foco, redimensionado, movimiento y visibilidad,
   `conformance/window-events.txt` (campos válidos, nombre de evento desconocido, tipos erróneos,
   lista vacía), las 19 transcripciones restantes, `no_window`, 18 tests de Node, 15 de React y 18
   de Python; `clippy -D warnings`, `fmt` y el type-check de los ejemplos, limpios.
-- **Pendiente (regla 7):** abrir `pnpm dev windows` en una ventana real y comprobar que la ventana
-  abre en 80,80, que no baja de 320x220, que el texto de geometría sigue al redimensionado, que el
-  botón minimiza y a los 1 s restaura, y que `focus`/`blur` llegan al cambiar de ventana. No se
-  pudo hacer en esta sesión (sin interacción con el escritorio); los tests cubren el protocolo, no
-  el dibujo ni el mouse.
+- **Prueba en ventana real (2026-10-21).** Se condujo el host con un script (una ventana "probe"
+  a 80,80, mínimo 300x200, minimizar y restaurar) y destapó tres cosas que los tests no podían ver:
+  - **`pnpm dev` ejecutaba un host viejo.** `scripts/dev.mjs` prefería `target/release`, que era
+    anterior a M1 (empaquetado de M0); el debug era el actual. Por eso "no funcionaba nada" en
+    `pnpm dev windows`. Ahora prefiere `debug` (el orden que ya usan los clientes) y `--debug`
+    imprime la ruta del host en uso, porque un binario viejo y una función rota se ven igual.
+  - **La geometría se leía del área cliente.** `Window::bounds()` devuelve el origen del área de
+    cliente (80,124 con `x`/`y` = 80,80: +44 px de barra de título), así que un `move` tras
+    minimizar y restaurar "desplazaba" la ventana y un cliente que guardara ese valor y lo
+    devolviera a `x`/`y` se iría bajando en cada arranque. Se usa
+    `window.window_bounds().get_bounds()`: origen del marco (lo mismo que fija `x`/`y`) y tamaño
+    cliente (lo mismo que `width`/`height`).
+  - **`visibility: false` no llegaba al minimizar.** El observador de visibilidad no llama al
+    registrar (a diferencia de activación y bounds), así que el primer `Hidden` se consumía como
+    "prime" y se perdía. Ahora el estado se primea con `window.visibility()` al registrar.
+  - Al minimizar, Windows mueve la ventana a `-32000`; con `window_bounds` ese cambio no aparece
+    como `move`, así que no hace falta filtrarlo.
+  - Secuencia verificada tras el arreglo: `focus` al abrir; `visibility false` + `blur` al
+    minimizar; `focus` + `visibility true` al restaurar; sin `move` espurios.
+- **Pendiente (regla 7):** la comprobación visual sigue en manos del usuario: que la ventana se
+  vea en 80,80, que no baje de 320x220, que el texto de geometría siga al redimensionado y que el
+  botón minimice y restaure. Lo automático cubre el protocolo y los eventos; el dibujo, el mouse y
+  el tamaño mínimo en pantalla no.
 - **Fuera de este paso:** mover o redimensionar la ventana desde el cliente después de abrirla
   (`x`/`y`/`minWidth`/`minHeight` se leen solo al abrir, y avisan por stderr si cambian), ocultar
   de verdad (GPUI no lo expone), estado maximizado/pantalla completa en el protocolo, y eventos de

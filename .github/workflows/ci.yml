@@ -90,8 +90,31 @@ jobs:
       - name: Build the platform-tagged wheel
         run: node scripts/stage-host.mjs --to python; python packages/client-python/build_wheel.py
       - name: The tarball carries the host
+        shell: pwsh
         run: |
-          tar -tf packages/client-node/gpui-bridge-*.tgz | Select-String 'bin/gpui-bridge-host.exe'
+          # PowerShell does not expand globs for native commands: tar.exe would receive the
+          # literal `*.tgz` (that is what broke this job the first time).
+          $tarballs = @(Get-ChildItem packages/client-node/*.tgz)
+          if ($tarballs.Count -ne 1) { throw "expected one tarball, found $($tarballs.Count)" }
+          $tarball = $tarballs[0]
+          $entries = @(tar -tf $tarball.FullName)
+          if ($LASTEXITCODE -ne 0) { throw "tar could not read $($tarball.Name)" }
+          if (-not ($entries -match '^package/bin/gpui-bridge-host\.exe$')) {
+            throw "$($tarball.Name) does not carry bin/gpui-bridge-host.exe"
+          }
+          if (-not ($entries -match '^package/bin/host\.json$')) {
+            throw "$($tarball.Name) does not carry bin/host.json"
+          }
+          $entries -match '^package/bin/'
+
+      - name: The wheel carries the host
+        shell: pwsh
+        run: |
+          $wheels = @(Get-ChildItem packages/client-python/dist/*.whl)
+          if ($wheels.Count -ne 1) { throw "expected one wheel, found $($wheels.Count)" }
+          python -c "import sys, zipfile; names = zipfile.ZipFile(sys.argv[1]).namelist(); missing = [n for n in ('gpui_bridge/bin/gpui-bridge-host.exe', 'gpui_bridge/bin/host.json') if n not in names]; sys.exit('missing: %s' % missing if missing else 0)" $wheels[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw "$($wheels[0].Name) does not carry the host" }
+          'wheel carries the host'
       - uses: actions/upload-artifact@v4
         with:
           name: packages

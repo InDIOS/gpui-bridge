@@ -154,6 +154,14 @@ impl RootView {
     /// The subscriptions are detached: they live as long as this view, which lives as long as
     /// its window.
     fn track_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // The visibility observer does not call back when it is registered, so its state is
+        // primed here; the bounds one is primed too, so opening a window reports no geometry.
+        // `window_bounds` is the frame's origin (what `x`/`y` set) with the client size, which
+        // is what the client can feed back into `window`; `bounds()` is the client area, so its
+        // origin carries the title bar (it would make a saved position drift).
+        self.window_visible = Some(window.visibility().is_visible());
+        self.window_bounds = Some(bounds_of(window));
+
         cx.observe_window_activation(window, |this, window, cx| {
             let active = window.is_window_active();
             let Some(previous) = this.window_active.replace(active) else {
@@ -171,13 +179,7 @@ impl RootView {
         .detach();
 
         cx.observe_window_bounds(window, |this, window, cx| {
-            let bounds = window.bounds();
-            let state = (
-                f32::from(bounds.origin.x),
-                f32::from(bounds.origin.y),
-                f32::from(bounds.size.width),
-                f32::from(bounds.size.height),
-            );
+            let state = bounds_of(window);
             let Some(previous) = this.window_bounds.replace(state) else {
                 return;
             };
@@ -196,11 +198,7 @@ impl RootView {
 
         cx.observe_window_visibility(window, |this, visibility, _window, cx| {
             let visible = visibility.is_visible();
-            let Some(previous) = this.window_visible.replace(visible) else {
-                // First call primes it; minimizing or covering the window reports `Hidden` later.
-                return;
-            };
-            if previous != visible {
+            if this.window_visible.replace(visible) != Some(visible) {
                 this.send_window_event("visibility", None, Some(visible), cx);
             }
         })
@@ -1357,6 +1355,19 @@ fn loops(node: &Node, class: &str) -> bool {
     class
         .split_whitespace()
         .any(|name| name == "animate-pulse" || (spins && name == "animate-spin"))
+}
+
+/// The window's frame origin and client size, as `x, y, width, height`: the coordinates a
+/// client sets with `window` and can persist from `windowEvent`. `Window::bounds()` is the
+/// client area, so its origin differs by the title bar height.
+fn bounds_of(window: &Window) -> (f32, f32, f32, f32) {
+    let bounds = window.window_bounds().get_bounds();
+    (
+        f32::from(bounds.origin.x),
+        f32::from(bounds.origin.y),
+        f32::from(bounds.size.width),
+        f32::from(bounds.size.height),
+    )
 }
 
 /// `windowControl`: Windows treats the area as its own title bar part (drag, snap, buttons).

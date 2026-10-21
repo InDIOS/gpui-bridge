@@ -121,8 +121,11 @@ interpreted safely.
 | `visibility` | the platform stopped or resumed presenting the window (minimizing, covering it, display sleep) | `visible` |
 
 Only changes are sent: opening a window does not report its initial size or position (they
-are the ones the client asked for). `resize` and `move` carry the full bounds, so a client can
-persist a window's geometry with either. They are sent while the user drags or resizes, at the
+are the ones the client asked for). `resize` and `move` carry the full bounds, in the same
+coordinates `x`, `y`, `width` and `height` take — the window frame's top-left and the client
+size — so a client can feed a reported `x`, `y`, `width`, `height` straight back into `window`
+to restore it. While the window is minimized the platform moves it off screen; the host does
+not report that as a `move`. They are sent while the user drags or resizes, at the
 platform's pace; a client that only needs the final size can debounce. Events for a window
 whose `events` list does not include them are not sent at all.
 
