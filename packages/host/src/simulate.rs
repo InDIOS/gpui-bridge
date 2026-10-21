@@ -173,6 +173,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Tree, "change" | "expand" | "collapse")
             | (NodeType::Diff, "change")
             | (NodeType::Carousel, "change")
+            | (NodeType::Sidebar, "change")
             | (NodeType::Div | NodeType::MenuBar, "menu")
             | (NodeType::Alert, "close")
     );
@@ -573,6 +574,20 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             })?;
             if node.props.get("value").and_then(Value::as_u64) != Some(index) {
                 components::value_chosen(tree, id, Value::from(index));
+            }
+        }
+        // An entry of a Sidebar: an unknown id is an error; a disabled one or the active one does nothing.
+        (NodeType::Sidebar, "change") => {
+            let entry = text()?;
+            let sections = components::sidebar::sections(node);
+            let Some(spec) = components::sidebar::find_entry(&sections, &entry) else {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no entry '{entry}'"),
+                ));
+            };
+            if !spec.disabled && node.props.get("value").and_then(Value::as_str) != Some(&entry) {
+                components::sidebar::entry_clicked(tree, id, &entry);
             }
         }
         (NodeType::Input | NodeType::NumberInput, "submit") => {

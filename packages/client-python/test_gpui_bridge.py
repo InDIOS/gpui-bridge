@@ -375,6 +375,51 @@ class ClientTest(unittest.TestCase):
             ],
         )
 
+    def test_sidebar_and_chart_are_accepted_and_the_sidebar_dispatches_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+
+        sidebar = app.sidebar(
+            items=[
+                {
+                    "label": "General",
+                    "items": [
+                        {"id": "home", "label": "Home", "icon": "layout-dashboard"},
+                        {"id": "inbox", "label": "Inbox", "icon": "inbox"},
+                    ],
+                },
+                {"items": [{"id": "settings", "label": "Settings", "children": [{"id": "theme", "label": "Theme"}]}]},
+            ],
+            value="home",
+        )
+        sidebar.on("change", lambda entry: seen.append(("sidebar", entry)))
+        line = app.chart(
+            chart="line",
+            data=[{"label": "Mon", "value": 12}, {"label": "Tue", "value": 18}],
+            yAxis=True,
+        )
+        pie = app.chart(chart="pie", data=[{"label": "Rust", "value": 60}], innerRadius=20)
+        app.window(root=app.div().append(sidebar, line, pie))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": sidebar.id, "event": "change", "value": "theme"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("sidebar", "theme")])
+
+    def test_malformed_sidebar_and_chart_props_are_invalid_props(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+
+        app.sidebar(items=[{"items": [{"id": "home"}]}])
+        app.chart(data=[{"label": "Mon"}])
+        app.window(root=app.div())
+        app.commit()
+        app.close()
+        self.assertEqual([error.code for error in errors], ["invalid_props", "invalid_props"])
+
     def test_create_window_has_its_own_id_root_and_closed_callback(self):
         app = App(headless=True)
         errors, closed = [], []

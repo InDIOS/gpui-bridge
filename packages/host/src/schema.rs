@@ -39,6 +39,10 @@ pub enum PropKind {
     TreeItems,
     /// A Diff's `patch`: a unified or Git diff gpui-component can parse.
     Patch,
+    /// A Sidebar's `items`: sections of `{id, label, ...}` entries (PROTOCOL.md section 19).
+    Sections,
+    /// A Chart's `data`: `{label, value}` points.
+    Series,
 }
 
 impl PropKind {
@@ -58,7 +62,9 @@ impl PropKind {
             | Self::Entries
             | Self::Sizes
             | Self::TreeItems
-            | Self::Patch => self.check(value).is_ok(),
+            | Self::Patch
+            | Self::Sections
+            | Self::Series => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -92,6 +98,10 @@ impl PropKind {
                 .map_err(|err| format!("a list of tree items ({err})")),
             Self::Patch => crate::components::diff::check_patch(value)
                 .map_err(|err| format!("a patch ({err})")),
+            Self::Sections => crate::components::sidebar::check_items(value)
+                .map_err(|err| format!("a list of sidebar sections ({err})")),
+            Self::Series => crate::components::chart::check_data(value)
+                .map_err(|err| format!("a list of data points ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -117,6 +127,8 @@ impl PropKind {
             Self::Sizes => "a list of positive sizes".into(),
             Self::TreeItems => "a list of tree items".into(),
             Self::Patch => "a unified diff string".into(),
+            Self::Sections => "a list of sidebar sections".into(),
+            Self::Series => "a list of data points".into(),
         }
     }
 }
@@ -171,6 +183,9 @@ pub enum NodeType {
     Tree,
     Diff,
     Carousel,
+    // Data components (PROTOCOL.md section 19).
+    Sidebar,
+    Chart,
 }
 
 impl NodeType {
@@ -219,6 +234,8 @@ impl NodeType {
             "Tree" => Some(Self::Tree),
             "Diff" => Some(Self::Diff),
             "Carousel" => Some(Self::Carousel),
+            "Sidebar" => Some(Self::Sidebar),
+            "Chart" => Some(Self::Chart),
             _ => None,
         }
     }
@@ -328,6 +345,21 @@ impl NodeType {
             (Self::Carousel, "value") => Some(Index),
             (Self::Carousel, "axis") => Some(OneOf(&["horizontal", "vertical"])),
             (Self::Carousel, "looping" | "controls" | "pagination") => Some(Bool),
+            // Data components (PROTOCOL.md section 19).
+            (Self::Sidebar, "items") => Some(Sections),
+            (Self::Sidebar, "value") => Some(Str),
+            (Self::Sidebar, "collapsible") => Some(OneOf(&["icon", "offcanvas", "none"])),
+            (Self::Sidebar, "side") => Some(OneOf(&["left", "right"])),
+            (Self::Sidebar, "collapsed") => Some(Bool),
+            (Self::Chart, "data") => Some(Series),
+            (Self::Chart, "chart") => Some(OneOf(&["line", "bar", "pie"])),
+            (Self::Chart, "color") => Some(OneOf(crate::components::chart::COLORS)),
+            (Self::Chart, "name") => Some(Str),
+            (Self::Chart, "curve") => Some(OneOf(&["linear", "natural", "step"])),
+            (Self::Chart, "dot" | "horizontal" | "grid" | "xAxis" | "yAxis" | "interactive") => {
+                Some(Bool)
+            }
+            (Self::Chart, "yMin" | "yMax" | "innerRadius" | "padAngle") => Some(Number),
             (
                 Self::Input
                 | Self::Checkbox
@@ -344,7 +376,8 @@ impl NodeType {
                 | Self::OtpInput
                 | Self::Calendar
                 | Self::Tree
-                | Self::Carousel,
+                | Self::Carousel
+                | Self::Sidebar,
                 "controlled",
             ) => Some(Bool),
             (
@@ -414,6 +447,8 @@ impl NodeType {
             Self::Tree => "Tree",
             Self::Diff => "Diff",
             Self::Carousel => "Carousel",
+            Self::Sidebar => "Sidebar",
+            Self::Chart => "Chart",
         }
     }
 }
@@ -464,6 +499,8 @@ pub const ALL: &[NodeType] = &[
     NodeType::Tree,
     NodeType::Diff,
     NodeType::Carousel,
+    NodeType::Sidebar,
+    NodeType::Chart,
 ];
 
 #[cfg(test)]

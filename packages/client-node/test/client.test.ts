@@ -422,6 +422,53 @@ test("Tree, Diff and Carousel are accepted; their events are dispatched", async 
   ]);
 });
 
+test("Sidebar and Chart are accepted; the sidebar reports the chosen entry", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const sidebar = app
+    .sidebar({
+      items: [
+        {
+          label: "General",
+          items: [
+            { id: "home", label: "Home", icon: "layout-dashboard" },
+            { id: "inbox", label: "Inbox", icon: "inbox" },
+          ],
+        },
+        { items: [{ id: "settings", label: "Settings", children: [{ id: "theme", label: "Theme" }] }] },
+      ],
+      value: "home",
+    })
+    .on("change", ({ value }) => seen.push(["sidebar", value]));
+  const line = app.chart({ chart: "line", data: [{ label: "Mon", value: 12 }, { label: "Tue", value: 18 }], yAxis: true });
+  const pie = app.chart({ chart: "pie", data: [{ label: "Rust", value: 60 }], innerRadius: 20 });
+  app.window({ root: app.div().append(sidebar, line, pie) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: sidebar.id, event: "change", value: "theme" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["sidebar", "theme"]]);
+});
+
+test("malformed sidebar and chart props are invalid_props, and the host keeps running", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  app.sidebar({ items: [{ items: [{ id: "home" }] }] });
+  app.chart({ data: [{ label: "Mon" }] });
+  app.window({ root: app.div() });
+  app.commit();
+  await app.close();
+  assert.deepEqual(
+    errors.map((error) => error.code),
+    ["invalid_props", "invalid_props"],
+  );
+});
+
 test("a host crash is reported clearly", async () => {
   const app = await createApp(headless);
   const exited = new Promise<HostExit>((resolve) => app.on("exit", resolve));

@@ -202,10 +202,12 @@ Rules:
 | `Tree`     | `items`, `value`, `controlled`, `class`                      | `change`, `expand`, `collapse` |
 | `Diff`     | `patch`, `mode` (`unified`, `split`), `lineNumbers`, `softWrap`, `header`, `class` | `change` |
 | `Carousel` | `value`, `axis` (`horizontal`, `vertical`), `looping`, `controls`, `pagination`, `controlled`, `class` | `change` |
+| `Sidebar`  | `items`, `value`, `collapsed`, `collapsible` (`icon`, `offcanvas`, `none`), `side` (`left`, `right`), `controlled`, `class` | `change` |
+| `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `yAxis`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
-`Carousel`) in section 18.
+`Carousel`) in section 18, and `Sidebar` and `Chart` in section 19.
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -755,8 +757,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock`, `Command`, `Settings`, `List`, `Chart` and `Sidebar` keep their own delegates
-and state machines and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18.
+binary. `Dock`, `Command`, `Settings` and `List` keep their own delegates and state machines
+and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, and `Sidebar` and
+`Chart` in section 19.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
@@ -884,4 +887,82 @@ expansion are not lost on every commit.
   client's index until it is confirmed.
 
 The transcript in `conformance/advanced.txt` is the reference for their props and events.
+
+## 19. Sidebar and charts
+
+Two more components whose content is data rather than children: a navigation sidebar and a
+chart. Neither adds dependencies and both are props-only for the client.
+
+### Sidebar
+
+```json
+{"op":"create","id":30,"type":"Sidebar","props":{
+  "items":[
+    {"label":"General","items":[
+      {"id":"home","label":"Home","icon":"layout-dashboard"},
+      {"id":"inbox","label":"Inbox","icon":"inbox"},
+      {"id":"soon","label":"Soon","disabled":true}
+    ]},
+    {"items":[{"id":"settings","label":"Settings","open":true,
+               "children":[{"id":"theme","label":"Theme"}]}]}
+  ],
+  "value":"home","collapsed":false,"collapsible":"icon","side":"left"
+},"events":["change"]}
+```
+
+- `items` is a list of sections. A section is `{"label", "items"}`; without `label` its entries
+  have no heading. Each entry is `{"id", "label"}` with optional `icon` (a bundled icon name),
+  `disabled`, `open` (its submenu starts open, default false) and `children` (a submenu of
+  entries, the same shape, any depth).
+- `id` is a string chosen by the client and must be unique across the whole sidebar; a
+  repeated one, an entry without `id` or `label`, a section without `items`, an icon that is
+  not bundled, or an unknown field type is `invalid_props`.
+- `value` is the active entry's `id`; one that is not in `items` leaves none active. Clicking
+  an entry sends `change` with its `id`; in synced mode the host keeps it in `value`, in
+  controlled mode the host shows the client's `value` again until it is confirmed. A disabled
+  entry, or the active one again, sends nothing. A parent entry reports its own `id` and
+  toggles its submenu.
+- `collapsed` folds the sidebar to icon width (48 px); `collapsible` says what folding does:
+  `icon` (default), `offcanvas` (it leaves the layout) or `none` (it ignores `collapsed`). The
+  toggle is the app's: a `Button` that sets `collapsed`.
+- `side` is `left` (default) or `right`. The sidebar fills the height of its box and is 255 px
+  wide (`w-64` in `class` changes it); give it a bounded parent (`h-full` in a `flex` row).
+- The node takes **no children**: its content is `items`. A header or a footer is the app's,
+  composed next to it.
+
+### Chart
+
+```json
+{"op":"create","id":31,"type":"Chart","props":{
+  "chart":"line","name":"Visits","color":"primary",
+  "data":[{"label":"Mon","value":12},{"label":"Tue","value":18},{"label":"Wed","value":9}],
+  "curve":"natural","dot":true,"yAxis":true,"grid":true
+}}
+```
+
+- `chart` is `line` (default), `bar` or `pie`. `data` is a list of `{"label", "value"}`: the
+  category of a point or a bar, or the name of a slice. A point without a `label` string or
+  with a value that is not a finite number is `invalid_props`. A thousand points are fine: the
+  host parses `data` once per change and keeps it while the node lives.
+- `color` names a theme color, so light, dark and custom themes come for free: `chart-1`
+  (default) to `chart-5`, `primary`, `secondary`, `muted`, `accent`, `danger`, `success`,
+  `warning` or `info`. A line uses it as its stroke and a bar chart as its fill; a pie cycles
+  `chart-1` to `chart-5` slice by slice. `name` is the series name the hover tooltip shows (a
+  pie's tooltip names the slice instead).
+- A line: `curve` is `linear` (default), `natural` or `step`; `dot` puts a dot on each point;
+  `yMin` and `yMax` (both, with `yMin < yMax`) pin the value axis instead of fitting the line
+  from zero.
+- A bar chart: `horizontal` grows the bars to the right from a left baseline (default false,
+  they grow up from the bottom).
+- `xAxis` (default true) shows the category axis (at most 12 labels, spread evenly from the
+  first point to the last) and `yAxis` (default false) the value axis;
+  `grid` (default true) draws the grid lines. `interactive` (default true) turns the hover
+  crosshair, the dots and the tooltip off.
+- A pie: `innerRadius` is the hole in the middle in pixels (default 0, a donut from there in)
+  and `padAngle` the gap between slices in **radians** (`0.03` is a thin gap; `2` would
+  swallow every slice narrower than 115 degrees).
+- A chart fills its box and has **no events**: nothing it does is the app's business. Give it
+  a bounded size in `class` (`h-56 w-full`, `h-64 flex-1`).
+
+The transcript in `conformance/charts.txt` is the reference for their props and events.
 

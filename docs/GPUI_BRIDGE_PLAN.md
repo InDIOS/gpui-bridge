@@ -270,8 +270,9 @@ un hito por iteración, con revisión y parada entre cada uno (regla 6).
 > verde en los tres jobs y ventanas verificadas en ventana real. **M2 hecho** («Fase 29»):
 > protocolo, host, los tres clientes, `conformance/advanced.txt`, ejemplo, 52+19+16+19 tests en
 > verde y prueba en ventana real (selección y expansión del árbol, selección de líneas del diff y
-> carrusel con flechas y puntos). M3–M6 sin empezar. Proteger `main` queda fuera de M0, para
-> cuando el repositorio sea público.
+> carrusel con flechas y puntos). **M3 hecho** («Fase 30»): `Sidebar` y `Chart`, 57+21+17+21
+> tests en verde y prueba en ventana real con una serie de 1000 puntos y un árbol de 10 niveles.
+> M4–M6 sin empezar. Proteger `main` queda fuera de M0, para cuando el repositorio sea público.
 
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y

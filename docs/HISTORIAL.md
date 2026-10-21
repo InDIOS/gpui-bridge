@@ -1138,3 +1138,58 @@ Python en el mismo cambio.
   componente), búsqueda o filtrado en `Tree`, carga incremental, y `Dock`/`Command`/`Settings`/
   `List`/`Chart`/`Sidebar`, que siguen en las tandas siguientes.
 
+### Fase 30 — M3: Sidebar y Chart (2026-10-21)
+
+Tercer hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), tanda 2 de
+[GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube `PROTOCOL_VERSION`: son dos
+tipos de nodo y props nuevas que un cliente viejo no envía.
+
+**Criterios de aceptación:** los de M2 (props validadas, transcripción, ejemplo, ventana real y
+los tres clientes en el mismo cambio) más una prueba con series de 1000 puntos y un árbol
+profundo.
+
+**Estado:** hecha, con la prueba en ventana real.
+
+- **Protocolo (§5 y §19):** `Sidebar` (`items` en secciones `{label?, items}` de entradas
+  `{id, label, icon?, disabled?, open?, children?}` a cualquier profundidad, `value`,
+  `collapsed`, `collapsible` `icon`/`offcanvas`/`none`, `side`, `controlled`; `change` con el id)
+  y `Chart` (`chart` `line`/`bar`/`pie`, `data` `[{label, value}]`, `color` con los nombres del
+  tema, `name`, y las opciones de cada gráfico; sin eventos). Ninguno toma hijos.
+- **Host — Sidebar:** `check_items` valida secciones, entradas, ids únicos en todo el sidebar e
+  iconos incluidos; `build` arma `Sidebar`/`SidebarGroup`/`SidebarMenu` de gpui-component con el
+  activo marcado por `value`. Un clic en una entrada deshabilitada o en la activa no envía nada;
+  una entrada padre reporta su id y abre o cierra su submenú.
+- **Host — Chart:** `ChartSlot` guarda los puntos parseados y solo se relee cuando cambia `data`
+  (una serie de 1000 puntos no se parsea en cada cuadro). Línea (`curve`, `dot`, `yMin`/`yMax`),
+  barras (`horizontal`) y tarta (`innerRadius`, `padAngle`, colores `chart-1`…`chart-5` por
+  porción).
+- **Simulación y conformidad:** `change` en `Sidebar` (id desconocido → `invalid_operation`,
+  deshabilitada o activa → nada; `Chart` no tiene eventos). Transcripción nueva
+  `conformance/charts.txt` (props válidas, selección, submenú, controlado y diez
+  `invalid_props`).
+- **Clientes:** Node `app.sidebar/chart` con `SidebarSection`, `ChartDatum` y los tipos de props;
+  React `<Sidebar onChange>` y `<Chart>`; Python `sidebar` y `chart`.
+- **Ejemplo:** `examples/dashboard.ts` (`pnpm dev dashboard`): sidebar con submenú y entrada
+  deshabilitada, línea de 1000 puntos con botón para reenviarlos, barras, tarta y un árbol de 10
+  niveles (2047 items).
+- **Tres fallos que destapó la prueba en ventana real** y que ningún test sin ventana ve:
+  - **Las 1000 etiquetas del eje x** se dibujaban todas (gpui-component etiqueta cada punto por
+    defecto) y formaban una barra negra. El host fija ahora `x_tick_count`/`band_tick_count` a
+    12 como máximo, repartidas del primer punto al último; sin prop nueva.
+  - **`padAngle` está en radianes** (`Pie` de gpui-base trabaja sobre `TAU`). El ejemplo y la
+    transcripción usaban `2` (≈115°), que se tragaba toda porción menor: solo se veía la de
+    Rust, aunque el hover sí encontraba las otras. Se documenta la unidad y el ejemplo pasa a
+    `0.03`.
+  - **El tooltip de la tarta no decía qué porción era** («21 (21.0%)»); ahora usa
+    `tooltip_name` con la etiqueta («TypeScript 21 (21.0%)»).
+- **Prueba en ventana real (2026-10-21).** Host en debug, `pnpm dev dashboard`, clics guionizados
+  y capturas de la ventana: clic en Inbox, Settings (abre el submenú con Palette atenuada) y
+  Theme mueven el activo y muestran `Sidebar: <id>`; Palette deshabilitada no cambia nada;
+  «Toggle sidebar» lo pliega a iconos; «Refresh the series» reenvía los 1000 puntos (0,6 ms en
+  el cliente) y la línea se redibuja; el árbol de 10 niveles se ve con tres niveles abiertos y un
+  clic expande `b`. Sin pánicos en el stderr del host.
+- **Verificación automática:** 57 unitarios del host, las 22 transcripciones de `conformance/`,
+  `no_window`, 21 tests de Node, 17 de React y 21 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Fuera de este paso:** varias series por gráfico, leyenda, gráficos de área/radar/velas, un
+  prop para el número de etiquetas del eje, y eventos de clic en puntos o porciones.

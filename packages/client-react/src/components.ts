@@ -369,3 +369,11 @@ export type CarouselProps = NodeProps["Carousel"] & {
   children?: ReactNode;
 };
 export const Carousel = "Carousel" as unknown as HostComponent<CarouselProps>;
+
+/** The sections are data; `onChange` gets the clicked entry's id. */
+export type SidebarProps = NodeProps["Sidebar"] & { onChange?: (id: string) => void };
+export const Sidebar = "Sidebar" as unknown as HostComponent<SidebarProps>;
+
+/** A line, bar or pie chart of the points in `data`; it has no events of its own. */
+export type ChartProps = NodeProps["Chart"];
+export const Chart = "Chart" as unknown as HostComponent<ChartProps>;

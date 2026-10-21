@@ -215,7 +215,7 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
   if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
-  if (type === "Tree" || type === "Carousel") wire.controlled = props.value !== undefined;
+  if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch") wire.controlled = props.checked !== undefined;
   return { wire, handlers };
 }
@@ -326,6 +326,10 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.diff(wire);
     case "Carousel":
       return app.carousel(wire);
+    case "Sidebar":
+      return app.sidebar(wire);
+    case "Chart":
+      return app.chart(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

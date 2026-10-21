@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Carousel, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -305,6 +305,51 @@ test("Tree, Diff and Carousel render with their props and report plain values", 
   ]);
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === tree.id && m.props.value === "README.md"));
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === carousel.id && m.props.value === 1));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Sidebar and Chart render with their props and report plain values", async () => {
+  const got: unknown[] = [];
+  const items = [
+    {
+      label: "General",
+      items: [
+        { id: "home", label: "Home", icon: "layout-dashboard" },
+        { id: "inbox", label: "Inbox" },
+      ],
+    },
+    { items: [{ id: "settings", label: "Settings", children: [{ id: "theme", label: "Theme" }] }] },
+  ];
+  const data = [
+    { label: "Mon", value: 12 },
+    { label: "Tue", value: 18 },
+  ];
+  function Dashboard() {
+    const [active, setActive] = useState("home");
+    return (
+      <Div>
+        <Sidebar items={items} value={active} onChange={(id) => (got.push(["sidebar", id]), setActive(id))} />
+        <Chart chart="line" data={data} yAxis />
+        <Chart chart="pie" data={[{ label: "Rust", value: 60 }]} innerRadius={20} />
+      </Div>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Dashboard />);
+  const [sidebar] = created(sent, "Sidebar");
+  const charts = created(sent, "Chart");
+  assert.deepEqual(sidebar.props?.items, items);
+  assert.equal(sidebar.props?.controlled, true);
+  assert.equal(charts.length, 2);
+  assert.equal(charts[0].props?.chart, "line");
+  assert.equal(charts[0].props?.yAxis, true);
+  assert.deepEqual(charts[0].props?.data, data);
+  assert.equal(charts[1].props?.innerRadius, 20);
+
+  emit(app, { id: sidebar.id, event: "change", value: "theme" });
+  await tick();
+  assert.deepEqual(got, [["sidebar", "theme"]]);
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === sidebar.id && m.props.value === "theme"));
   await app.close();
   assert.deepEqual(errors, []);
 });

@@ -21,6 +21,7 @@ use crate::a11y;
 use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
 use crate::components::carousel::{self, CarouselSlot};
+use crate::components::chart::{self, ChartSlot};
 use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
@@ -28,7 +29,7 @@ use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, checkbox, layout, menu, radio, switch, tabs, tree,
+    self, accordion, basic, button, checkbox, layout, menu, radio, sidebar, switch, tabs, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -55,6 +56,8 @@ pub struct RootView {
     trees: HashMap<NodeId, tree::TreeSlot>,
     diffs: HashMap<NodeId, DiffSlot>,
     carousels: HashMap<NodeId, CarouselSlot>,
+    /// One per Chart: its data, parsed once per change (a series can be 1 000 points long).
+    charts: HashMap<NodeId, ChartSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -127,6 +130,7 @@ impl RootView {
             trees: HashMap::new(),
             diffs: HashMap::new(),
             carousels: HashMap::new(),
+            charts: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -277,6 +281,7 @@ impl RootView {
         let trees = tree::snapshot(tree, &members);
         let diffs = diff::snapshot(tree, &members);
         let carousels = carousel::snapshot(tree, &members);
+        let charts = chart::snapshot(tree, &members);
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -322,6 +327,7 @@ impl RootView {
         tree::sync(&mut self.trees, trees, &self.session, cx);
         diff::sync(&mut self.diffs, diffs, &self.session, cx);
         carousel::sync(&mut self.carousels, carousels, &self.session, cx);
+        chart::sync(&mut self.charts, charts, &self.session, cx);
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
@@ -430,6 +436,7 @@ impl RootView {
             trees: &self.trees,
             diffs: &self.diffs,
             carousels: &self.carousels,
+            charts: &self.charts,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
@@ -744,6 +751,7 @@ struct RenderCx<'a> {
     trees: &'a HashMap<NodeId, tree::TreeSlot>,
     diffs: &'a HashMap<NodeId, DiffSlot>,
     carousels: &'a HashMap<NodeId, CarouselSlot>,
+    charts: &'a HashMap<NodeId, ChartSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -857,9 +865,11 @@ impl RenderCx<'_> {
             NodeType::Tree => self.tree_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Diff => self.diff_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Sidebar => self.sidebar_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
         };
-        // `div` and `text` apply `a11y` themselves; the three data components put it on their own
-        // sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // `div` and `text` apply `a11y` themselves; the data components put it on their own sized
+        // wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one).
         match accessibility {
@@ -871,6 +881,8 @@ impl RenderCx<'_> {
                         | NodeType::Tree
                         | NodeType::Diff
                         | NodeType::Carousel
+                        | NodeType::Sidebar
+                        | NodeType::Chart
                 ) =>
             {
                 a11y::wrap(&spec, id, element)
@@ -1044,6 +1056,36 @@ impl RenderCx<'_> {
         match self.carousels.get(&id) {
             Some(slot) => {
                 self.component_a11y(id, carousel::build(id, node, slot, slides), classes, a11y)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    /// Its content is the `items` prop: the node takes no children. It needs a bounded height
+    /// (`h-full` inside a row, or `class`), and the wrapper is that box.
+    fn sidebar_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let element = sidebar::build(id, node, self.session);
+        self.component_a11y(id, element, classes, a11y)
+    }
+
+    /// The plot fills the box (`h-64` in `class`), which the wrapper provides.
+    fn chart_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.charts.get(&id) {
+            Some(slot) => {
+                let element = chart::build(id, node, slot, self.theme);
+                self.component_a11y(id, element, classes, a11y)
             }
             None => div().into_any_element(),
         }

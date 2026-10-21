@@ -399,6 +399,19 @@ class App:
         `pagination`, `controlled`. Append one child per slide; `change` passes the index."""
         return self._create("Carousel", props)
 
+    def sidebar(self, **props) -> Node:
+        """A sidebar: `items` (sections: {"label", "items": [{"id", "label", "icon",
+        "disabled", "open", "children"}]}), `value` (the active entry id), `collapsed`,
+        `collapsible` (icon, offcanvas, none), `side` (left, right), `controlled`. `change`
+        passes the clicked entry's id."""
+        return self._create("Sidebar", props)
+
+    def chart(self, **props) -> Node:
+        """A chart: `chart` (line, bar, pie), `data` ([{"label", "value"}]), `color`, `name`,
+        plus the options of each plot (`curve`, `dot`, `horizontal`, `xAxis`, `yAxis`, `grid`,
+        `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`). It has no events."""
+        return self._create("Chart", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)

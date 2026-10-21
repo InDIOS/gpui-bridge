@@ -49,7 +49,9 @@ export type NodeType =
   | "Calendar"
   | "Tree"
   | "Diff"
-  | "Carousel";
+  | "Carousel"
+  | "Sidebar"
+  | "Chart";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -693,6 +695,97 @@ export interface CarouselProps {
   class?: string;
 }
 
+/** One entry of a `Sidebar`; `children` is its submenu. */
+export interface SidebarEntry {
+  /** Unique across the whole sidebar: it is the `value` and what `change` reports. */
+  id: string;
+  label: string;
+  /** A bundled icon name; collapsed, it is all the entry shows. */
+  icon?: string;
+  disabled?: boolean;
+  /** The submenu starts open; default false. */
+  open?: boolean;
+  children?: SidebarEntry[];
+}
+
+/** A group of entries with a heading (`label`); without one the entries have no heading. */
+export interface SidebarSection {
+  label?: string;
+  items: SidebarEntry[];
+}
+
+export interface SidebarProps {
+  /** The sections: the sidebar takes no children. */
+  items?: SidebarSection[];
+  /** The active entry's `id`; one that is not in `items` leaves none active. */
+  value?: string;
+  /** Icon width (48px) instead of the full width. */
+  collapsed?: boolean;
+  /** What collapsing does: `icon` (default), `offcanvas` or `none`. */
+  collapsible?: "icon" | "offcanvas" | "none";
+  /** Default `left`. */
+  side?: "left" | "right";
+  /** The host only reports clicks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+/** A theme color of a chart series (PROTOCOL.md section 19). */
+export type ChartColor =
+  | "chart-1"
+  | "chart-2"
+  | "chart-3"
+  | "chart-4"
+  | "chart-5"
+  | "primary"
+  | "secondary"
+  | "muted"
+  | "accent"
+  | "danger"
+  | "success"
+  | "warning"
+  | "info";
+
+/** One point of a `Chart`: the category of a line or a bar, or the name of a slice. */
+export interface ChartDatum {
+  label: string;
+  value: number;
+}
+
+export interface ChartProps {
+  /** The plot: `line` (default), `bar` or `pie`. */
+  chart?: "line" | "bar" | "pie";
+  /** The points, in order. */
+  data?: ChartDatum[];
+  /** A line's or the bars' color; default `chart-1`. A pie cycles `chart-1` to `chart-5`. */
+  color?: ChartColor;
+  /** The series name the hover tooltip shows. */
+  name?: string;
+  /** A line's curve between points; default `linear`. */
+  curve?: "linear" | "natural" | "step";
+  /** A line: a dot on each point; default false. */
+  dot?: boolean;
+  /** Bars grow from the left instead of the bottom; default false. */
+  horizontal?: boolean;
+  /** The category axis (of a line or the bars); default true. */
+  xAxis?: boolean;
+  /** The value axis; default false. */
+  yAxis?: boolean;
+  /** The grid lines; default true. */
+  grid?: boolean;
+  /** A line: pin the value axis; both are needed, in order. */
+  yMin?: number;
+  yMax?: number;
+  /** A pie: the hole in the middle, in pixels; default 0. */
+  innerRadius?: number;
+  /** A pie: the gap between slices, in radians (0.03 is a thin gap); default 0. */
+  padAngle?: number;
+  /** The hover crosshair, the dots and the tooltip; default true. */
+  interactive?: boolean;
+  /** Give it a bounded box (`h-64`, `flex-1 w-full`): the plot fills it. */
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -737,6 +830,8 @@ export interface NodeProps {
   Tree: TreeProps & SharedProps;
   Diff: DiffProps & SharedProps;
   Carousel: CarouselProps & SharedProps;
+  Sidebar: SidebarProps & SharedProps;
+  Chart: ChartProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -792,4 +887,8 @@ export interface NodeEvents {
   Diff: { change: { value: DiffSelection | null } };
   /** `value` is the selected slide index. */
   Carousel: { change: { value: number } };
+  /** `value` is the `id` of the entry clicked. */
+  Sidebar: { change: { value: string } };
+  /** A chart has no events: the hover tooltip is the component's own. */
+  Chart: {};
 }

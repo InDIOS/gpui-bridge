@@ -526,6 +526,16 @@ export class App {
     return this.create("Carousel", props);
   }
 
+  /** Sections of entries in props; `change` with the clicked entry's id. */
+  sidebar(props: NodeProps["Sidebar"] = {}) {
+    return this.create("Sidebar", props);
+  }
+
+  /** A line, bar or pie chart of the points in `data`. */
+  chart(props: NodeProps["Chart"] = {}) {
+    return this.create("Chart", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);
