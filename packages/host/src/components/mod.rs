@@ -8,7 +8,9 @@ pub mod accordion;
 pub mod basic;
 pub mod button;
 pub mod calendar;
+pub mod carousel;
 pub mod checkbox;
+pub mod diff;
 pub mod input;
 pub mod layout;
 pub mod menu;
@@ -19,6 +21,7 @@ pub mod slider;
 pub mod switch;
 pub mod table;
 pub mod tabs;
+pub mod tree;
 
 use gpui_kit::{App, Entity};
 use serde_json::Value;

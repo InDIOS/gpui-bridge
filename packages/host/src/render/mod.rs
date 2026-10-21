@@ -20,13 +20,15 @@ use crate::Session;
 use crate::a11y;
 use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
+use crate::components::carousel::{self, CarouselSlot};
+use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
 use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, checkbox, layout, menu, radio, switch, tabs,
+    self, accordion, basic, button, checkbox, layout, menu, radio, switch, tabs, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -50,6 +52,9 @@ pub struct RootView {
     /// One per OtpInput and per Calendar: their state keeps what the user typed or chose.
     otps: HashMap<NodeId, OtpSlot>,
     calendars: HashMap<NodeId, CalendarSlot>,
+    trees: HashMap<NodeId, tree::TreeSlot>,
+    diffs: HashMap<NodeId, DiffSlot>,
+    carousels: HashMap<NodeId, CarouselSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -119,6 +124,9 @@ impl RootView {
             tables: HashMap::new(),
             otps: HashMap::new(),
             calendars: HashMap::new(),
+            trees: HashMap::new(),
+            diffs: HashMap::new(),
+            carousels: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -266,6 +274,9 @@ impl RootView {
         let selects = select::snapshot(tree, &members);
         let sliders = slider::snapshot(tree, &members);
         let tables = table::snapshot(tree, &members);
+        let trees = tree::snapshot(tree, &members);
+        let diffs = diff::snapshot(tree, &members);
+        let carousels = carousel::snapshot(tree, &members);
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -308,6 +319,9 @@ impl RootView {
         select::sync(&mut self.selects, selects, &self.session, window, cx);
         slider::sync(&mut self.sliders, sliders, &self.session, window, cx);
         table::sync(&mut self.tables, tables, &self.session, window, cx);
+        tree::sync(&mut self.trees, trees, &self.session, cx);
+        diff::sync(&mut self.diffs, diffs, &self.session, cx);
+        carousel::sync(&mut self.carousels, carousels, &self.session, cx);
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
@@ -373,6 +387,8 @@ impl RootView {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.calendars.get(&id) {
                 slot.focus(window, cx);
+            } else if let Some(slot) = self.trees.get(&id) {
+                slot.focus(window, cx);
             } else if let Some(handle) = self.focusables.get(&id) {
                 handle.focus(window, cx);
             } else if let Some(slot) = self.tables.get(&id) {
@@ -411,6 +427,9 @@ impl RootView {
             numbers: &self.numbers,
             otps: &self.otps,
             calendars: &self.calendars,
+            trees: &self.trees,
+            diffs: &self.diffs,
+            carousels: &self.carousels,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
@@ -722,6 +741,9 @@ struct RenderCx<'a> {
     numbers: &'a HashMap<NodeId, InputSlot<InputMode>>,
     otps: &'a HashMap<NodeId, OtpSlot>,
     calendars: &'a HashMap<NodeId, CalendarSlot>,
+    trees: &'a HashMap<NodeId, tree::TreeSlot>,
+    diffs: &'a HashMap<NodeId, DiffSlot>,
+    carousels: &'a HashMap<NodeId, CarouselSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -781,6 +803,7 @@ impl RenderCx<'_> {
             });
         }
 
+        let accessibility = a11y::of(node);
         let element = match node.node_type {
             NodeType::Div => self.div_node(id, node, &classes),
             NodeType::MenuBar => self.menu_bar_node(id, node, &classes),
@@ -831,11 +854,25 @@ impl RenderCx<'_> {
             NodeType::Toolbar => self.toolbar_node(id, node, &classes),
             NodeType::Resizable => self.resizable_node(id, node, &classes),
             NodeType::Calendar => self.calendar_node(id, node, &classes),
+            NodeType::Tree => self.tree_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Diff => self.diff_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
         };
-        // `div` and `text` apply `a11y` themselves; a component cannot take an id or a role from
-        // outside, so it gets a wrapper (only when the client asked for one).
-        match a11y::of(node) {
-            Some(spec) if !matches!(node.node_type, NodeType::Div | NodeType::Text) => {
+        // `div` and `text` apply `a11y` themselves; the three data components put it on their own
+        // sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // Any other component cannot take an id or a role from outside, so it gets a wrapper
+        // (only when the client asked for one).
+        match accessibility {
+            Some(spec)
+                if !matches!(
+                    node.node_type,
+                    NodeType::Div
+                        | NodeType::Text
+                        | NodeType::Tree
+                        | NodeType::Diff
+                        | NodeType::Carousel
+                ) =>
+            {
                 a11y::wrap(&spec, id, element)
             }
             _ => element,
@@ -858,14 +895,33 @@ impl RenderCx<'_> {
         element: impl IntoElement + 'static,
         classes: &[Class],
     ) -> AnyElement {
+        self.component_a11y(id, element, classes, None)
+    }
+
+    /// `component` for a node whose `a11y` goes on the same sized wrapper. The general
+    /// `a11y::wrap` is a flex row, which gives a `size_full` component no width to size against.
+    fn component_a11y(
+        &mut self,
+        id: NodeId,
+        element: impl IntoElement + 'static,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
         let wrapper = if self.in_control {
             div().occlude()
         } else {
             div()
         };
-        self.style(id, wrapper, classes, false)
-            .child(element)
-            .into_any_element()
+        match a11y {
+            Some(spec) => self
+                .style(id, a11y::apply(spec, id, wrapper), classes, false)
+                .child(element)
+                .into_any_element(),
+            None => self
+                .style(id, wrapper, classes, false)
+                .child(element)
+                .into_any_element(),
+        }
     }
 
     fn badge_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -943,6 +999,52 @@ impl RenderCx<'_> {
     fn calendar_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.calendars.get(&id) {
             Some(slot) => self.component(id, calendar::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn tree_node(
+        &mut self,
+        id: NodeId,
+        _node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.trees.get(&id) {
+            Some(slot) => {
+                self.component_a11y(id, tree::build(id, slot, self.session), classes, a11y)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    /// The component keeps its own scrolling: it needs a bounded height in `class`.
+    fn diff_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.diffs.get(&id) {
+            Some(slot) => self.component_a11y(id, diff::build(node, slot), classes, a11y),
+            None => div().into_any_element(),
+        }
+    }
+
+    /// One child per slide, in order.
+    fn carousel_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let slides = self.children(node);
+        match self.carousels.get(&id) {
+            Some(slot) => {
+                self.component_a11y(id, carousel::build(id, node, slot, slides), classes, a11y)
+            }
             None => div().into_any_element(),
         }
     }

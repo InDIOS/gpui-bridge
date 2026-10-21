@@ -180,6 +180,8 @@ const EVENT_PROPS: Record<string, string> = {
   onCancel: "cancel",
   onClose: "close",
   onSort: "sort",
+  onExpand: "expand",
+  onCollapse: "collapse",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -213,6 +215,7 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
   if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
+  if (type === "Tree" || type === "Carousel") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch") wire.controlled = props.checked !== undefined;
   return { wire, handlers };
 }
@@ -317,6 +320,12 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.resizable(wire);
     case "Calendar":
       return app.calendar(wire);
+    case "Tree":
+      return app.tree(wire);
+    case "Diff":
+      return app.diff(wire);
+    case "Carousel":
+      return app.carousel(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

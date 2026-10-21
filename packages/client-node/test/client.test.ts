@@ -374,6 +374,54 @@ test("VirtualList, Table and Tabs are accepted; their events are dispatched", as
   ]);
 });
 
+test("Tree, Diff and Carousel are accepted; their events are dispatched", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const tree = app
+    .tree({
+      items: [
+        { id: "src", label: "src", expanded: true, children: [{ id: "src/lib.rs", label: "lib.rs" }] },
+        { id: "README.md", label: "README.md" },
+      ],
+      value: "src",
+    })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("expand", ({ value }) => seen.push(["expand", value]))
+    .on("collapse", ({ value }) => seen.push(["collapse", value]));
+  const diff = app
+    .diff({
+      patch: "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n",
+      mode: "split",
+    })
+    .on("change", ({ value }) => seen.push(["diff", value]));
+  const carousel = app
+    .carousel({ value: 0, pagination: true, class: "h-40" })
+    .append(app.text({ content: "One" }), app.text({ content: "Two" }))
+    .on("change", ({ value }) => seen.push(["carousel", value]));
+  app.window({ root: app.div().append(tree, diff, carousel) });
+  app.commit();
+
+  const selection = { path: "notes.txt", side: "modified", start: 1, end: 2, endSide: "modified" };
+  app.handleMessage({ type: "event", id: tree.id, event: "change", value: "README.md" });
+  app.handleMessage({ type: "event", id: tree.id, event: "expand", value: "src" });
+  app.handleMessage({ type: "event", id: tree.id, event: "collapse", value: "src" });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: selection });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: carousel.id, event: "change", value: 1 });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["change", "README.md"],
+    ["expand", "src"],
+    ["collapse", "src"],
+    ["diff", selection],
+    ["diff", null],
+    ["carousel", 1],
+  ]);
+});
+
 test("a host crash is reported clearly", async () => {
   const app = await createApp(headless);
   const exited = new Promise<HostExit>((resolve) => app.on("exit", resolve));

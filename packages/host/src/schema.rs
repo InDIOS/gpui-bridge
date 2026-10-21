@@ -35,6 +35,10 @@ pub enum PropKind {
     Entries,
     /// A Resizable's `sizes`: one initial size in pixels per child.
     Sizes,
+    /// A Tree's `items`: `{id, label, children?, expanded?, disabled?}`, recursively.
+    TreeItems,
+    /// A Diff's `patch`: a unified or Git diff gpui-component can parse.
+    Patch,
 }
 
 impl PropKind {
@@ -52,7 +56,9 @@ impl PropKind {
             | Self::Accessibility
             | Self::Items
             | Self::Entries
-            | Self::Sizes => self.check(value).is_ok(),
+            | Self::Sizes
+            | Self::TreeItems
+            | Self::Patch => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -82,6 +88,10 @@ impl PropKind {
                 .map_err(|err| format!("a list of entries ({err})")),
             Self::Sizes => crate::components::layout::check_sizes(value)
                 .map_err(|err| format!("a list of sizes ({err})")),
+            Self::TreeItems => crate::components::tree::check_items(value)
+                .map_err(|err| format!("a list of tree items ({err})")),
+            Self::Patch => crate::components::diff::check_patch(value)
+                .map_err(|err| format!("a patch ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -105,6 +115,8 @@ impl PropKind {
             Self::Items => "a list of accordion items".into(),
             Self::Entries => "a list of entries".into(),
             Self::Sizes => "a list of positive sizes".into(),
+            Self::TreeItems => "a list of tree items".into(),
+            Self::Patch => "a unified diff string".into(),
         }
     }
 }
@@ -155,6 +167,10 @@ pub enum NodeType {
     Resizable,
     // Advanced components.
     Calendar,
+    // Data components (PROTOCOL.md section 18).
+    Tree,
+    Diff,
+    Carousel,
 }
 
 impl NodeType {
@@ -200,6 +216,9 @@ impl NodeType {
             "Toolbar" => Some(Self::Toolbar),
             "Resizable" => Some(Self::Resizable),
             "Calendar" => Some(Self::Calendar),
+            "Tree" => Some(Self::Tree),
+            "Diff" => Some(Self::Diff),
+            "Carousel" => Some(Self::Carousel),
             _ => None,
         }
     }
@@ -300,6 +319,15 @@ impl NodeType {
             (Self::Calendar, "value") => Some(Str),
             (Self::Calendar, "months") => Some(Positive),
             (Self::Calendar, "weekStartsOn") => Some(OneOf(&["monday", "sunday"])),
+            // Data components (PROTOCOL.md section 18).
+            (Self::Tree, "items") => Some(TreeItems),
+            (Self::Tree, "value") => Some(Str),
+            (Self::Diff, "patch") => Some(Patch),
+            (Self::Diff, "mode") => Some(OneOf(&["unified", "split"])),
+            (Self::Diff, "lineNumbers" | "softWrap" | "header") => Some(Bool),
+            (Self::Carousel, "value") => Some(Index),
+            (Self::Carousel, "axis") => Some(OneOf(&["horizontal", "vertical"])),
+            (Self::Carousel, "looping" | "controls" | "pagination") => Some(Bool),
             (
                 Self::Input
                 | Self::Checkbox
@@ -314,7 +342,9 @@ impl NodeType {
                 | Self::Stepper
                 | Self::NumberInput
                 | Self::OtpInput
-                | Self::Calendar,
+                | Self::Calendar
+                | Self::Tree
+                | Self::Carousel,
                 "controlled",
             ) => Some(Bool),
             (
@@ -381,6 +411,9 @@ impl NodeType {
             Self::Toolbar => "Toolbar",
             Self::Resizable => "Resizable",
             Self::Calendar => "Calendar",
+            Self::Tree => "Tree",
+            Self::Diff => "Diff",
+            Self::Carousel => "Carousel",
         }
     }
 }
@@ -428,6 +461,9 @@ pub const ALL: &[NodeType] = &[
     NodeType::Toolbar,
     NodeType::Resizable,
     NodeType::Calendar,
+    NodeType::Tree,
+    NodeType::Diff,
+    NodeType::Carousel,
 ];
 
 #[cfg(test)]

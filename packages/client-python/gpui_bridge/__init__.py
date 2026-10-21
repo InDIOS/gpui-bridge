@@ -382,6 +382,23 @@ class App:
         `change` passes the chosen day."""
         return self._create("Calendar", props)
 
+    def tree(self, **props) -> Node:
+        """Items in props: `items=[{"id", "label", "children", "expanded", "disabled"}]`, `value`
+        (the selected item id), `controlled`. `change` passes the chosen id; `expand` and
+        `collapse` pass a folder's id."""
+        return self._create("Tree", props)
+
+    def diff(self, **props) -> Node:
+        """A patch: `patch` (a unified or Git diff), `mode` (unified or split), `lineNumbers`,
+        `softWrap`, `header`. `change` passes the selected lines ({path, side, start, end,
+        endSide}) or None."""
+        return self._create("Diff", props)
+
+    def carousel(self, **props) -> Node:
+        """A carousel: `value` (the selected slide index), `axis`, `looping`, `controls`,
+        `pagination`, `controlled`. Append one child per slide; `change` passes the index."""
+        return self._create("Carousel", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)

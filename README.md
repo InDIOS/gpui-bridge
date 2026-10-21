@@ -35,10 +35,10 @@ built or tested there). Protocol version 1.
   `VirtualList`, `Table`, `Tabs`, and most of gpui-kit's Basic, Form and Layout groups:
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
-  `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus `Calendar`.
+  `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus `Calendar`, `Tree`,
+  `Diff` and `Carousel`.
   `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
-  `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` and `Sidebar` are
-  not mapped yet.
+  `Dock`, `Command`, `Settings`, `List`, `Chart` and `Sidebar` are not mapped yet.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
   readers through AccessKit; the window root and the controls name themselves too.
@@ -124,6 +124,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `overlays.ts` | A dialog, toasts and tooltips |
 | `components.ts` | The Basic and Layout components, a `Form`, a `Resizable` split and accessibility |
 | `data.ts` | A 10,000-row `VirtualList` and a sortable 10,000-row `Table` |
+| `advanced.ts` | A `Tree` with expansion, a `Diff` of a patch and a `Carousel` |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).

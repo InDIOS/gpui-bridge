@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
-import type { App, ClientMessage, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Checkbox, Collapsible, DescriptionList, Dialog, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, VirtualList, Window } from "../src/index.js";
+import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
+import { Accordion, Alert, Badge, Button, Calendar, Carousel, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -245,6 +245,66 @@ test("VirtualList renders rows as children; Table and Tabs get plain values", as
   // Sorted rows and the confirmed tab go back to the host.
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === table.id && JSON.stringify(m.props.rows) === JSON.stringify([{ name: "a" }, { name: "b" }])));
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === tabs.id && m.props.value === "table"));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Tree, Diff and Carousel render with their props and report plain values", async () => {
+  const got: unknown[] = [];
+  const items = [
+    { id: "src", label: "src", expanded: true, children: [{ id: "src/lib.rs", label: "lib.rs" }] },
+    { id: "README.md", label: "README.md" },
+  ];
+  const patch = "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n";
+  function Advanced() {
+    const [selected, setSelected] = useState("src");
+    const [slide, setSlide] = useState(0);
+    return (
+      <Div>
+        <Tree
+          items={items}
+          value={selected}
+          onChange={(id) => (got.push(["tree", id]), setSelected(id))}
+          onExpand={(id) => got.push(["expand", id])}
+          onCollapse={(id) => got.push(["collapse", id])}
+        />
+        <Diff patch={patch} mode="split" onChange={(selection) => got.push(["diff", selection])} />
+        <Carousel value={slide} pagination onChange={(index) => (got.push(["slide", index]), setSlide(index))}>
+          <Text>One</Text>
+          <Text>Two</Text>
+        </Carousel>
+      </Div>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Advanced />);
+  const [tree] = created(sent, "Tree");
+  const [diff] = created(sent, "Diff");
+  const [carousel] = created(sent, "Carousel");
+  assert.deepEqual(tree.props?.items, items);
+  assert.equal(tree.props?.controlled, true);
+  assert.equal(diff.props?.mode, "split");
+  assert.equal(carousel.props?.pagination, true);
+  assert.equal(carousel.props?.controlled, true);
+  assert.equal(sent.filter((m) => m.op === "append" && m.parent === carousel.id).length, 2);
+
+  const selection: DiffSelection = { path: "notes.txt", side: "modified", start: 1, end: 2, endSide: "modified" };
+  emit(app, { id: tree.id, event: "change", value: "README.md" });
+  emit(app, { id: tree.id, event: "expand", value: "src" });
+  emit(app, { id: tree.id, event: "collapse", value: "src" });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: selection });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: null });
+  emit(app, { id: carousel.id, event: "change", value: 1 });
+  await tick();
+  assert.deepEqual(got, [
+    ["tree", "README.md"],
+    ["expand", "src"],
+    ["collapse", "src"],
+    ["diff", selection],
+    ["diff", null],
+    ["slide", 1],
+  ]);
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === tree.id && m.props.value === "README.md"));
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === carousel.id && m.props.value === 1));
   await app.close();
   assert.deepEqual(errors, []);
 });

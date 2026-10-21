@@ -170,6 +170,9 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             )
             | (NodeType::Calendar, "change")
             | (NodeType::Table, "change" | "doubleClick" | "sort")
+            | (NodeType::Tree, "change" | "expand" | "collapse")
+            | (NodeType::Diff, "change")
+            | (NodeType::Carousel, "change")
             | (NodeType::Div | NodeType::MenuBar, "menu")
             | (NodeType::Alert, "close")
     );
@@ -476,6 +479,100 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             }
             if node.props.get("value").and_then(Value::as_str) != Some(value.as_str()) {
                 components::value_chosen(tree, id, Value::String(value));
+            }
+        }
+        // A tree item: an unknown id is an error, a disabled one or the current one does nothing.
+        (NodeType::Tree, "change") => {
+            let item = text()?;
+            let items = components::tree::items(node);
+            let Some(spec) = components::tree::find_spec(&items, &item) else {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no item '{item}'"),
+                ));
+            };
+            if spec.disabled || node.props.get("value").and_then(Value::as_str) == Some(&item) {
+            } else {
+                components::tree::item_clicked(tree, id, &item);
+            }
+        }
+        // Expanding or collapsing a folder; a leaf has nothing to expand.
+        (NodeType::Tree, "expand" | "collapse") => {
+            let item = text()?;
+            let items = components::tree::items(node);
+            let Some(spec) = components::tree::find_spec(&items, &item) else {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no item '{item}'"),
+                ));
+            };
+            if !spec.children.is_empty() {
+                let expanded = sim.event == "expand";
+                components::tree::expansion_reported(tree, id, &item, expanded);
+            }
+        }
+        // Selected source lines: `null`, or `{path, side, start, end}` of the patch.
+        (NodeType::Diff, "change") => {
+            let value = sim.value.clone().unwrap_or(Value::Null);
+            if !value.is_null() {
+                let text = |key| value.get(key).and_then(Value::as_str);
+                let line = |key| value.get(key).and_then(Value::as_u64);
+                let valid = text("path").is_some()
+                    && matches!(text("side"), Some("original" | "modified"))
+                    && matches!(text("endSide"), None | Some("original" | "modified"))
+                    && line("start").is_some()
+                    && line("end").is_some();
+                if !valid {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        "'change' on a Diff needs null or {path, side, start, end, endSide?}"
+                            .into(),
+                    ));
+                }
+                let patch = node
+                    .props
+                    .get("patch")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let paths = gpui_kit::component::diff::DiffFile::parse(patch)
+                    .map(|files| {
+                        files
+                            .iter()
+                            .map(|file| file.path().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                if !paths.iter().any(|path| Some(path.as_str()) == text("path")) {
+                    return Err(fail(
+                        ErrorCode::InvalidOperation,
+                        format!(
+                            "The patch of node {id} has no file '{}'",
+                            text("path").unwrap_or("")
+                        ),
+                    ));
+                }
+            }
+            components::diff::selection_reported(tree, id, Some(value));
+        }
+        // A slide: it must be within the slides; the current one does nothing.
+        (NodeType::Carousel, "change") => {
+            let count = node.children.len() as u64;
+            let index = sim
+                .value
+                .as_ref()
+                .and_then(Value::as_u64)
+                .filter(|index| *index < count);
+            let index = index.ok_or_else(|| {
+                fail(
+                    ErrorCode::InvalidJson,
+                    format!(
+                        "'change' on a Carousel needs a whole 'value' from 0 to {}",
+                        count.saturating_sub(1)
+                    ),
+                )
+            })?;
+            if node.props.get("value").and_then(Value::as_u64) != Some(index) {
+                components::value_chosen(tree, id, Value::from(index));
             }
         }
         (NodeType::Input | NodeType::NumberInput, "submit") => {

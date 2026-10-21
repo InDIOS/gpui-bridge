@@ -46,7 +46,10 @@ export type NodeType =
   | "StatusBar"
   | "Toolbar"
   | "Resizable"
-  | "Calendar";
+  | "Calendar"
+  | "Tree"
+  | "Diff"
+  | "Carousel";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -139,7 +142,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -628,6 +631,68 @@ export interface CalendarProps {
   class?: string;
 }
 
+/** One item of a `Tree`; `children` nests them. */
+export interface TreeNode {
+  /** Unique within the whole `items` list. */
+  id: string;
+  label: string;
+  children?: TreeNode[];
+  /** Open when the tree first shows it; the user can expand or collapse it. */
+  expanded?: boolean;
+  disabled?: boolean;
+}
+
+export interface TreeProps {
+  items?: TreeNode[];
+  /** The selected item's `id`; one that is not in `items` selects nothing. */
+  value?: string;
+  /** The host only reports clicks; the client confirms them with `value`. */
+  controlled?: boolean;
+  /** Give the tree a bounded height (`h-64`, `flex-1`): it scrolls itself. */
+  class?: string;
+}
+
+/** The selected source lines of a `Diff`, reported with `change`. */
+export interface DiffSelection {
+  path: string;
+  side: "original" | "modified";
+  start: number;
+  end: number;
+  endSide: "original" | "modified";
+}
+
+export interface DiffProps {
+  /** A unified or Git diff; a malformed patch is `invalid_props`. */
+  patch?: string;
+  /** Default "unified". */
+  mode?: "unified" | "split";
+  /** Default true. */
+  lineNumbers?: boolean;
+  /** Default false: long lines scroll horizontally. */
+  softWrap?: boolean;
+  /** Shows a header above each file; default true. */
+  header?: boolean;
+  /** Give it a bounded height (`h-96`, `flex-1`): it scrolls itself. */
+  class?: string;
+}
+
+/** A carousel; each child is one slide. */
+export interface CarouselProps {
+  /** The selected slide index; one past the last slide selects the last one. */
+  value?: number;
+  /** Default "horizontal". */
+  axis?: "horizontal" | "vertical";
+  /** Wrap from the last slide to the first; default false. */
+  looping?: boolean;
+  /** Previous and next buttons; default true. */
+  controls?: boolean;
+  /** One dot per slide; default false. */
+  pagination?: boolean;
+  /** The host only reports slides; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -669,6 +734,9 @@ export interface NodeProps {
   Toolbar: ToolbarProps & SharedProps;
   Resizable: ResizableProps & SharedProps;
   Calendar: CalendarProps & SharedProps;
+  Tree: TreeProps & SharedProps;
+  Diff: DiffProps & SharedProps;
+  Carousel: CarouselProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -718,4 +786,10 @@ export interface NodeEvents {
   Resizable: {};
   /** `value` is the chosen day, `YYYY-MM-DD`. */
   Calendar: { change: { value: string } };
+  /** `value` is the selected item's `id`; `expand`/`collapse` report a folder's `id`. */
+  Tree: { change: { value: string }; expand: { value: string }; collapse: { value: string } };
+  /** `value` is the selected range, `null` when the selection is cleared. */
+  Diff: { change: { value: DiffSelection | null } };
+  /** `value` is the selected slide index. */
+  Carousel: { change: { value: number } };
 }

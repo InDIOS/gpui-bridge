@@ -1041,3 +1041,100 @@ restaurar sin cerrar; eventos de foco, redimensionado, movimiento y visibilidad,
   de verdad (GPUI no lo expone), estado maximizado/pantalla completa en el protocolo, y eventos de
   DPI o de pantalla.
 
+### Fase 29 — M2: Tree, Diff y Carousel (2026-10-21)
+
+Segundo hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), tanda 1 de
+[GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube `PROTOCOL_VERSION`: son props
+nuevas y objetos dentro de `value`, que un host viejo ignora (PROTOCOL.md §6) y un cliente viejo
+no envía.
+
+**Criterios de aceptación:** props validadas (árbol y patch incluidos), selección y expansión
+reaplicadas al reconstruir, transcripción propia, ejemplo y ventana real; clientes Node, React y
+Python en el mismo cambio.
+
+**Estado:** completada la parte automática; **falta la prueba en ventana real** (ver abajo).
+
+- **API de gpui-component 0.7.3 verificada en la fuente instalada** (regla 2): `tree::Tree` con
+  `TreeState::new/items/set_items/set_selected_item/selected_item/scroll_handle` y
+  `TreeEvent::{Expanded, Collapsed}`; `diff::{Diff, DiffState, DiffFile::parse, DiffEvent,
+  DiffMode, DiffLineRange}`; `carousel::{Carousel, CarouselContent, CarouselItem,
+  CarouselPrevious, CarouselNext, CarouselPagination, CarouselPaginationItem, CarouselState,
+  CarouselEvent}`. Dos detalles que fijaron el diseño: `TreeState::set_items` **resetea** la
+  selección, y al revelar un item seleccionado dentro de una carpeta cerrada
+  `set_selected_item` **emite** `TreeEvent::Expanded` por cada ancestro; `CarouselState` emite
+  `Change` solo desde los caminos de usuario (`select_*`) y sus setters son silenciosos.
+- **Protocolo (§5, §6 y §18):** `Tree` (`items` recursivo, `value`, `controlled`; eventos
+  `change`, `expand`, `collapse`), `Diff` (`patch`, `mode`, `lineNumbers`, `softWrap`, `header`;
+  `change` con `{path, side, start, end, endSide}` o `null`) y `Carousel` (`value`, `axis`,
+  `looping`, `controls`, `pagination`, `controlled`; un hijo por diapositiva; `change` con el
+  índice). `value` admite ya un objeto para `Diff`, como `Table` con `sort`.
+- **Host — Tree:** un `TreeState` por nodo y `TreeSlot` con la lista normalizada
+  (`ItemSpec`, comparable) y un mapa de expansión elegida por el usuario. El estado se reconstruye
+  **solo** cuando `items` cambia (comparar el prop, como `Select` con `options`); tras
+  `set_items` se reaplica `value`. La expansión del usuario sobrevive al rebuild para los ids que
+  siguen existiendo y cuyo `expanded` no cambió el cliente. Un `Cell` de silencio evita que la
+  expansión automática de ancestros (al revelar la selección) se confunda con un clic. La
+  selección se reporta desde el `on_click` de la fila (`change` con el id); los `ListItem` llevan
+  sangría por profundidad y chevron con los iconos incluidos, y las filas se virtualizan solas.
+- **Host — Diff:** `check_patch` parsea el patch al validar la prop, así que uno mal formado es
+  `invalid_props` y nunca llega a `DiffState`; el estado se reconstruye solo si cambian `patch` o
+  `mode` (`set_mode` conserva la selección cuando solo cambia la presentación). `change` se emite
+  desde `DiffEvent::SelectionChanged`, con `null` al limpiar.
+- **Host — Carousel:** un `CarouselState` por nodo; el número de diapositivas es
+  `node.children.len()`, y `sync` aplica recuento, eje, bucle y el índice de `value`
+  (`set_selected_index` lo acota). Los hijos se envuelven en `CarouselItem` en orden; los
+  controles y los puntos son opcionales.
+- **Simulación (`--no-window`):** `change`/`expand`/`collapse` en `Tree` (id desconocido →
+  `invalid_operation`, hoja o item deshabilitado → nada), `change` en `Diff` (`null` o rango con
+  ruta del patch; ruta ausente → `invalid_operation`, objeto mal formado → `invalid_json`) y
+  `change` en `Carousel` (índice fuera de rango → `invalid_json`). Transcripción nueva
+  `conformance/advanced.txt` (props válidas, selección, expansión, controlado, los errores de
+  `simulate` y diez `invalid_props`).
+- **Clientes:** Node añade `app.tree/diff/carousel`, los tipos `TreeNode`, `DiffSelection`,
+  `TreeProps`, `DiffProps`, `CarouselProps` y los eventos tipados. Para liberar el nombre `tree`
+  el árbol de operaciones interno de `App` pasó a llamarse `wire` (solo uso interno). React añade
+  `<Tree>`, `<Diff>` y `<Carousel>`, `onExpand`/`onCollapse` y deduce `controlled` de `value` como
+  el resto de controles. Python añade `tree`, `diff` y `carousel`.
+- **Ejemplo:** `examples/advanced.ts` (árbol de un repositorio con selección y expansión, patch
+  unificado con selección de líneas y carrusel con puntos), ejecutable con
+  `pnpm dev advanced`.
+- **Verificación automática:** 52 unitarios del host (nuevos: validación recursiva del árbol,
+  reaplicación de la expansión y parseo del patch), las 21 transcripciones de `conformance/`,
+  `no_window`, 19 tests de Node, 16 de React y 19 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Corrección tras la primera prueba en ventana real (2026-10-21).** `pnpm dev advanced` mostró
+  los tres contenedores vacíos (el carrusel solo con los puntos) y destapó dos fallos de layout
+  que ningún test sin ventana podía ver:
+  - **`a11y::wrap` encogía los componentes a su ancho de contenido.** Es un `div().flex()` extra;
+    dentro de una columna, un hijo `size_full()` no tiene un ancho definido contra el que
+    resolverse, así que `Tree` y `Diff` quedaban con un ancho mínimo. Los tres componentes de datos
+    aplican ahora el `a11y` en **su propia** caja con tamaño (`component_a11y`), sin envoltorio
+    extra; el resto de componentes conserva el envoltorio de siempre.
+  - **El carrusel no tenía altura definida.** El estado contaba las diapositivas (los puntos
+    salían), pero `CarouselContent` se dimensionaba por contenido y una diapositiva `size-full`
+    resolvía a 0. Ahora la raíz del carrusel es `h_full()` y el contenido `flex_1().min_h_0()`, de
+    modo que la diapositiva llena el espacio que dejan los controles.
+- **Prueba en ventana real (2026-10-21).** Con el host en debug, `pnpm dev advanced` y clics
+  guionizados sobre la ventana (más capturas de la propia ventana con `PrintWindow`), se
+  comprobó lo que ningún test sin ventana cubre:
+  - **Tree:** muestra la jerarquía (`src` abierto con `main.rs` y `ui`, y `README.md` y `target`
+    deshabilitado atenuado); un clic en `README.md` mueve la selección y muestra
+    `Tree: selected README.md`; un clic en `ui` lo expande y aparece `tree.rs`.
+  - **Diff:** pinta el patch con cabecera, hunk y líneas tintadas; un clic en el número de la
+    línea 2 la selecciona (azul) y muestra `Diff: notes.txt original 2-2`.
+  - **Carousel:** la diapositiva se ve y llena la caja; las flechas `‹ ›` y los tres puntos están
+    visibles; un clic en `›` pasa a la diapositiva 2, mueve el punto activo y muestra
+    `Carousel: slide 2`.
+- **Dos fallos más que destapó esa prueba.**
+  - **`ListItem` apila sus hijos directos en un bloque**, así que el chevron y el texto del árbol
+    salían en dos líneas; ahora van dentro de un `h_flex` (una fila).
+  - **`CarouselPrevious`/`CarouselNext` se posicionan en absoluto sobre el contenido y en este
+    host quedaban fuera de la caja visible.** Se sustituyen por dos botones propios (iconos
+    `chevron-left`/`chevron-right`) en una fila bajo la diapositiva, que llaman a
+    `select_previous`/`select_next` (el mismo camino que emite `change`).
+- **Pendiente (regla 7):** nada visual de esta tanda; el teclado del carrusel y del árbol se
+  ejercitó por los botones y el foco, y lo automático cubre el resto.
+- **Fuera de este paso:** `value` como selección de líneas de `Diff` (la selección es del
+  componente), búsqueda o filtrado en `Tree`, carga incremental, y `Dock`/`Command`/`Settings`/
+  `List`/`Chart`/`Sidebar`, que siguen en las tandas siguientes.
+

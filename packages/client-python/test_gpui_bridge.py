@@ -320,6 +320,61 @@ class ClientTest(unittest.TestCase):
             [("row", 1), ("row", None), ("open", 0), ("sort", {"column": "name", "direction": "desc"}), ("tab", "table")],
         )
 
+    def test_tree_diff_and_carousel_are_accepted_and_dispatch_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+
+        tree = app.tree(
+            items=[
+                {"id": "src", "label": "src", "expanded": True, "children": [{"id": "src/lib.rs", "label": "lib.rs"}]},
+                {"id": "README.md", "label": "README.md"},
+            ],
+            value="src",
+        )
+        tree.on("change", lambda value: seen.append(("change", value)))
+        tree.on("expand", lambda value: seen.append(("expand", value)))
+        tree.on("collapse", lambda value: seen.append(("collapse", value)))
+        patch = (
+            "diff --git a/notes.txt b/notes.txt\n"
+            "--- a/notes.txt\n"
+            "+++ b/notes.txt\n"
+            "@@ -1,3 +1,4 @@\n"
+            " one\n"
+            "-two\n"
+            "+2\n"
+            " three\n"
+            "+four\n"
+        )
+        diff = app.diff(patch=patch, mode="split")
+        diff.on("change", lambda selection: seen.append(("diff", selection)))
+        carousel = app.carousel(value=0, pagination=True, class_="h-40")
+        carousel.append(app.text(content="One"), app.text(content="Two"))
+        carousel.on("change", lambda index: seen.append(("slide", index)))
+        app.window(root=app.div().append(tree, diff, carousel))
+        app.commit()
+
+        selection = {"path": "notes.txt", "side": "modified", "start": 1, "end": 2, "endSide": "modified"}
+        app._dispatch({"type": "event", "id": tree.id, "event": "change", "value": "README.md"})
+        app._dispatch({"type": "event", "id": tree.id, "event": "expand", "value": "src"})
+        app._dispatch({"type": "event", "id": tree.id, "event": "collapse", "value": "src"})
+        app._dispatch({"type": "event", "id": diff.id, "event": "change", "value": selection})
+        app._dispatch({"type": "event", "id": diff.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": carousel.id, "event": "change", "value": 1})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("change", "README.md"),
+                ("expand", "src"),
+                ("collapse", "src"),
+                ("diff", selection),
+                ("diff", None),
+                ("slide", 1),
+            ],
+        )
+
     def test_create_window_has_its_own_id_root_and_closed_callback(self):
         app = App(headless=True)
         errors, closed = [], []

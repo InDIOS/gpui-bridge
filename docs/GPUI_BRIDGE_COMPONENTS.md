@@ -2,7 +2,8 @@
 
 > Documento de trabajo, 2026-10-20. En español, como [GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md)
 > y [HISTORIAL.md](HISTORIAL.md); el protocolo y el README siguen en inglés (regla 9 del plan).
-> Complementa la §8 del plan: **no** hay nada de esto implementado todavía.
+> Complementa la §8 del plan. La tanda 1 (`Tree`, `Diff`, `Carousel`) está implementada
+> (HISTORIAL.md, «Fase 29»); el análisis de abajo sigue siendo el de las tandas 2–5.
 
 ## 1. Resumen
 
@@ -149,7 +150,7 @@ el mismo cambio, prueba en ventana real y anotación en HISTORIAL.md.
 
 | Tanda | Componentes | Por qué en este orden | Criterios de aceptación |
 |---|---|---|---|
-| **1** | `Tree`, `Diff`, `Carousel` | Los tres son datos + un slot; no tocan el modelo. Mejor relación valor/riesgo | props validadas (incluidos árboles y el patch), selección/expansión reaplicadas tras reconstruir, transcripciones propias, ejemplo y ventana real |
+| **1** | `Tree`, `Diff`, `Carousel` — **hecha (2026-10-21)** | Los tres son datos + un slot; no tocan el modelo. Mejor relación valor/riesgo | props validadas (incluidos árboles y el patch), selección/expansión reaplicadas tras reconstruir, transcripciones propias, ejemplo y ventana real |
 | **2** | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie` primero) | Datos con más estructura; `Chart` se puede partir por tipo de gráfico | igual, más una prueba de datos grandes (series de 1000 puntos) |
 | **3** | `Command`, `Settings` | Necesitan un mini-lenguaje de datos (como `Table`) y una paleta modal | igual, más `query`/filtrado y `change` con `{key, value}` |
 | **4** | `List` | Solo si hace falta lo que `VirtualList` no da (secciones, búsqueda integrada, carga incremental) | delegate genérico probado con 10 000 filas y árbol profundo |

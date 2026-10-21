@@ -267,8 +267,11 @@ un hito por iteración, con revisión y parada entre cada uno (regla 6).
 | **M6 — Tanda 3 y cierre de calidad** | `Command`, `Settings`, repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro. | Lo de M2 más `change` con `{key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | `change` con objeto (campo `data` opcional) |
 
 > **Estado (2026-10-21):** **M0 y M1 hechos** ([HISTORIAL.md](HISTORIAL.md), «Fase 28»): CI en
-> verde en los tres jobs y ventanas verificadas en ventana real; M2–M6 sin empezar. Proteger
-> `main` queda fuera de M0, para cuando el repositorio sea público.
+> verde en los tres jobs y ventanas verificadas en ventana real. **M2 hecho** («Fase 29»):
+> protocolo, host, los tres clientes, `conformance/advanced.txt`, ejemplo, 52+19+16+19 tests en
+> verde y prueba en ventana real (selección y expansión del árbol, selección de líneas del diff y
+> carrusel con flechas y puntos). M3–M6 sin empezar. Proteger `main` queda fuera de M0, para
+> cuando el repositorio sea público.
 
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y

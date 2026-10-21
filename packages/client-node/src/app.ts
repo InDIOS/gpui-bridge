@@ -179,44 +179,44 @@ export class UINode<T extends NodeType> {
 
   append(...children: UINode<NodeType>[]): this {
     for (const child of children) {
-      this.app.tree.queue({ op: "append", parent: this.id, child: child.id });
-      this.app.tree.attach(this.id, child.id);
+      this.app.wire.queue({ op: "append", parent: this.id, child: child.id });
+      this.app.wire.attach(this.id, child.id);
     }
     return this;
   }
 
   insertBefore(child: UINode<NodeType>, before: UINode<NodeType>): this {
-    this.app.tree.queue({ op: "insertBefore", parent: this.id, child: child.id, before: before.id });
-    this.app.tree.attach(this.id, child.id);
+    this.app.wire.queue({ op: "insertBefore", parent: this.id, child: child.id, before: before.id });
+    this.app.wire.attach(this.id, child.id);
     return this;
   }
 
   /** Merges props; `null` removes one. */
   set(props: PropsUpdate<T>): this {
-    this.app.tree.queue({ op: "setProps", id: this.id, props });
+    this.app.wire.queue({ op: "setProps", id: this.id, props });
     return this;
   }
 
   /** Subscribes to an event; the host only emits subscribed events. */
   on<E extends keyof NodeEvents[T] & string>(event: E, handler: (payload: NodeEvents[T][E]) => void): this {
-    this.app.tree.setHandler(this.id, event, handler);
+    this.app.wire.setHandler(this.id, event, handler);
     return this;
   }
 
   off<E extends keyof NodeEvents[T] & string>(event: E): this {
-    this.app.tree.setHandler(this.id, event, undefined);
+    this.app.wire.setHandler(this.id, event, undefined);
     return this;
   }
 
   /** Gives the node the keyboard focus on the next commit (an Input, a Textarea or a div with `keyDown`). */
   focus(): this {
-    this.app.tree.queue({ op: "focus", id: this.id });
+    this.app.wire.queue({ op: "focus", id: this.id });
     return this;
   }
 
   /** Removes the node and all its descendants. */
   remove(): void {
-    this.app.tree.remove(this.id);
+    this.app.wire.remove(this.id);
   }
 }
 
@@ -294,8 +294,8 @@ export class AppWindow {
 }
 
 export class App {
-  /** @internal */
-  readonly tree = new Tree();
+  /** @internal Protocol operations queued until `commit`. */
+  readonly wire = new Tree();
   private readonly listeners: { [K in keyof AppEvents]: Set<(payload: AppEvents[K]) => void> } = {
     error: new Set(),
     windowClosed: new Set(),
@@ -511,9 +511,24 @@ export class App {
     return this.create("Calendar", props);
   }
 
+  /** Items in props; `change` with the chosen item's id, `expand`/`collapse` with a folder's id. */
+  tree(props: NodeProps["Tree"] = {}) {
+    return this.create("Tree", props);
+  }
+
+  /** A parsed patch; `change` with the selected lines. */
+  diff(props: NodeProps["Diff"] = {}) {
+    return this.create("Diff", props);
+  }
+
+  /** Slides as children; `change` with the selected index. */
+  carousel(props: NodeProps["Carousel"] = {}) {
+    return this.create("Carousel", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
-    return new UINode(this, this.tree.create(type, { ...props }), type);
+    return new UINode(this, this.wire.create(type, { ...props }), type);
   }
 
   /** Creates or updates the main window (window 1). It opens on the first commit that sets `root`. */
@@ -532,13 +547,13 @@ export class App {
   /** @internal */
   queueWindow(id: WindowId | undefined, options: WindowOptions): void {
     const { root, ...rest } = options;
-    this.tree.queue({ op: "window", ...(id !== undefined && { id }), ...rest, ...(root && { root: root.id }) });
+    this.wire.queue({ op: "window", ...(id !== undefined && { id }), ...rest, ...(root && { root: root.id }) });
     if (root) this.openWindows.add(id ?? 1);
   }
 
   /** @internal */
   queueCloseWindow(id: WindowId): void {
-    this.tree.queue({ op: "closeWindow", id });
+    this.wire.queue({ op: "closeWindow", id });
     this.openWindows.delete(id);
   }
 
@@ -592,20 +607,20 @@ export class App {
 
   /** App-wide keyboard shortcuts (`ctrl-s`, `f5`…), applied on the next commit; replaces the list. */
   shortcuts(keys: string[]): this {
-    this.tree.queue({ op: "shortcuts", keys });
+    this.wire.queue({ op: "shortcuts", keys });
     return this;
   }
 
   /** Shows or updates the system tray icon on the next commit. */
   tray(options: TrayOptions): this {
-    this.tree.queue({ op: "tray", ...options });
+    this.wire.queue({ op: "tray", ...options });
     this.hasTray = true;
     return this;
   }
 
   /** Removes the tray icon on the next commit; with no window open, the host then exits. */
   removeTray(): this {
-    this.tree.queue({ op: "removeTray" });
+    this.wire.queue({ op: "removeTray" });
     this.hasTray = false;
     if (this.openWindows.size === 0) this.closing = true;
     return this;
@@ -614,7 +629,7 @@ export class App {
   /** Sends every pending operation; the host renders once per commit. */
   commit(): void {
     if (this.exitInfo) throw new HostExitedError(describeExit(this.exitInfo, this.hostPath), this.exitInfo);
-    this.tree.commit((message) => this.host.send(message));
+    this.wire.commit((message) => this.host.send(message));
   }
 
   on<K extends keyof AppEvents>(event: K, listener: (payload: AppEvents[K]) => void): this {
@@ -644,9 +659,9 @@ export class App {
   handleMessage(message: HostMessage): void {
     switch (message.type) {
       case "event": {
-        const handler = this.tree.handler(message.id, message.event);
+        const handler = this.wire.handler(message.id, message.event);
         if (!handler) return;
-        const type = this.tree.type(message.id);
+        const type = this.wire.type(message.id);
         const payload =
           message.event === "menu"
             ? { item: message.value ?? "" }

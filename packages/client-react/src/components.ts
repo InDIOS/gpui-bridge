@@ -5,6 +5,7 @@ import type { ReactNode, Ref } from "react";
 import type {
   A11y,
   ButtonProps as WireButtonProps,
+  DiffSelection,
   ImageProps as WireImageProps,
   Menu,
   MenuItem,
@@ -350,3 +351,21 @@ export const Resizable = "Resizable" as unknown as HostComponent<ResizableProps>
 
 export type CalendarProps = NodeProps["Calendar"] & { onChange?: (day: string) => void };
 export const Calendar = "Calendar" as unknown as HostComponent<CalendarProps>;
+
+export type TreeProps = NodeProps["Tree"] & {
+  onChange?: (id: string) => void;
+  onExpand?: (id: string) => void;
+  onCollapse?: (id: string) => void;
+};
+export const Tree = "Tree" as unknown as HostComponent<TreeProps>;
+
+/** The selected lines, or `null` when the selection is cleared. */
+export type DiffProps = NodeProps["Diff"] & { onChange?: (selection: DiffSelection | null) => void };
+export const Diff = "Diff" as unknown as HostComponent<DiffProps>;
+
+/** Each child is one slide. */
+export type CarouselProps = NodeProps["Carousel"] & {
+  onChange?: (index: number) => void;
+  children?: ReactNode;
+};
+export const Carousel = "Carousel" as unknown as HostComponent<CarouselProps>;

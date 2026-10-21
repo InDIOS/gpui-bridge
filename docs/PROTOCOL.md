@@ -199,9 +199,13 @@ Rules:
 | `Toolbar`  | `class`                                                      | —                  |
 | `Resizable` | `axis`, `sizes`, `class`                                    | —                  |
 | `Calendar` | `value`, `months`, `weekStartsOn`, `disabled`, `controlled`, `class` | `change`    |
+| `Tree`     | `items`, `value`, `controlled`, `class`                      | `change`, `expand`, `collapse` |
+| `Diff`     | `patch`, `mode` (`unified`, `split`), `lineNumbers`, `softWrap`, `header`, `class` | `change` |
+| `Carousel` | `value`, `axis` (`horizontal`, `vertical`), `looping`, `controls`, `pagination`, `controlled`, `class` | `change` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
-and Advanced groups are described in section 17.
+and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
+`Carousel`) in section 18.
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -282,8 +286,9 @@ and Advanced groups are described in section 17.
 {"type":"error","code":"unknown_node","message":"Node 42 does not exist","op":"setProps"}
 ```
 
-`value` is a string, except for `Slider` (a number) and `Table` (a row index, `null` when
-the selection is cleared, or the `sort` object of section 15).
+`value` is a string, except for `Slider` and `Carousel` (a number), `Table` (a row index,
+`null` when the selection is cleared, or the `sort` object of section 15) and `Diff` (the
+selected lines object of section 18, or `null` when the selection is cleared).
 
 `windowClosed` is sent only when the user closes a window, with the window's `id` (1 for
 the main window); after the last open window the host exits. A window the client closes with
@@ -397,6 +402,10 @@ of the client contract: without `--no-window` it is `unknown_op`.
 {"op":"simulate","event":"trayMenu","value":"quit"}
 {"op":"simulate","id":13,"event":"change","value":2}
 {"op":"simulate","id":13,"event":"sort","value":{"column":"name","direction":"desc"}}
+{"op":"simulate","id":15,"event":"change","value":"src/lib.rs"}
+{"op":"simulate","id":15,"event":"expand","value":"src"}
+{"op":"simulate","id":17,"event":"change","value":{"path":"notes.txt","side":"modified","start":1,"end":2,"endSide":"modified"}}
+{"op":"simulate","id":19,"event":"change","value":2}
 ```
 
 - It acts at once on the committed tree, like a user acting on the screen: pending
@@ -426,6 +435,13 @@ of the client contract: without `--no-window` it is `unknown_op`.
   nothing) and `doubleClick` selects the row, then reports it. A row past the end is
   `invalid_operation`. `sort` takes the column and direction in `value` (the window cycles
   them, `simulate` names them); a column that is not `sortable` is `invalid_operation`.
+- `change` on a `Tree` selects the item whose `id` is `value` (the selected item again does
+  nothing, a `disabled` one does nothing, an unknown one is `invalid_operation`); `expand`
+  and `collapse` report a folder's `id` (a leaf does nothing, an unknown id is
+  `invalid_operation`).
+  `change` on a `Diff` takes `null` or the selected lines object of section 18 (a path the
+  patch does not have is `invalid_operation`, a malformed object is `invalid_json`).
+  `change` on a `Carousel` takes a slide index (past the last slide is `invalid_json`).
 - `trayClick` and `trayMenu` (with the item `id` in `value`) play a left click on the tray
   icon and choosing an item of its menu. Without a tray they are `invalid_operation`; a
   disabled item does nothing and an unknown one is `invalid_operation`. An unknown window is `invalid_operation`.
@@ -739,8 +755,8 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` and
-`Sidebar` keep their own delegates and state machines and are not mapped yet.
+binary. `Dock`, `Command`, `Settings`, `List`, `Chart` and `Sidebar` keep their own delegates
+and state machines and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
@@ -791,4 +807,81 @@ binary. `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Char
 
 The transcripts in `conformance/basic.txt`, `conformance/layout.txt` and
 `conformance/a11y.txt` are the reference for their props and events.
+
+## 18. Trees, diffs and carousels
+
+These three describe data in props instead of plain values. They keep one state per node in
+the host and rebuild it only when the data changes, so scroll position, selection and
+expansion are not lost on every commit.
+
+### Tree
+
+```json
+{"op":"create","id":15,"type":"Tree","props":{"items":[
+  {"id":"src","label":"src","expanded":true,"children":[
+    {"id":"src/lib.rs","label":"lib.rs"},
+    {"id":"src/ui","label":"ui","children":[{"id":"src/ui/tree.rs","label":"tree.rs"}]}
+  ]},
+  {"id":"README.md","label":"README.md"},
+  {"id":"target","label":"target","disabled":true}
+],"value":"src"},"events":["change","expand","collapse"]}
+```
+
+- `items` is a list of `{"id", "label"}` with optional `children` (the same shape, any depth),
+  `expanded` (open when the tree is first built; default false) and `disabled`. `id` is a
+  string chosen by the client and must be unique across the whole tree; a repeated one, a
+  missing `id`/`label`, or `children` that is not a list is `invalid_props`.
+- `value` is the selected item's `id`; one that is not in `items` (or a collapsed one)
+  selects nothing, and a value that points inside a collapsed folder expands its ancestors.
+  Selecting an item sends `change` with its `id`; in synced mode the host keeps it in
+  `value`, in controlled mode the host shows the client's `value` again until it is confirmed.
+- Clicking a folder selects it and toggles it, sending `expand` or `collapse` with its `id`
+  (opt-in, like every event). The expansion is kept in the host while the node lives and is
+  reapplied when `items` is rebuilt, except for items the client changes explicitly with
+  `expanded`.
+- The tree scrolls itself and virtualizes its rows: give it a bounded height (`h-64`,
+  `flex-1`) with `class`.
+- `focus` works on a Tree: the arrow keys move the selection, Enter toggles a folder.
+
+### Diff
+
+```json
+{"op":"create","id":17,"type":"Diff","props":{
+  "patch":"diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n",
+  "mode":"split","lineNumbers":true,"softWrap":true,"header":true
+},"events":["change"]}
+```
+
+- `patch` is a unified or Git diff, parsed by the host; a malformed patch is `invalid_props`.
+  An empty patch draws nothing. The state is rebuilt only when the patch (or `mode`) changes.
+- `mode` is `unified` (default) or `split`; `lineNumbers`, `softWrap` and `header` default to
+  `true`, `false` and `true`.
+- Selecting source lines sends `change` with
+  `{"path", "side", "start", "end", "endSide"}` (`side` and `endSide` are `original` or
+  `modified`, the lines are 1-based), or `null` when the selection is cleared. The selection
+  is the component's: it is not a prop.
+- Like the tree, the diff scrolls itself: give it a bounded height in `class`.
+
+### Carousel
+
+```json
+{"op":"create","id":19,"type":"Carousel","props":{"value":0,"axis":"horizontal",
+  "looping":false,"controls":true,"pagination":true},"events":["change"]}
+{"op":"create","id":20,"type":"text","props":{"content":"One"}}
+{"op":"create","id":21,"type":"text","props":{"content":"Two"}}
+{"op":"append","parent":19,"child":20}
+{"op":"append","parent":19,"child":21}
+```
+
+- Each child is one slide; the host counts the node's children. Adding or removing a child
+  changes the slide count and clamps the selection.
+- `value` is the selected slide index (0-based); one past the last slide selects the last one.
+  `axis` is `horizontal` (default) or `vertical`; `looping` wraps at the ends (default false);
+  `controls` shows the previous/next buttons (default true); `pagination` shows one dot per
+  slide (default false).
+- Moving with the buttons, dots, the pointer or the arrow keys sends `change` with the new
+  index; in synced mode the host keeps it in `value`, in controlled mode it goes back to the
+  client's index until it is confirmed.
+
+The transcript in `conformance/advanced.txt` is the reference for their props and events.
 
