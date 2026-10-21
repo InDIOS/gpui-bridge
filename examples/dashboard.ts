@@ -72,6 +72,7 @@ const bars = app.chart({
   })),
   color: "chart-2",
   yAxis: true,
+  yTicks: 3,
   class: "h-56 flex-1 border border-border rounded-md",
 });
 

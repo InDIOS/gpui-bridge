@@ -360,7 +360,7 @@ impl NodeType {
                 Some(Bool)
             }
             (Self::Chart, "yMin" | "yMax" | "innerRadius" | "padAngle") => Some(Number),
-            (Self::Chart, "xTicks") => Some(Index),
+            (Self::Chart, "xTicks" | "yTicks") => Some(Index),
             (
                 Self::Input
                 | Self::Checkbox

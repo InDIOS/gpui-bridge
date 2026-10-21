@@ -1177,6 +1177,8 @@ profundo.
     defecto) y formaban una barra negra. El host pasa ahora `x_tick_count`/`band_tick_count`:
     12 etiquetas por defecto, repartidas del primer punto al último, y el prop `xTicks` (entero
     desde 0) deja al cliente elegir el número (0 ninguna; uno mayor que los puntos, todas).
+    `yTicks` hace lo mismo con las marcas del eje de valores (por defecto 5, extremos incluidos;
+    gpui-component sube a 2 lo que quede por debajo).
   - **`padAngle` está en radianes** (`Pie` de gpui-base trabaja sobre `TAU`). El ejemplo y la
     transcripción usaban `2` (≈115°), que se tragaba toda porción menor: solo se veía la de
     Rust, aunque el hover sí encontraba las otras. Se documenta la unidad y el ejemplo pasa a

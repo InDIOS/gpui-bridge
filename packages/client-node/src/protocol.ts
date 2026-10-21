@@ -773,6 +773,8 @@ export interface ChartProps {
   xTicks?: number;
   /** The value axis; default false. */
   yAxis?: boolean;
+  /** Ticks on the value axis, both ends included; default 5, below 2 counts as 2. */
+  yTicks?: number;
   /** The grid lines; default true. */
   grid?: boolean;
   /** A line: pin the value axis; both are needed, in order. */

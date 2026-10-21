@@ -171,7 +171,10 @@ pub fn sync<V: 'static>(
 
 /// Category labels an axis draws unless `xTicks` says otherwise, spread evenly: gpui-component
 /// labels every point by default, and a thousand of them overlap into a solid bar.
-const TICKS: usize = 12;
+const X_TICKS: usize = 12;
+
+/// Ticks on the value axis unless `yTicks` says otherwise: gpui-component's own default.
+const Y_TICKS: usize = 5;
 
 fn flag(node: &Node, key: &str, default: bool) -> bool {
     node.props
@@ -187,24 +190,26 @@ fn number(node: &Node, key: &str) -> Option<f64> {
         .filter(|value| value.is_finite())
 }
 
-/// `xTicks`: 0 draws none, and one at or above the number of points labels them all.
-fn ticks(node: &Node) -> usize {
+/// `xTicks` (0 draws none, one at or above the number of points labels them all) or `yTicks`
+/// (both ends included; gpui-component raises anything below 2 to 2).
+fn ticks(node: &Node, key: &str, default: usize) -> usize {
     node.props
-        .get("xTicks")
+        .get(key)
         .and_then(Value::as_u64)
-        .map_or(TICKS, |count| count as usize)
+        .map_or(default, |count| count as usize)
 }
 
 fn name(node: &Node) -> Option<&str> {
     node.props.get("name").and_then(Value::as_str)
 }
 
-/// A line: `curve` (`linear`, `natural` or `step`), `dot`, `xAxis`, `xTicks`, `yAxis`, `grid`,
-/// `yMin`/`yMax` and `interactive`.
+/// A line: `curve` (`linear`, `natural` or `step`), `dot`, `xAxis`, `xTicks`, `yAxis`, `yTicks`,
+/// `grid`, `yMin`/`yMax` and `interactive`.
 fn line_chart(id: NodeId, node: &Node, data: Vec<Datum>, stroke: Hsla) -> AnyElement {
     let mut chart = LineChart::new(data)
         .id(("chart", id))
-        .x_tick_count(ticks(node))
+        .x_tick_count(ticks(node, "xTicks", X_TICKS))
+        .y_tick_count(ticks(node, "yTicks", Y_TICKS))
         .x(|datum: &Datum| datum.label.clone())
         .y(|datum: &Datum| datum.value)
         .stroke(stroke)
@@ -231,12 +236,13 @@ fn line_chart(id: NodeId, node: &Node, data: Vec<Datum>, stroke: Hsla) -> AnyEle
     chart.into_any_element()
 }
 
-/// Bars: `horizontal`, `xAxis` and `xTicks` (the label axis), `yAxis` (the value axis), `grid` and
-/// `interactive`.
+/// Bars: `horizontal`, `xAxis` and `xTicks` (the label axis), `yAxis` and `yTicks` (the value
+/// axis), `grid` and `interactive`.
 fn bar_chart(id: NodeId, node: &Node, data: Vec<Datum>, fill: Hsla) -> AnyElement {
     let mut chart = BarChart::new(data)
         .id(("chart", id))
-        .band_tick_count(ticks(node))
+        .band_tick_count(ticks(node, "xTicks", X_TICKS))
+        .value_tick_count(ticks(node, "yTicks", Y_TICKS))
         .band(|datum: &Datum| datum.label.clone())
         .value(|datum: &Datum| datum.value)
         .fill(move |_: &Datum, _: Bounds<f32>, _: Bounds<f32>, _: BarAlignment| fill)
@@ -294,7 +300,7 @@ pub fn build(id: NodeId, node: &Node, slot: &ChartSlot, theme: &Theme) -> AnyEle
 #[cfg(test)]
 mod tests {
     // Not `super::*`: gpui's own `test` attribute would shadow the standard one.
-    use super::{Kind, TICKS, check_data, parse, ticks};
+    use super::{Kind, X_TICKS, Y_TICKS, check_data, parse, ticks};
     use crate::schema::NodeType;
     use crate::tree::Node;
     use serde_json::{Value, json};
@@ -335,10 +341,11 @@ mod tests {
     }
 
     #[test]
-    fn x_ticks_defaults_to_twelve() {
-        assert_eq!(ticks(&node(json!({}))), TICKS);
-        assert_eq!(ticks(&node(json!({"xTicks": 0}))), 0);
-        assert_eq!(ticks(&node(json!({"xTicks": 5}))), 5);
+    fn ticks_default_per_axis() {
+        assert_eq!(ticks(&node(json!({})), "xTicks", X_TICKS), 12);
+        assert_eq!(ticks(&node(json!({})), "yTicks", Y_TICKS), 5);
+        assert_eq!(ticks(&node(json!({"xTicks": 0})), "xTicks", X_TICKS), 0);
+        assert_eq!(ticks(&node(json!({"yTicks": 3})), "yTicks", Y_TICKS), 3);
     }
 
     #[test]

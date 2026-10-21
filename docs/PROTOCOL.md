@@ -203,7 +203,7 @@ Rules:
 | `Diff`     | `patch`, `mode` (`unified`, `split`), `lineNumbers`, `softWrap`, `header`, `class` | `change` |
 | `Carousel` | `value`, `axis` (`horizontal`, `vertical`), `looping`, `controls`, `pagination`, `controlled`, `class` | `change` |
 | `Sidebar`  | `items`, `value`, `collapsed`, `collapsible` (`icon`, `offcanvas`, `none`), `side` (`left`, `right`), `controlled`, `class` | `change` |
-| `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
+| `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -957,7 +957,8 @@ chart. Neither adds dependencies and both are props-only for the client.
 - `xAxis` (default true) shows the category axis and `yAxis` (default false) the value axis;
   `xTicks` is how many category labels a line or bar chart draws, spread evenly from the first
   point to the last (default 12; 0 draws none, and one at or above the number of points labels
-  every point);
+  every point); `yTicks` is how many ticks the value axis carries, both ends included, which
+  places its labels and the horizontal grid lines (default 5; anything below 2 counts as 2);
   `grid` (default true) draws the grid lines. `interactive` (default true) turns the hover
   crosshair, the dots and the tooltip off.
 - A pie: `innerRadius` is the hole in the middle in pixels (default 0, a donut from there in)
