@@ -5,7 +5,7 @@
 //   pnpm dev todo                 # examples/todo.ts
 //   pnpm dev counter.py           # examples/counter.py
 //   pnpm dev react/todo           # examples/react/todo.tsx (compiled first)
-//   pnpm dev forms -- --debug     # extra arguments go to the example
+//   pnpm dev forms --debug        # extra arguments go to the example (pnpm swallows `--`)
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -30,7 +30,9 @@ function hostPath() {
 
 const separator = process.argv.indexOf("--");
 const args = process.argv.slice(2, separator === -1 ? undefined : separator);
-const extra = separator === -1 ? [] : process.argv.slice(separator + 1);
+// Everything after the example name goes to it. pnpm strips the `--` itself, so both
+// `pnpm dev forms --debug` and `pnpm dev forms -- --debug` reach the example.
+const extra = separator === -1 ? args.slice(1) : process.argv.slice(separator + 1);
 const name = args[0] ?? "counter";
 
 const host = hostPath();

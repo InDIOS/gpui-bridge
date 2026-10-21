@@ -17,7 +17,10 @@ pnpm test                      # host, Node, React and Python
 ```
 
 `pnpm dev <name>` resolves the host and sets `GPUI_BRIDGE_HOST` for the example: `pnpm dev todo`,
-`pnpm dev react/todo`, `pnpm dev counter.py`. Extra arguments after `--` go to the example.
+`pnpm dev react/todo`, `pnpm dev counter.py`. It prefers the debug build in `target/debug` and
+falls back to `target/release`; `--debug` prints which host it runs and forwards its logs, e.g.
+`pnpm dev forms --debug`. Extra arguments go to the example (pnpm swallows a `--`, so both
+`--debug` and `-- --debug` work).
 
 ## Layout
 
