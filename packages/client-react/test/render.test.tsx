@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -245,6 +245,41 @@ test("VirtualList renders rows as children; Table and Tabs get plain values", as
   // Sorted rows and the confirmed tab go back to the host.
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === table.id && JSON.stringify(m.props.rows) === JSON.stringify([{ name: "a" }, { name: "b" }])));
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === tabs.id && m.props.value === "table"));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a Tabs of Tab nodes puts their children in the chips", async () => {
+  const got: unknown[] = [];
+  function Chips() {
+    const [tab, setTab] = useState("files");
+    return (
+      <Tabs value={tab} variant="underline" onChange={(value) => (got.push(["tab", value]), setTab(value))}>
+        <Tab value="files" a11y={{ label: "Files" }}>
+          <Icon name="folder" />
+          <Text>Files</Text>
+          <Badge count={3} />
+        </Tab>
+        <Tab value="history" label="History" disabled />
+      </Tabs>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Chips />);
+  const [tabs] = created(sent, "Tabs");
+  const chips = created(sent, "Tab");
+  assert.deepEqual(chips.map((m) => m.props), [
+    { value: "files", a11y: { label: "Files" } },
+    { value: "history", label: "History", disabled: true },
+  ]);
+  assert.ok(sent.some((m) => m.op === "append" && m.parent === tabs.id && m.child === chips[0].id));
+  // The chip is built from nodes: its `Icon`, `Text` and `Badge` are inside the `Tab`.
+  assert.equal(sent.filter((m) => m.op === "append" && m.parent === chips[0].id).length, 3);
+
+  emit(app, { id: tabs.id, event: "change", value: "history" });
+  await tick();
+  assert.deepEqual(got, [["tab", "history"]]);
+  // The confirmed value goes back to the `Tabs`, which has no `tabs` list at all.
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === tabs.id && m.props.value === "history"));
   await app.close();
   assert.deepEqual(errors, []);
 });

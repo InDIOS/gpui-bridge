@@ -157,6 +157,14 @@ el mismo cambio, prueba en ventana real y anotación en HISTORIAL.md.
 | **4** | `List` | Solo si hace falta lo que `VirtualList` no da (secciones, búsqueda integrada, carga incremental) | delegate genérico probado con 10 000 filas y árbol profundo |
 | **5** | `Dock` | Requiere un ADR antes de escribir código | ADR aprobado; después, lo mismo que las demás tandas + persistencia del layout |
 
+**Subcomponentes — piloto con `Tab` dentro de `Tabs` (hecho el 2026-10-21, M4).** Un componente
+cuyo contenido es una lista de props (`tabs`, `options`, `items`) no puede llevar nodos dentro.
+El patrón de `Form`/`Field` sí: el padre mira a sus hijos y usa los del tipo del subcomponente
+(`Tab` con `value`, `label`, `disabled`, y sus propios hijos dentro), e ignora su prop de lista
+cuando los tiene. Sirve para que un `RadioGroup` tome `Radio` hijos, un `Stepper` `Step`, un
+`DescriptionList` `Entry` y un `Accordion` `Section`, sin tocar el modelo del host (nodos
+normales, `change` desde el padre). El del piloto quedó en `PROTOCOL.md` §15.
+
 ## 10. Decisiones abiertas (Dock)
 
 1. **Quién posee el layout.** (a) El cliente manda un árbol de splits/pestañas con ids de panel y

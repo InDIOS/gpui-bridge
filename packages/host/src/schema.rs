@@ -2,6 +2,8 @@
 
 use serde_json::Value;
 
+use crate::protocol::Props;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropKind {
     Str,
@@ -152,6 +154,8 @@ pub enum NodeType {
     VirtualList,
     Table,
     Tabs,
+    /// The chip of a `Tabs` built from nodes (PROTOCOL.md section 15).
+    Tab,
     // Basic components (PROTOCOL.md section 5).
     Alert,
     Badge,
@@ -208,6 +212,7 @@ impl NodeType {
             "VirtualList" => Some(Self::VirtualList),
             "Table" => Some(Self::Table),
             "Tabs" => Some(Self::Tabs),
+            "Tab" => Some(Self::Tab),
             "Alert" => Some(Self::Alert),
             "Badge" => Some(Self::Badge),
             "Tag" => Some(Self::Tag),
@@ -273,6 +278,8 @@ impl NodeType {
             (Self::Tabs, "variant") => {
                 Some(OneOf(&["tab", "outline", "pill", "segmented", "underline"]))
             }
+            (Self::Tab, "value" | "label") => Some(Str),
+            (Self::Tab, "disabled") => Some(Bool),
             (Self::Icon, "name") => Some(Icon),
             (Self::Div, "windowControl") => Some(OneOf(&["drag", "minimize", "maximize", "close"])),
             (Self::Image, "src") => Some(Str),
@@ -403,6 +410,21 @@ impl NodeType {
         }
     }
 
+    /// The props a node cannot be built without. Only a `Tab` has one: the `value` it reports
+    /// (PROTOCOL.md section 15). `props` is the whole message, so this also rejects a `setProps`
+    /// that removes or empties `value`.
+    pub fn check_required(self, props: &Props) -> Result<(), String> {
+        if self != Self::Tab
+            || props
+                .get("value")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.is_empty())
+        {
+            return Ok(());
+        }
+        Err("A Tab needs a non-empty 'value' string".into())
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Div => "div",
@@ -422,6 +444,7 @@ impl NodeType {
             Self::VirtualList => "VirtualList",
             Self::Table => "Table",
             Self::Tabs => "Tabs",
+            Self::Tab => "Tab",
             Self::Alert => "Alert",
             Self::Badge => "Badge",
             Self::Tag => "Tag",
@@ -474,6 +497,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::VirtualList,
     NodeType::Table,
     NodeType::Tabs,
+    NodeType::Tab,
     NodeType::Alert,
     NodeType::Badge,
     NodeType::Tag,

@@ -392,6 +392,11 @@ export class App {
     return this.create("Tabs", props);
   }
 
+  /** One tab of a `Tabs`; append the nodes of its chip (an `Icon`, a `text`, a `Badge`…). */
+  tab(props: NodeProps["Tab"] = {}) {
+    return this.create("Tab", props);
+  }
+
   /** A menu bar: one button per menu (PROTOCOL.md section 10). */
   menuBar(props: NodeProps["MenuBar"] = {}) {
     return this.create("MenuBar", props);

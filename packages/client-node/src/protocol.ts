@@ -24,6 +24,7 @@ export type NodeType =
   | "VirtualList"
   | "Table"
   | "Tabs"
+  | "Tab"
   | "Alert"
   | "Badge"
   | "Tag"
@@ -412,6 +413,21 @@ export interface TabsProps {
   variant?: "tab" | "outline" | "pill" | "segmented" | "underline";
   /** The host only reports choices; the client confirms them with `value`. */
   controlled?: boolean;
+  class?: string;
+}
+
+/**
+ * One tab of a `Tabs`: append children to build its chip (an `Icon`, a `text`, a `Badge`…).
+ * A `Tabs` with `Tab` children uses them and ignores its `tabs`, and the `Tab` reports nothing:
+ * its `Tabs` sends the `change`.
+ */
+export interface TabProps {
+  /** What `change` reports for this tab. Required: the host rejects a `Tab` without it. */
+  value?: string;
+  /** The tab's text, drawn before its children. A chip of nodes names itself with `a11y.label`. */
+  label?: string;
+  disabled?: boolean;
+  /** Styles the chip itself: `flex-1` makes the tabs share the bar's width. */
   class?: string;
 }
 
@@ -808,6 +824,7 @@ export interface NodeProps {
   VirtualList: VirtualListProps & SharedProps;
   Table: TableProps & SharedProps;
   Tabs: TabsProps & SharedProps;
+  Tab: TabProps & SharedProps;
   Alert: AlertProps & SharedProps;
   Badge: BadgeProps & SharedProps;
   Tag: TagProps & SharedProps;
@@ -859,6 +876,8 @@ export interface NodeEvents {
   /** `value` is a row index; `null` when Escape clears the selection. */
   Table: { change: { value: number | null }; doubleClick: { value: number }; sort: TableSort };
   Tabs: { change: { value: string } };
+  /** A `Tab` reports nothing: its `Tabs` sends the `change`. */
+  Tab: {};
   Alert: { close: {} };
   Badge: {};
   Tag: {};

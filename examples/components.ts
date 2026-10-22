@@ -1,14 +1,14 @@
 // Components from gpui-kit's Basic, Form and Layout groups: an alert, badges, tags, keys, a
 // progress bar, a rating, a pagination, a stepper, an accordion, a form of fields, a description
-// list, a toolbar, a status bar, a resizable split and a calendar. Everything carries an `a11y`
-// prop where its own label is not enough.
+// list, a toolbar, a status bar, a resizable split, a calendar and a tab bar built from `Tab`
+// nodes. Everything carries an `a11y` prop where its own label is not enough.
 // Run: node examples/components.ts   (after `npm run build` in client-node/ and `cargo build` in host/)
 
 import { createApp, type NodeType, type UINode } from "gpui-bridge";
 
 const app = await createApp({ debug: process.argv.includes("--debug") });
 
-const state = { stars: 3, page: 1, step: "account", day: "2024-08-03", plan: "pro", name: "" };
+const state = { stars: 3, page: 1, step: "account", day: "2024-08-03", plan: "pro", name: "", section: "files", closed: 0 };
 const summary = app.text({ class: "text-sm text-muted-foreground" });
 const show = () => summary.set({ content: JSON.stringify(state) });
 show();
@@ -72,6 +72,39 @@ const form = app
     app.field({ label: "Name", required: true }).append(name),
   );
 
+// A `Tabs` whose tabs are nodes: every `Tab` child holds its own chip — an icon, a text and a
+// `Badge` — instead of `tabs` entries. A control inside a chip keeps its own click, so the
+// Button in the first tab closes nothing: it does not choose the tab.
+const tabs = app
+  .tabs({ value: "files", variant: "underline", a11y: { role: "tablist", label: "Sections" } })
+  .on("change", onChange<string>((value) => (state.section = value)));
+const chips = [
+  { value: "files", label: "Files", icon: "folder", count: 12 },
+  { value: "changes", label: "Changes", icon: "replace", count: 2 },
+  { value: "history", label: "History", icon: "undo", count: 4, disabled: true },
+];
+for (const chip of chips) {
+  // A tab of nodes has no text of its own, so `a11y.label` names it for the reader.
+  const tab = app.tab({ value: chip.value, disabled: chip.disabled, a11y: { label: chip.label } });
+  // A `Badge` counts what it holds (it draws the number over its child), so it wraps the icon.
+  tab.append(
+    app.badge({ count: chip.count }).append(app.icon({ name: chip.icon, class: "size-4" })),
+    app.text({ content: chip.label }),
+  );
+  if (chip.value === "files") {
+    tab.append(
+      app
+        .button({ label: "×", variant: "ghost", tooltip: "Closing a tab is the app's job" })
+        .on("click", () => {
+          state.closed += 1;
+          show();
+          app.commit();
+        }),
+    );
+  }
+  tabs.append(tab);
+}
+
 const split = app
   .resizable({ axis: "horizontal", sizes: [200], class: "h-48 border border-border rounded-md" })
   .append(
@@ -105,6 +138,7 @@ root.append(
   ),
   row(stars, pages),
   steps,
+  tabs,
   accordion,
   row(
     form,
@@ -131,5 +165,5 @@ root.append(
   app.statusBar({ left: "Ready", right: "gpui-bridge" }),
   summary,
 );
-app.window({ title: "Components", width: 900, height: 860, root, theme: "dark" });
+app.window({ title: "Components", width: 900, height: 860, root });
 app.commit();

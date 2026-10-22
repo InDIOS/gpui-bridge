@@ -212,12 +212,27 @@ export interface TableProps extends SharedProps {
 }
 
 export interface TabsProps extends SharedProps {
-  tabs: Option[];
+  /** Ignored when the `Tabs` has `Tab` children. */
+  tabs?: Option[];
   /** Passing `value` makes the tabs controlled (the host waits for React to confirm choices). */
   value?: string;
   variant?: WireTabsProps["variant"];
   class?: string;
   onChange?: (value: string) => void;
+  /** One `Tab` per child. */
+  children?: ReactNode;
+}
+
+export interface TabProps extends SharedProps {
+  /** What `change` reports for this tab. Required: the host rejects a `Tab` without it. */
+  value?: string;
+  /** The tab's text, drawn before its children. A chip of nodes names itself with `a11y.label`. */
+  label?: string;
+  disabled?: boolean;
+  /** Nodes inside the chip, e.g. an `Icon`, a `Text` and a `Badge`. */
+  children?: ReactNode;
+  /** Styles the chip itself: `flex-1` makes the tabs share the bar's width. */
+  class?: string;
 }
 
 export interface WindowProps {
@@ -272,6 +287,8 @@ export const VirtualList = "VirtualList" as unknown as HostComponent<VirtualList
 export const Table = "Table" as unknown as HostComponent<TableProps>;
 /** A tab bar; render the chosen tab's content yourself. */
 export const Tabs = "Tabs" as unknown as HostComponent<TabsProps>;
+/** One tab of a `Tabs`: its children are the nodes of its chip. */
+export const Tab = "Tab" as unknown as HostComponent<TabProps>;
 /**
  * Shows the system tray icon while mounted (one per app). While it is shown, closing the
  * last window does not end the app; unmounting it then does.

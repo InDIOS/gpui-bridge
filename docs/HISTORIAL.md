@@ -1196,3 +1196,67 @@ profundo.
   type-check de los ejemplos, limpios.
 - **Fuera de este paso:** varias series por gráfico, leyenda, gráficos de área/radar/velas y
   eventos de clic en puntos o porciones.
+
+### Fase 31 — M4: `Tab` dentro de `Tabs` (2026-10-21)
+
+Cuarto hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), el piloto de
+subcomponentes de [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube
+`PROTOCOL_VERSION`: un tipo de nodo nuevo que un cliente viejo no envía, y `tabs` sigue igual.
+
+**Criterios de aceptación:** pestañas hechas de nodos (icono + texto + `Badge`) que informan la
+elegida como hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia;
+transcripción, ejemplo, los tres clientes y ventana real.
+
+**Estado:** hecha, con la prueba en ventana real (2026-10-21).
+
+- **Protocolo (§5 y §15):** nodo `Tab` (`value` obligatoria y no vacía, `label`, `disabled`,
+  `class`; sin eventos) y el párrafo que explica que un `Tabs` con hijos `Tab` los usa e **ignora
+  `tabs`**, que los hijos del `Tab` se dibujan dentro del chip **después del `label`** (o sea, que
+  una pestaña se arma con nodos), que el `class` del `Tab` vista el chip, que una pestaña sin
+  `label` se anuncia con su `a11y.label` y que un `Tab` fuera de un `Tabs` o un hijo que no es
+  `Tab` no se dibujan ni son pestañas (y `value` repetido: gana el primero). `change` sigue
+  saliendo del `Tabs`. `simulate` (§9) elige sobre los hijos `Tab` cuando los hay.
+- **Host — `tabs.rs`:** `choices` (los `(value, disabled)` de los hijos `Tab`, o los de `tabs`) y
+  `chip` (el `Tab` de gpui-component con su `label` o su `aria_label`, y sus hijos dentro en una
+  fila con `gap_2`). `build` arma la barra con los chips que le pasa el render, o con los de
+  `tabs` si no hay hijos; el clic sigue siendo el mismo `on_click` por índice, así que una pestaña
+  deshabilitada o ya elegida no envía nada.
+- **Host — `schema.rs` y `tree.rs`:** `NodeType::check_required`, la primera prop obligatoria del
+  protocolo: un `Tab` sin `value` (o con uno vacío, o un `setProps` que lo quita) es
+  `invalid_props`.
+- **Host — render:** `tabs_node` recoge los hijos `Tab`, les pasa sus nodos ya construidos y les
+  aplica su `class` al chip; un `Tab` suelto no dibuja nada. `tab_content` construye el contenido
+  con `in_chip` puesto: la marca nueva que hace que **solo los controles** (`Button`, `Checkbox`,
+  `Input`, `Select`, `Switch`, `RadioGroup`, `Slider`, `NumberInput`, un `Tab` doblado, un `Table`,
+  un `MenuBar` y un `div` con `click`) ocluyan el clic, de modo que la pestaña no se elija. Se
+  separa de `in_control` (área de título) a propósito: el occlude de `component_a11y`, que vale
+  para un área de título, haría que un `Icon`, un `text` o un `Badge` dentro del chip se comieran
+  el clic y la pestaña no se eligiera al pulsar sobre ellos. Los dos casos se juntan en
+  `blocks_area`.
+- **Simulación y conformidad:** `conformance/data.txt` (§15) gana una barra de hijos `Tab`:
+  elección, repetida, deshabilitada, `tabs` ignorado y un hijo que no es `Tab` (`invalid_operation`
+  para los dos), controlado y `Tab` sin `value` / con `value` vacío o no textual / quitado
+  (`invalid_props`).
+- **Clientes:** Node `app.tab` (con `TabProps`), React `<Tab>` (con hijos; `TabsProps.tabs` pasa a
+  opcional) y Python `tab`.
+- **Ejemplos:** `examples/components.ts` gana una barra hecha de nodos (icono + texto + `Badge`),
+  una pestaña deshabilitada y un `Button` «×» dentro de la primera pestaña; `examples/data.ts`
+  cambia sus pestañas por nodos con el icono y, encima, un `Badge` con las 10 000 filas.
+- **Dos fallos de aspecto que destapó mirar la ventana real.** El chip no separaba sus nodos
+  (gpui-component solo separa lo que construye él: su `label`, su prefijo y su sufijo), así que
+  icono, texto y `Badge` salían pegados; ahora van en una fila con `gap_2` (8 px, lo mismo que
+  una fila de `Tree`). Y el `Badge` del ejemplo estaba suelto: el `Badge` de gpui-component es un
+  envoltorio que pinta la cuenta en absoluto **sobre su hijo**, así que sin hijos ocupaba 0×0 y el
+  número se montaba encima del texto; ahora envuelve al icono (y `PROTOCOL.md` §17 lo aclara).
+- **Prueba en ventana real (2026-10-21):** el host abre la ventana del ejemplo sin rechazar
+  ninguna operación (el log no trae `invalid_props` ni `unknown_type`) y sin pánicos en el
+  `stderr`; los iconos del ejemplo se corrigieron a nombres del juego por defecto (`replace`,
+  `undo`). **Verificado con clics por el usuario:** elegir pestañas, la pestaña deshabilitada que no
+  hace nada y —el punto del hito— la «×» dentro de un chip, que **no** cambia de pestaña.
+- **Verificación automática:** 58 unitarios del host, las 22 transcripciones de `conformance/`,
+  `no_window`, 22 tests de Node, 18 de React y 22 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Fuera de este paso:** el resto del piloto (`Radio` en `RadioGroup`, `Step` en `Stepper`,
+  `Entry` en `DescriptionList`, `Section` en `Accordion`, que sí tendrían que decidir cómo se
+  dibuja un `Radio`/`Step` suelto, y `Select`/`Tree`/`Table`/`Sidebar`, que arman sus elementos a
+  partir de datos y tienen estado propio).

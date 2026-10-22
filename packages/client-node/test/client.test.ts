@@ -374,6 +374,24 @@ test("VirtualList, Table and Tabs are accepted; their events are dispatched", as
   ]);
 });
 
+test("a Tabs built from Tab nodes commits; `change` still comes from the Tabs", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const tabs = app.tabs({ value: "files", variant: "underline" }).on("change", ({ value }) => seen.push(value));
+  const files = app.tab({ value: "files", a11y: { label: "Files" } });
+  files.append(app.icon({ name: "folder", class: "size-4" }), app.text({ content: "Files" }), app.badge({ count: 3 }));
+  tabs.append(files, app.tab({ value: "history", label: "History", disabled: true }));
+  app.window({ root: app.div().append(tabs) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: tabs.id, event: "change", value: "files" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["files"]);
+});
+
 test("Tree, Diff and Carousel are accepted; their events are dispatched", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

@@ -461,6 +461,9 @@ impl Tree {
                 })?;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                node_type
+                    .check_required(&props)
+                    .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 if matches!(node_type, NodeType::Input | NodeType::Textarea)
                     && props.get("value").is_some_and(|v| !v.is_null())
                 {
@@ -522,6 +525,12 @@ impl Tree {
                     .node_type;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                // Only when the op touches it: a `Tab` keeps the `value` it was created with.
+                if props.contains_key("value") {
+                    node_type
+                        .check_required(&props)
+                        .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                }
                 if matches!(node_type, NodeType::Input | NodeType::Textarea)
                     && props.contains_key("value")
                 {

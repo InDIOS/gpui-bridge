@@ -39,8 +39,8 @@ built or tested there). Protocol version 1.
   `VirtualList`, `Table`, `Tabs`, and most of gpui-kit's Basic, Form and Layout groups:
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
-  `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus `Calendar`, `Tree`,
-  `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
+  `Tab` inside `Tabs`, `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus
+  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
   `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
   `Dock`, `Command`, `Settings` and `List` are not mapped yet.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
@@ -126,7 +126,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |
 | `overlays.ts` | A dialog, toasts and tooltips |
-| `components.ts` | The Basic and Layout components, a `Form`, a `Resizable` split and accessibility |
+| `components.ts` | The Basic and Layout components, a `Form`, a `Tabs` of `Tab` nodes, a `Resizable` split and accessibility |
 | `data.ts` | A 10,000-row `VirtualList` and a sortable 10,000-row `Table` |
 | `advanced.ts` | A `Tree` with expansion, a `Diff` of a patch and a `Carousel` |
 | `dashboard.ts` | A `Sidebar`, three `Chart`s (1,000 points, bars, a pie) and a 10-level tree |

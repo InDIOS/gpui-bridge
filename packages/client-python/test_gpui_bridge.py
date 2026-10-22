@@ -320,6 +320,23 @@ class ClientTest(unittest.TestCase):
             [("row", 1), ("row", None), ("open", 0), ("sort", {"column": "name", "direction": "desc"}), ("tab", "table")],
         )
 
+    def test_a_tabs_of_tab_nodes(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        tabs = app.tabs(value="files", variant="underline")
+        tabs.on("change", lambda value: seen.append(("tab", value)))
+        files = app.tab(value="files", a11y={"label": "Files"})
+        files.append(app.icon(name="folder", class_="size-4"), app.text(content="Files"), app.badge(count=3))
+        tabs.append(files, app.tab(value="history", label="History", disabled=True))
+        app.window(root=app.div().append(tabs))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": tabs.id, "event": "change", "value": "files"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("tab", "files")])
+
     def test_tree_diff_and_carousel_are_accepted_and_dispatch_events(self):
         app = App(headless=True)
         errors, seen = [], []

@@ -277,22 +277,22 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         (NodeType::RadioGroup | NodeType::Select | NodeType::Tabs, "change") => {
             let value = text()?;
             let current = node.props.get("value").and_then(Value::as_str);
-            let key = if node_type == NodeType::Tabs {
-                "tabs"
-            } else {
-                "options"
+            // A `Tabs` takes its options from its `Tab` children when it has any.
+            let choices: Vec<(String, bool)> = match node_type {
+                NodeType::Tabs => components::tabs::choices(tree, node),
+                _ => components::options(node, "options")
+                    .into_iter()
+                    .map(|(value, _, disabled)| (value, disabled))
+                    .collect(),
             };
-            match components::options(node, key)
-                .into_iter()
-                .find(|(option, ..)| *option == value)
-            {
+            match choices.into_iter().find(|(option, _)| *option == value) {
                 None => {
                     return Err(fail(
                         ErrorCode::InvalidOperation,
                         format!("Node {id} has no option '{value}'"),
                     ));
                 }
-                Some((.., true)) => {}
+                Some((_, true)) => {}
                 Some(_) if current == Some(value.as_str()) => {}
                 Some(_) => {
                     components::value_chosen(tree, id, Value::String(value));

@@ -442,6 +442,7 @@ impl RootView {
             animated: &self.animated,
             theme: cx.theme(),
             in_control: false,
+            in_chip: false,
             transitions: &mut self.transitions,
             hovered,
             stateful: &mut self.stateful,
@@ -760,6 +761,10 @@ struct RenderCx<'a> {
     theme: &'a Theme,
     /// Inside a `windowControl` area, where interactive nodes must block it (see `blocks`).
     in_control: bool,
+    /// Inside a `Tab` chip, where the control of a node keeps its own click so it does not
+    /// choose the tab (see `blocks_area`; the chip's own text, icons and `Badge`s are part of
+    /// the chip and still choose it, so `component_a11y` does not block them).
+    in_chip: bool,
     /// Every node's transition, by the state of its last frame. Shared with the view, so the pass
     /// a Dialog body or a list row runs in keeps it too.
     transitions: &'a mut HashMap<NodeId, Transition>,
@@ -822,6 +827,8 @@ impl RenderCx<'_> {
             NodeType::Checkbox => self.checkbox_node(id, node, &classes),
             NodeType::Switch => self.switch_node(id, node, &classes),
             NodeType::Tabs => self.tabs_node(id, node, &classes),
+            // Drawn by its `Tabs`: on its own a `Tab` is not a chip (PROTOCOL.md section 15).
+            NodeType::Tab => div().into_any_element(),
             NodeType::Table => self.table_node(id, node, &classes),
             NodeType::VirtualList => self.virtual_list_node(id, node, &classes),
             // Drawn in gpui-component's dialog layer (`dialog::open`), not where it sits in the tree.
@@ -897,6 +904,12 @@ impl RenderCx<'_> {
             .iter()
             .map(|&child| self.node(child))
             .collect()
+    }
+
+    /// Whether an interactive node built here keeps its own click and blocks whatever holds it:
+    /// inside a `windowControl` area, or inside a `Tab` chip, where it must not choose the tab.
+    fn blocks_area(&self) -> bool {
+        self.in_control || self.in_chip
     }
 
     /// A component that does not take the node's classes itself: a wrapper holds them, and it
@@ -1093,7 +1106,7 @@ impl RenderCx<'_> {
 
     fn div_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let control = window_control(node);
-        let blocks = self.in_control && (control.is_some() || node.events.contains("click"));
+        let blocks = self.blocks_area() && (control.is_some() || node.events.contains("click"));
         let outer = self.in_control;
         self.in_control |= control.is_some();
         let children: Vec<AnyElement> = node
@@ -1200,7 +1213,11 @@ impl RenderCx<'_> {
             .and_then(Value::as_array)
             .map_or(&[][..], Vec::as_slice);
         let bar = menu::bar(id, menus, self.session);
-        let bar = if self.in_control { bar.occlude() } else { bar };
+        let bar = if self.blocks_area() {
+            bar.occlude()
+        } else {
+            bar
+        };
         self.style(id, bar, classes, false).into_any_element()
     }
 
@@ -1257,7 +1274,7 @@ impl RenderCx<'_> {
     // Inside a `windowControl` area, a control must block it or Windows takes its clicks as title bar ones.
     fn button_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let button = button::build(id, node, self.session);
-        let button = if self.in_control {
+        let button = if self.blocks_area() {
             button.occlude()
         } else {
             button
@@ -1267,7 +1284,7 @@ impl RenderCx<'_> {
 
     fn checkbox_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let checkbox = checkbox::build(id, node, self.session);
-        let checkbox = if self.in_control {
+        let checkbox = if self.blocks_area() {
             checkbox.occlude()
         } else {
             checkbox
@@ -1280,16 +1297,43 @@ impl RenderCx<'_> {
         self.blocking(id, switch, classes)
     }
 
+    /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`.
     fn tabs_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
-        let tabs = tabs::build(id, node, self.session);
-        self.blocking(id, tabs, classes)
+        let mut chips = Vec::new();
+        for &child in &node.children {
+            let Some(tab) = self
+                .tree
+                .node(child)
+                .filter(|tab| tab.node_type == NodeType::Tab)
+            else {
+                continue;
+            };
+            let content = self.tab_content(tab);
+            let (value, disabled, chip) = tabs::chip(tab, content);
+            // The chip is the `Tab` node, so its `class` styles the chip itself (`flex-1` makes
+            // the tabs share the bar's width).
+            let class = tab.props.get("class").and_then(Value::as_str).unwrap_or("");
+            let classes = self.styles.classes(class);
+            chips.push((value, disabled, styles::apply(chip, &classes, self.theme)));
+        }
+        let bar = tabs::build(id, node, chips, self.session);
+        self.blocking(id, bar, classes)
+    }
+
+    /// The content of a `Tab`: here the control of a node keeps its own click, so clicking a
+    /// `Button` in a tab does not choose the tab (see `in_chip`).
+    fn tab_content(&mut self, node: &Node) -> Vec<AnyElement> {
+        let outer = std::mem::replace(&mut self.in_chip, true);
+        let children = self.children(node);
+        self.in_chip = outer;
+        children
     }
 
     // A wrapper takes the classes (DataTable fills it) and blocks a `windowControl` area.
     fn table_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.tables.get(&id) {
             Some(slot) => {
-                let wrapper = if self.in_control {
+                let wrapper = if self.blocks_area() {
                     div().occlude()
                 } else {
                     div()
@@ -1334,7 +1378,7 @@ impl RenderCx<'_> {
     fn radio_group_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         // A wrapper takes the classes: RadioGroup lays out its own radios.
         let group = radio::build(id, node, self.session);
-        let wrapper = if self.in_control {
+        let wrapper = if self.blocks_area() {
             div().occlude()
         } else {
             div()
@@ -1369,8 +1413,8 @@ impl RenderCx<'_> {
     fn input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.inputs.get(&id) {
             // Input cannot occlude itself or listen to keys: a wrapper takes its classes instead.
-            Some(slot) if self.in_control || node.events.contains("keyDown") => {
-                let wrapper = if self.in_control {
+            Some(slot) if self.blocks_area() || node.events.contains("keyDown") => {
+                let wrapper = if self.blocks_area() {
                     div().occlude().flex()
                 } else {
                     div().flex()
@@ -1414,15 +1458,15 @@ impl RenderCx<'_> {
         })
     }
 
-    /// A control that cannot `occlude` itself: inside a `windowControl` area a blocking wrapper
-    /// takes its classes; elsewhere it takes them itself.
+    /// A control that cannot `occlude` itself: where it must block what holds it a blocking
+    /// wrapper takes its classes; elsewhere it takes them itself.
     fn blocking<E: Styled + IntoElement + 'static>(
         &mut self,
         id: NodeId,
         element: E,
         classes: &[Class],
     ) -> AnyElement {
-        if self.in_control {
+        if self.blocks_area() {
             self.style(id, div().occlude().flex(), classes, false)
                 .child(element)
                 .into_any_element()

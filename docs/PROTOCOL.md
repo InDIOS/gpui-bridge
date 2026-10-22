@@ -176,6 +176,7 @@ Rules:
 | `VirtualList` | `rowHeight`, `class`                                      | —                  |
 | `Table`    | `columns`, `rows`, `selected`, `stripe`, `bordered`, `controlled`, `class` | `change`, `doubleClick`, `sort` |
 | `Tabs`     | `tabs`, `value`, `variant`, `controlled`, `class`            | `change`           |
+| `Tab`      | `value`, `label`, `disabled`, `class`                        | —                  |
 | `Alert`    | `message`, `title`, `variant`, `banner`, `closable`, `class` | `close`            |
 | `Badge`    | `count`, `max`, `dot`, `icon`, `class`                       | —                  |
 | `Tag`      | `label`, `variant`, `outline`, `icon`, `class`               | —                  |
@@ -432,7 +433,8 @@ of the client contract: without `--no-window` it is `unknown_op`.
 - `drop` on a `div` plays files dropped on it; `value` is the list of paths.
 - `ok` and `cancel` on an open `Dialog` play the user's answer: the event is sent and `open`
   becomes `false`. On a closed one they are `invalid_operation`.
-- `change` on `Tabs` works like on `RadioGroup` (over `tabs`). On a `Table`, `change` selects
+- `change` on `Tabs` works like on `RadioGroup` (over `tabs`, or over its `Tab` children).
+  On a `Table`, `change` selects
   the row index in `value` (`null` clears the selection; the selected row again does
   nothing) and `doubleClick` selects the row, then reports it. A row past the end is
   `invalid_operation`. `sort` takes the column and direction in `value` (the window cycles
@@ -699,6 +701,36 @@ commits; removing the list from the window (or moving it out) resets it.
 the app shows the selected tab's content itself, for example by moving the matching panel
 into the window.
 
+A `Tabs` may instead take **`Tab` children**, one per tab, which then replace `tabs`
+altogether (a `Tabs` with `Tab` children ignores `tabs`; with none it works as before):
+
+```json
+{"op":"create","id":40,"type":"Tabs","props":{"value":"files","variant":"underline"},"events":["change"]}
+{"op":"create","id":41,"type":"Tab","props":{"value":"files","a11y":{"label":"Files"}}}
+{"op":"create","id":42,"type":"Icon","props":{"name":"folder","class":"size-4"}}
+{"op":"create","id":43,"type":"Badge","props":{"count":12}}
+{"op":"create","id":44,"type":"text","props":{"content":"Files"}}
+{"op":"append","parent":43,"child":42}
+{"op":"append","parent":41,"child":43}
+{"op":"append","parent":41,"child":44}
+{"op":"append","parent":40,"child":41}
+```
+
+A `Tab` is `value` —required and not empty, it is what `change` reports—, `label` (its text)
+and `disabled`. Its children are drawn inside the chip, after the `label`, in a row with a gap,
+so a tab can be **made of nodes**: an `Icon`, a `text`, a `Badge` and so on (a `Badge` counts
+what it holds, as in section 17, so it goes around the node it marks). Its `class` styles the
+chip itself, so `flex-1` makes the tabs share the bar's width. The `Tabs` still sends `change`,
+and a tab that is `disabled` or already selected does nothing. A control inside a `Tab`
+(`Button`, `Checkbox`, `Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click:
+it does not choose the tab.
+
+The nodes of a chip are not the chip itself: the tab is announced as a tab, with the `label`, or
+with the `a11y.label` of the `Tab` node when there is none. Three cases are the client's own
+mistake and the host only draws around them: a `Tab` outside a `Tabs` is not drawn, a child of a
+`Tabs` that is not a `Tab` is not a tab, and with a `value` repeated among siblings the first
+one wins.
+
 Not supported: cells with anything but text, cell or column selection, moving columns, a
 context menu per row, loading more rows at the end, rows of different heights, and tabs that
 can be closed or reordered.
@@ -765,7 +797,8 @@ and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, and `Si
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
   `close`. The app removes the node, or clears `closable`.
 - **Badge** — `count` (hidden at 0) up to `max` (default 99), or `dot`, or a bundled `icon`; its
-  children are shown under the badge.
+  children are shown under the badge, with the count drawn over them, so a `Badge` without
+  children has nothing to sit on.
 - **Tag** — a label with a `variant` (`primary`, `secondary` (default), `danger`, `success`,
   `warning`, `info`), `outline` and an optional `icon`.
 - **Kbd** — `keys` as one keystroke (`ctrl-s`, `f5`, `shift-enter`); `outline`. A string that is

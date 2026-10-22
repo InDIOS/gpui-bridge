@@ -274,6 +274,8 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.table(wire);
     case "Tabs":
       return app.tabs(wire);
+    case "Tab":
+      return app.tab(wire);
     case "Alert":
       return app.alert(wire);
     case "Badge":

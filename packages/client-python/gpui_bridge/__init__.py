@@ -280,6 +280,12 @@ class App:
         """A tab bar: `tabs=[{"value": ..., "label": ...}]`, `value`, `variant`. Show the content yourself."""
         return self._create("Tabs", props)
 
+    def tab(self, **props) -> Node:
+        """One tab of a `tabs` bar: `value` (required, not empty), `label` (its text, before the
+        children), `disabled` and `class` (of the chip). Append the nodes of its chip (an `icon`, a
+        `text`, a `badge`); a `Tabs` with `tab` children uses them and ignores `tabs`."""
+        return self._create("Tab", props)
+
     def menu_bar(self, **props) -> Node:
         """A menu bar (PROTOCOL.md section 10): `menus=[{"label": ..., "items": [...]}]`."""
         return self._create("MenuBar", props)

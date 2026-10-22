@@ -255,7 +255,7 @@ los ejemplos, limpios. Los "cabos sueltos" de las fases 17–27 están cerrados
 (<https://github.com/InDIOS/gpui-bridge>).
 
 El orden de la tabla está aprobado y se programa un hito por iteración, con revisión y parada
-entre cada uno (regla 6). **Hechos: M0–M3. Siguiente: M4.** El 2026-10-21 se agregó M4
+entre cada uno (regla 6). **Hechos: M0–M4. Siguiente: M5.** El 2026-10-21 se agregó M4
 (subcomponentes) y los hitos siguientes pasaron a M5–M7; las entradas de
 [HISTORIAL.md](HISTORIAL.md) anteriores a ese cambio conservan la numeración vieja.
 
@@ -265,7 +265,7 @@ entre cada uno (regla 6). **Hechos: M0–M3. Siguiente: M4.** El 2026-10-21 se a
 | **M1 — Ventanas** — **hecho** («Fase 28») | Ocultar y mostrar ventanas sin cerrarlas, posición inicial, tamaño mínimo, eventos de foco y de redimensionado de ventana. | `PROTOCOL.md` §3 actualizado, transcripción propia en `conformance/`, ejemplo en `examples/windows.ts` y prueba en ventana real. | sí: extiende `window` (§3); compatible hacia atrás si los campos son opcionales |
 | **M2 — Componentes, tanda 1** — **hecho** («Fase 29») | `Tree`, `Diff`, `Carousel` ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9). | Props validadas (árboles y patch incluidos), selección/expansión reaplicadas al reconstruir, transcripción, ejemplo y ventana real; clientes Node, React y Python en el mismo cambio. | no: props nuevas, sin subir `PROTOCOL_VERSION` |
 | **M3 — Componentes, tanda 2** — **hecho** («Fase 30») | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`), con `xTicks`/`yTicks` para el número de etiquetas de cada eje. | Lo anterior más una prueba con series de 1000 puntos y árbol profundo. | no |
-| **M4 — Subcomponentes: `Tab` dentro de `Tabs`** (piloto) — **siguiente** | Nodo `Tab` (`value`, `label`, `disabled`) cuyos hijos van dentro de la pestaña, con el patrón de `Form`/`Field`; un `Tabs` con hijos `Tab` los usa e ignora `tabs`, sin hijos funciona como hoy. `change` sigue saliendo de `Tabs`. Si sale bien, el mismo patrón sirve para `RadioGroup`, `Stepper`, `DescriptionList` y `Accordion`. | Pestañas hechas de nodos (icono + texto + `Badge`) que informan la elegida igual que hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia; transcripción, ejemplo, los tres clientes y ventana real. | no: nodo nuevo, `tabs` sigue igual |
+| **M4 — Subcomponentes: `Tab` dentro de `Tabs`** (piloto) — **hecho** («Fase 31») | Nodo `Tab` (`value`, `label`, `disabled`) cuyos hijos van dentro de la pestaña, con el patrón de `Form`/`Field`; un `Tabs` con hijos `Tab` los usa e ignora `tabs`, sin hijos funciona como hoy. `change` sigue saliendo de `Tabs`. Si sale bien, el mismo patrón sirve para `RadioGroup`, `Stepper`, `DescriptionList` y `Accordion`. | Pestañas hechas de nodos (icono + texto + `Badge`) que informan la elegida igual que hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia; transcripción, ejemplo, los tres clientes y ventana real. | no: nodo nuevo, `tabs` sigue igual |
 | **M5 — Multiplataforma** | Compilar y probar el host en macOS y Linux; un asset por plataforma en `bin/`; tags de wheel por plataforma; evaluar `optionalDependencies` por plataforma en npm. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno; relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
 | **M6 — Primera publicación** | Versión semver (0.2.0 o 1.0.0, a decidir), `CHANGELOG.md`, npm y PyPI, firma de código del host de Windows. | Instalación desde los registros, sin `GPUI_BRIDGE_HOST`, abriendo un ejemplo; `gpui-bridge-host --version` coincide con `bin/host.json`. | no: el protocolo sigue en 1 |
 | **M7 — Tanda 3 y cierre de calidad** | `Command`, `Settings`, repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro. | Lo de M2 más `change` con `{key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | `change` con objeto (campo `data` opcional) |
@@ -276,9 +276,11 @@ entre cada uno (regla 6). **Hechos: M0–M3. Siguiente: M4.** El 2026-10-21 se a
 > verde y prueba en ventana real (selección y expansión del árbol, selección de líneas del diff y
 > carrusel con flechas y puntos). **M3 hecho** («Fase 30»): `Sidebar` y `Chart` (con `xTicks` y
 > `yTicks` para las etiquetas de los ejes), 58+21+17+21 tests en verde y prueba en ventana real
-> con una serie de 1000 puntos y un árbol de 10 niveles. **M4 es el siguiente** (subcomponentes,
-> agregado el 2026-10-21); M5, M6 y M7 sin empezar. Proteger `main` queda fuera de M0, para
-> cuando el repositorio sea público.
+> con una serie de 1000 puntos y un árbol de 10 niveles. **M4 hecho** («Fase 31»): `Tab` dentro de
+> `Tabs` (con `value` obligatoria, hijos después del `label`, `class` del chip y `a11y.label` para
+> la pestaña sin `label`), 58+22+18+22 tests en verde, `conformance/data.txt` ampliado, los ejemplos
+> `components.ts` y `data.ts`, y la comprobación visual del usuario; M5, M6 y M7 sin empezar.
+> Proteger `main` queda fuera de M0, para cuando el repositorio sea público.
 
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y
