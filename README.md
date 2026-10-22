@@ -83,9 +83,10 @@ scripts/                host staging and the `pnpm dev` runner
 
 ## Getting started (from this repository)
 
-Requirements: Rust (stable, with `rustup`), Visual Studio Build Tools with the C++ workload,
-Node.js 22.6+ with pnpm, and Python 3.10+ for the Python client. The first build of GPUI takes
-several minutes.
+Requirements: Rust (stable, with `rustup`), Node.js 22.6+ with pnpm, and Python 3.10+ for the
+Python client. The host builds on Windows (Visual Studio Build Tools with the C++ workload),
+macOS (Xcode: GPUI draws with Metal) and Linux (the Vulkan, Wayland/X11 and `libxkbcommon`
+development libraries; see §3 of the plan). The first build of GPUI takes several minutes.
 
 ```sh
 pnpm bootstrap                                 # pnpm install + debug host + TypeScript builds
@@ -98,9 +99,9 @@ Add `RUST_LOG=debug` to `--debug` to also see, once a second, how many frames a 
 and what its own pass costs (`window 1: 60.0 frames/s, 0.2 ms and 14 nodes per pass`).
 
 The clients look for the host in this order: an explicit path option, `$GPUI_BRIDGE_HOST`,
-the host bundled in the package, then a Cargo build in `target/debug` or `target/release`
-of this repository (searched upwards, so the layout of the monorepo is not part of the
-contract).
+the platform package installed with the client (`gpui-bridge-<platform>-<arch>`), then a Cargo
+build in `target/debug` or `target/release` of this repository (searched upwards, so the layout
+of the monorepo is not part of the contract).
 
 The host asks for an 8 MB stack for its main thread (`host/build.rs`, the same Rust gives on
 Linux): a debug build spends tens of KB of stack per level of a nested tree, and Windows'
@@ -159,17 +160,21 @@ See [benchmarks/README.md](benchmarks/README.md) for what each number means and 
 
 ## Packaging
 
-Each client is published with the host inside it as an asset (React has no binary: it depends
-on `gpui-bridge`, which brings one). The host is compiled **once** per platform and staged by
-`scripts/stage-host.mjs`; nothing is built twice.
+Every client ships the host as an asset (React has none of its own: it depends on
+`gpui-bridge`, which brings one). The host is compiled **once** per platform and staged by
+`scripts/stage-host.mjs`; nothing is built twice. The npm client does not carry the binary
+itself: one package per platform (`gpui-bridge-win32-x64`, `gpui-bridge-darwin-arm64`,
+`gpui-bridge-linux-x64`) is an optional dependency, so an install downloads only the host that
+machine can run. The Python wheel, being platform-tagged, carries its host directly.
 
 ```sh
-pnpm pack:node                        # release host -> packages/client-node/bin/ -> pnpm pack
+pnpm pack:node                        # release host -> packages/host-<platform>-<arch>/bin/
+pnpm --dir packages/host-win32-x64 pack    # the platform package: the tarball with the host
 pnpm wheel                            # release host -> gpui_bridge/bin/ -> platform-tagged wheel
 ```
 
-Both scripts print the path of the artifact. The optimized host is about 15 MB (6 MB zipped).
-With txiki.js, a whole app is about 19 MB.
+These commands print the path of the artifact they stage. The optimized host is about 15 MB
+(6 MB zipped). With txiki.js, a whole app is about 19 MB.
 
 ## Documents
 

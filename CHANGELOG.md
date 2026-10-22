@@ -7,13 +7,18 @@ Versions are lockstep across the host and the three clients; the protocol has it
 
 - Monorepo: Cargo workspace at the root (with `[profile.release]`), pnpm workspace with a single
   lockfile, `packages/` for the host and the clients, `docs/` for the documents.
-- Host compiled once and staged into the npm and Python packages (`scripts/stage-host.mjs`,
+- Host compiled once and staged into the packages that ship it (`scripts/stage-host.mjs`,
   `bin/host.json`); `prepack` and the wheel builder no longer compile.
 - Clients resolve the host by walking up to `target/{debug,release}`, so moving a package cannot
   break them; `gpui-bridge-host --version` added for packaging checks.
-- Python wheel is tagged with its platform (`py3-none-win_amd64`) instead of `py3-none-any`, and
-  the package metadata now has a README, license and classifiers.
-- npm packages declare `os: ["win32"]`, `cpu: ["x64"]` and Node 22.6+.
+- One npm package per platform (`gpui-bridge-win32-x64`, `gpui-bridge-darwin-arm64`,
+  `gpui-bridge-linux-x64`) carries the host binary; `gpui-bridge` pulls the one for the machine
+  in as an optional dependency and its clients declare no `os`/`cpu`. `defaultHostPath()`
+  reports the host a Node app resolved.
+- Python wheels are tagged with the platform they carry their host for (`py3-none-win_amd64`,
+  `py3-none-macosx_11_0_arm64`, `py3-none-manylinux2014_x86_64`), and the package metadata has a
+  README, license and classifiers for the three systems.
+- The host builds and its tests run on Windows, macOS and Linux (CI matrix of the three).
 - Examples consume the packages by name through the workspace; React examples moved to
   `examples/react/`; `pnpm dev <name>` runs any example with the repository host.
 - Docs: `CONTRIBUTING.md`, `docs/RELEASING.md`, ADR 0001 and a README per package.

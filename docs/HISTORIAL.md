@@ -1260,3 +1260,74 @@ transcripción, ejemplo, los tres clientes y ventana real.
   `Entry` en `DescriptionList`, `Section` en `Accordion`, que sí tendrían que decidir cómo se
   dibuja un `Radio`/`Step` suelto, y `Select`/`Tree`/`Table`/`Sidebar`, que arman sus elementos a
   partir de datos y tienen estado propio).
+
+### Fase 32 — M5: multiplataforma (2026-10-21)
+
+Quinto hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1). No sube
+`PROTOCOL_VERSION`: el protocolo es el mismo, cambia **dónde vive el binario** y en qué sistemas se
+compila.
+
+**Criterios de aceptación:** CI con matriz de los tres sistemas; instalar el paquete y abrir un
+ejemplo en cada uno; `os`/`cpu` de los `package.json` relajados junto con los assets.
+
+**Estado:** hecha la parte automática; **la matriz de CI aún no se ejecutó** (se verifica al
+empujar) y la comprobación visual en ventana real de macOS y Linux queda pendiente porque no hay
+máquinas de esas plataformas en el entorno (decisión del usuario: M5 cierra con la verificación de
+CI).
+
+- **El host compila en Linux.** `tray-icon` 0.26 emite `compile_error!` si no tiene uno de sus dos
+  backends de Linux, así que `packages/host/Cargo.toml` declara la dependencia con `ksni` en
+  `cfg(any(target_os = "linux", freebsd, netbsd, openbsd, dragonfly))`: `ksni` habla D-Bus por su
+  cuenta, sin GTK ni `libappindicator`. Windows y macOS usan la API del sistema y no llevan feature
+  (por eso `default-features = false` en la dependencia principal). No hay ni un `#[cfg]` en las
+  fuentes del host: lo específico de plataforma vivía en dependencias, no en el código.
+- **Un paquete npm por plataforma.** `packages/host-<plataforma>-<arch>/` (tres: `win32-x64`,
+  `darwin-arm64`, `linux-x64`) con nombre `gpui-bridge-<plataforma>-<arch>`, `os`/`cpu` propios,
+  `files: ["bin"]` y un `prepack` que copia el host ya compilado (y un `postpack` que lo borra, para
+  que un checkout no se quede con un binario viejo). `gpui-bridge` declara los tres como
+  `optionalDependencies` (`workspace:*`, que pnpm reescribe a la versión al publicar): npm instala
+  el que corresponde a la máquina y descarta los otros dos. El paquete del cliente ya **no** lleva
+  binario ni `os`/`cpu`, y `gpui-bridge-react` tampoco (es JavaScript puro).
+- **`scripts/stage-host.mjs` estrena plataforma explícita.** El destino del asset sale de un *tag*
+  (`win32-x64`, `darwin-arm64`, `linux-x64`) que se deduce del `--triple` de Rust o de la máquina, y
+  `--tag` lo fija a mano; con eso elige el nombre del ejecutable (`.exe` o no), el paquete npm de
+  destino y la carpeta del wheel. `--from` busca primero `target/<triple>/release` y después
+  `target/release`, así que sirve tanto para una compilación nativa como para un cross target. Si el
+  tag no tiene paquete npm, falla con un mensaje claro en vez de inventar una carpeta.
+- **Cómo encuentra el host cada cliente.** Node: `$GPUI_BRIDGE_HOST`, el binario del paquete de
+  plataforma instalado (`gpui-bridge-<plataforma>-<arch>`, resuelto por su `package.json` con
+  `createRequire`), y si no una build de Cargo en `target/{debug,release}` hacia arriba —el orden
+  acordado: entorno → paquete de plataforma → repositorio—. `defaultHostPath()` es ahora un export
+  público: sirve para diagnosticar qué host corre una app. Python no cambia su orden (el wheel es
+  uno solo por plataforma y sigue llevando el host en `gpui_bridge/bin/`); lo que cambia son sus
+  classifiers (Windows, macOS y Linux) y el texto que documenta el tag del wheel.
+- **Prueba de empaquetado reproducible: `scripts/check-package.mjs`** (también `pnpm
+  check:package`). Instala los tarballs y el wheel en una carpeta **fuera** del repositorio, sin
+  `GPUI_BRIDGE_HOST` y sin Rust, y abre una app headless con el cliente de Node y el de Python
+  imprimiendo la ruta del host que cada uno resolvió. En Windows resuelve además el detalle de
+  lanzar npm sin shell (un `.cmd` no se puede `spawn`ear directo; se ejecuta su `npm-cli.js` con el
+  mismo intérprete).
+- **CI con matriz** (`.github/workflows/ci.yml`): `host` en los tres sistemas (fmt, clippy,
+  unitarios + transcripciones + `no_window`, release y artefacto `gpui-bridge-host-<tag>`);
+  `clients` en Windows y Linux (Node, React y Python contra el host descargado, con el asset
+  **estageado** antes de correr los tests, para que la prueba del resolvedor ejercite la rama del
+  paquete de plataforma; y el type-check de los ejemplos); y `pack` en los tres (tarball del
+  paquete de plataforma, tarball del cliente y wheel, comprobación de que el host viaja dentro de
+  los dos últimos y `check-package.mjs`). Linux instala las bibliotecas que GPUI necesita: lista de
+  desarrollo en el job del host y lista de runtime en el de clientes, porque incluso un host que
+  corre sin ventana tiene que poder cargar sus `.so`.
+- **`release.yml`** publica primero el paquete de plataforma de Windows y después el cliente, y sube
+  también el tarball de plataforma como artefacto. Publicar los tres paquetes y los tres wheels de
+  una release es trabajo de M6 (el job corre en un solo runner).
+- **Verificación automática (local, 2026-10-21):** 58 unitarios del host, las 22 transcripciones de
+  `conformance/` y `no_window`; 23 tests de Node, 18 de React y 23 de Python (uno nuevo por
+  cliente, el del orden de búsqueda del host, que comprueba las dos ramas: paquete de plataforma
+  estageado y build del repositorio); `clippy -D warnings`, `fmt` y el type-check de los ejemplos,
+  limpios. El camino de empaquetado completo se corrió entero en Windows:
+  `pnpm --dir packages/host-win32-x64 pack`, `pnpm pack:node`, `pnpm wheel` y `pnpm check:package`,
+  que informó `node_modules/gpui-bridge-win32-x64/bin/gpui-bridge-host.exe` y
+  `site-packages/gpui_bridge/bin/gpui-bridge-host.exe`, y las dos apps headless cerraron con código
+  0. La matriz de CI, en cambio, todavía no se ejecutó.
+- **Fuera de este paso:** los paquetes de `darwin-x64`, `linux-arm64` y demás combinaciones (el
+  script los soporta en cuanto exista el paquete: `--tag`), la publicación multiplataforma (M6), la
+  firma de código de Windows (M6) y la comprobación visual en ventana real de macOS y Linux.

@@ -1,6 +1,9 @@
 # pnpm does not read `workspaces` from package.json: the workspace lives here.
 # `packages/client-python` is intentionally absent: it is built by setuptools, not pnpm.
+# `packages/host-<platform>-<arch>` are the platform packages `gpui-bridge` pulls in as
+# optional dependencies (one carries the host binary for the machine installing it).
 packages:
   - packages/client-node
   - packages/client-react
+  - packages/host-*
   - examples

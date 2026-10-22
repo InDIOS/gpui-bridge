@@ -25,10 +25,12 @@ app.commit();
 npm install gpui-bridge
 ```
 
-The package carries an optimized `gpui-bridge-host` binary for **Windows x64** in `bin/`, so it
-needs no Rust toolchain at runtime. Node.js 22.6+ (or [txiki.js](https://github.com/saghul/txiki.js)
-through `gpui-bridge/dist/txiki.js`). On another platform, set `GPUI_BRIDGE_HOST` to a host built
-from the repository (the host has only been built and tested on Windows so far).
+The package pulls in an optimized `gpui-bridge-host` binary for the machine installing it: the
+npm package `gpui-bridge-<platform>-<arch>` (`gpui-bridge-win32-x64`, `gpui-bridge-linux-x64`,
+`gpui-bridge-darwin-arm64`) is an optional dependency, so only the host this machine can run is
+downloaded. No Rust toolchain is needed at runtime — except on a platform without a package
+yet: set `GPUI_BRIDGE_HOST` to a host built from the repository. Node.js 22.6+ (or
+[txiki.js](https://github.com/saghul/txiki.js) through `gpui-bridge/dist/txiki.js`).
 
 Styles are Tailwind-like class strings that use the theme's colors, so light and dark mode and
 custom themes come for free. Props, events and every node type are typed.
@@ -37,11 +39,12 @@ custom themes come for free. Props, events and every node type are typed.
 
 1. `createApp({ hostPath })`
 2. `$GPUI_BRIDGE_HOST`
-3. `bin/gpui-bridge-host[.exe]` inside this package
+3. `gpui-bridge-<platform>-<arch>/bin/gpui-bridge-host[.exe]`, the platform package installed
+   with this one (`defaultHostPath()` reports the path that wins)
 4. A Cargo build in `target/debug` or `target/release`, searched upwards (a checkout)
 
-`bin/host.json` records the host version, protocol version and target the package was built
-with; include it in a bug report.
+The platform package's `bin/host.json` records the host version, protocol version and target it
+was built for; include it in a bug report.
 
 ## Links
 

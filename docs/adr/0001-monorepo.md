@@ -17,15 +17,17 @@ package**. The repository also has to be easy to pick up: clone, one command, on
 2. **The release profile lives in the workspace root.** Cargo silently ignores `[profile.*]` in a
    member; the packaged host depends on `lto`, `strip` and `panic = "abort"`.
 3. **The host is built once and staged.** `scripts/stage-host.mjs` copies
-   `target/release/gpui-bridge-host[.exe]` into `packages/client-node/bin/` and
-   `packages/client-python/gpui_bridge/bin/`, plus a `host.json` with version, protocol, target and
-   hash. `prepack` and `build_wheel.py` never compile: they fail with instructions if the asset is
-   missing. CI passes the same binary between jobs as an artifact.
+   `target/release/gpui-bridge-host[.exe]` into `packages/host-<platform>-<arch>/bin/` (the npm
+   package for the platform it was built for) and `packages/client-python/gpui_bridge/bin/`, plus
+   a `host.json` with version, protocol, target and hash. `prepack` and `build_wheel.py` never
+   compile: they fail with instructions if the asset is missing. CI passes the same binary
+   between jobs as an artifact, one per platform.
 4. **React ships no binary.** It declares `gpui-bridge` as a peer dependency; duplicating a 15 MB
    host would create two binaries in one install.
 5. **Clients find the host by walking up**, not by counting `..`: explicit option,
-   `$GPUI_BRIDGE_HOST`, bundled asset, then `target/{debug,release}` upwards. The number of
-   folders between a client and the workspace root is not part of the contract.
+   `$GPUI_BRIDGE_HOST`, the asset of the platform package installed with the client, then
+   `target/{debug,release}` upwards. The number of folders between a client and the workspace
+   root is not part of the contract.
 6. **Examples consume the packages by name** (`import { createApp } from "gpui-bridge"`), through
    the pnpm workspace, so they mirror what a user installs. React examples live in
    `examples/react/`, not inside the React package.

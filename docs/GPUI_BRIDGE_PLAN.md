@@ -20,11 +20,11 @@ Hecho (ver §6): host con 40 tipos de nodo, varias ventanas, ventanas sin marco,
 bandeja del sistema, animaciones, formularios, teclado y foco, diálogos nativos y portapapeles,
 diálogos y avisos, lista virtualizada y tablas, accesibilidad (`a11y` en todo nodo) y los
 componentes de gpui-kit de las categorías Basic, Form, Layout y Advanced que no piden
-dependencias extra; clientes de Node, txiki.js, React y Python; transcripciones de conformidad y
-empaquetado local (tarball de npm y wheel).
+dependencias extra; clientes de Node, txiki.js, React y Python; transcripciones de conformidad;
+empaquetado por plataforma (un paquete npm por sistema, wheel con tag de plataforma) y el host
+compilado y probado en Windows, macOS y Linux con CI en matriz.
 
-Fuera de alcance por ahora: plataformas distintas de Windows (GPUI las soporta, pero el host no
-se probó ahí) y componentes definidos desde el cliente.
+Fuera de alcance por ahora: componentes definidos desde el cliente.
 
 ## 2. Reglas para el asistente de IA
 
@@ -45,7 +45,9 @@ se probó ahí) y componentes definidos desde el cliente.
 - Dependencias de sistema de GPUI según plataforma:
   - **macOS:** Xcode completo (GPUI usa Metal).
   - **Windows:** Visual Studio Build Tools con el componente de C++ (MSVC).
-  - **Linux:** librerías de desarrollo de Vulkan, Wayland/X11 y `libxkbcommon`. El repositorio de Zed tiene un script que las instala por distribución; úsalo como referencia.
+  - **Linux:** las bibliotecas de desarrollo de Vulkan, Wayland/X11, `libxkbcommon` y fontconfig.
+    La lista exacta que instala CI (`apt-get`) está en `.github/workflows/ci.yml`; el repositorio
+    de Zed tiene además un script que las instala por distribución, útil como referencia.
 - La primera compilación de GPUI tarda varios minutos. Es normal.
 
 ### 3.1 Instalación en esta máquina (Windows)
@@ -255,7 +257,7 @@ los ejemplos, limpios. Los "cabos sueltos" de las fases 17–27 están cerrados
 (<https://github.com/InDIOS/gpui-bridge>).
 
 El orden de la tabla está aprobado y se programa un hito por iteración, con revisión y parada
-entre cada uno (regla 6). **Hechos: M0–M4. Siguiente: M5.** El 2026-10-21 se agregó M4
+entre cada uno (regla 6). **Hechos: M0–M5. Siguiente: M6.** El 2026-10-21 se agregó M4
 (subcomponentes) y los hitos siguientes pasaron a M5–M7; las entradas de
 [HISTORIAL.md](HISTORIAL.md) anteriores a ese cambio conservan la numeración vieja.
 
@@ -266,7 +268,7 @@ entre cada uno (regla 6). **Hechos: M0–M4. Siguiente: M5.** El 2026-10-21 se a
 | **M2 — Componentes, tanda 1** — **hecho** («Fase 29») | `Tree`, `Diff`, `Carousel` ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9). | Props validadas (árboles y patch incluidos), selección/expansión reaplicadas al reconstruir, transcripción, ejemplo y ventana real; clientes Node, React y Python en el mismo cambio. | no: props nuevas, sin subir `PROTOCOL_VERSION` |
 | **M3 — Componentes, tanda 2** — **hecho** («Fase 30») | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`), con `xTicks`/`yTicks` para el número de etiquetas de cada eje. | Lo anterior más una prueba con series de 1000 puntos y árbol profundo. | no |
 | **M4 — Subcomponentes: `Tab` dentro de `Tabs`** (piloto) — **hecho** («Fase 31») | Nodo `Tab` (`value`, `label`, `disabled`) cuyos hijos van dentro de la pestaña, con el patrón de `Form`/`Field`; un `Tabs` con hijos `Tab` los usa e ignora `tabs`, sin hijos funciona como hoy. `change` sigue saliendo de `Tabs`. Si sale bien, el mismo patrón sirve para `RadioGroup`, `Stepper`, `DescriptionList` y `Accordion`. | Pestañas hechas de nodos (icono + texto + `Badge`) que informan la elegida igual que hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia; transcripción, ejemplo, los tres clientes y ventana real. | no: nodo nuevo, `tabs` sigue igual |
-| **M5 — Multiplataforma** | Compilar y probar el host en macOS y Linux; un asset por plataforma en `bin/`; tags de wheel por plataforma; evaluar `optionalDependencies` por plataforma en npm. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno; relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
+| **M5 — Multiplataforma** — **hecho** («Fase 32») | El host compila y se prueba en Windows, macOS y Linux (en Linux el icono de bandeja usa `ksni`, sin GTK). Un paquete npm por plataforma (`gpui-bridge-win32-x64`, `-darwin-arm64`, `-linux-x64`, en `packages/host-<plataforma>-<arch>`) lleva el binario y es `optionalDependencies` de `gpui-bridge`, que ya no lleva binario propio; el wheel sigue llevándolo con tag por plataforma; `os`/`cpu` fuera de los dos clientes npm. CI con matriz de los tres sistemas y empaquetado por plataforma. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno (`scripts/check-package.mjs` instala tarball y wheel **fuera** del repositorio, sin `GPUI_BRIDGE_HOST`, y abre una app headless con Node y Python); relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
 | **M6 — Primera publicación** | Versión semver (0.2.0 o 1.0.0, a decidir), `CHANGELOG.md`, npm y PyPI, firma de código del host de Windows. | Instalación desde los registros, sin `GPUI_BRIDGE_HOST`, abriendo un ejemplo; `gpui-bridge-host --version` coincide con `bin/host.json`. | no: el protocolo sigue en 1 |
 | **M7 — Tanda 3 y cierre de calidad** | `Command`, `Settings`, repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro. | Lo de M2 más `change` con `{key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | `change` con objeto (campo `data` opcional) |
 
@@ -279,8 +281,14 @@ entre cada uno (regla 6). **Hechos: M0–M4. Siguiente: M5.** El 2026-10-21 se a
 > con una serie de 1000 puntos y un árbol de 10 niveles. **M4 hecho** («Fase 31»): `Tab` dentro de
 > `Tabs` (con `value` obligatoria, hijos después del `label`, `class` del chip y `a11y.label` para
 > la pestaña sin `label`), 58+22+18+22 tests en verde, `conformance/data.txt` ampliado, los ejemplos
-> `components.ts` y `data.ts`, y la comprobación visual del usuario; M5, M6 y M7 sin empezar.
-> Proteger `main` queda fuera de M0, para cuando el repositorio sea público.
+> `components.ts` y `data.ts`, y la comprobación visual del usuario. **M5 hecho** («Fase 32»):
+> host compilable en los tres sistemas, un paquete npm por plataforma con el binario dentro,
+> wheel con tag por plataforma, CI con matriz de tres sistemas (host en los tres, clientes en
+> Windows y Linux) y empaquetado por plataforma con la prueba de instalar y abrir headless.
+> M6 y M7 sin empezar. Proteger `main` queda fuera de M0, para cuando el repositorio sea
+> público. La comprobación visual en ventana real de macOS y Linux sigue pendiente: no hay
+> máquinas de esas plataformas en el entorno, así que M5 se cierra con la verificación de CI
+> (decisión del usuario).
 
 Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
 grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y
