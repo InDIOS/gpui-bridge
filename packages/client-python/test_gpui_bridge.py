@@ -1,8 +1,12 @@
 # Runs against the real host binary in headless mode (build it first: `cargo build` in host/).
 # Run: python -m unittest   (from client-python/)
 
+import os
+import sys
 import unittest
+from pathlib import Path
 
+import gpui_bridge
 from gpui_bridge import App, HostError, HostExitedError
 
 
@@ -496,6 +500,24 @@ class ClientTest(unittest.TestCase):
     def test_missing_host_binary_fails_with_helpful_message(self):
         with self.assertRaisesRegex(HostExitedError, r"host not found at does-not-exist\.exe"):
             App("does-not-exist.exe")
+
+    def test_default_host_path_prefers_the_packaged_asset(self):
+        # The wheel is platform-tagged and carries its binary; a checkout has none staged,
+        # so this checks the order: the explicit variable, the asset, the repository build.
+        name = "gpui-bridge-host.exe" if sys.platform == "win32" else "gpui-bridge-host"
+        packaged = Path(gpui_bridge.__file__).resolve().parent / "bin" / name
+        saved = os.environ.pop("GPUI_BRIDGE_HOST", None)
+        try:
+            if packaged.exists():
+                self.assertEqual(gpui_bridge.default_host_path(), str(packaged))
+            else:
+                self.assertRegex(gpui_bridge.default_host_path(), r"target[\\/](debug|release)[\\/]gpui-bridge-host")
+            os.environ["GPUI_BRIDGE_HOST"] = "an-explicit-host"
+            self.assertEqual(gpui_bridge.default_host_path(), "an-explicit-host")
+        finally:
+            os.environ.pop("GPUI_BRIDGE_HOST", None)
+            if saved is not None:
+                os.environ["GPUI_BRIDGE_HOST"] = saved
 
 
 if __name__ == "__main__":

@@ -2,7 +2,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp, HostExitedError, type HostError, type HostExit } from "../dist/index.js";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { createApp, defaultHostPath, HostExitedError, type HostError, type HostExit } from "../dist/index.js";
 
 const headless = { headless: true };
 
@@ -524,6 +526,24 @@ test("window events are opt-in: the window subscribes and both the window and th
 
 test("a missing host binary fails with a helpful message", async () => {
   await assert.rejects(createApp({ hostPath: "does-not-exist.exe" }), /host not found at does-not-exist\.exe/);
+});
+
+test("defaultHostPath prefers the packaged host, then the build in this repository", () => {
+  const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
+  // The platform package (`gpui-bridge-<platform>-<arch>`) carries the asset; a checkout has
+  // none until it is staged, so this asserts whichever of the two applies and the order.
+  const packaged = join(import.meta.dirname, "..", "..", `host-${process.platform}-${process.arch}`, "bin", exe);
+  const saved = process.env.GPUI_BRIDGE_HOST;
+  delete process.env.GPUI_BRIDGE_HOST;
+  try {
+    if (existsSync(packaged)) assert.equal(defaultHostPath(), packaged);
+    else assert.match(defaultHostPath(), /[\\/]target[\\/](debug|release)[\\/]gpui-bridge-host(\.exe)?$/);
+    process.env.GPUI_BRIDGE_HOST = "an-explicit-host";
+    assert.equal(defaultHostPath(), "an-explicit-host");
+  } finally {
+    if (saved === undefined) delete process.env.GPUI_BRIDGE_HOST;
+    else process.env.GPUI_BRIDGE_HOST = saved;
+  }
 });
 
 test("createWindow gives each window its own id, root and closed event", async () => {

@@ -32,9 +32,10 @@ app.run()
 pip install gpui-bridge
 ```
 
-Requires Python 3.10+. The wheel carries an optimized `gpui-bridge-host` binary for the platform
-in its name (`py3-none-win_amd64` today: the host has only been built and tested on Windows), so
-no Rust toolchain is needed at runtime.
+Requires Python 3.10+. The wheel is built per platform and carries an optimized
+`gpui-bridge-host` binary, so its tag names that platform (`py3-none-win_amd64`,
+`py3-none-macosx_11_0_arm64`, `py3-none-manylinux2014_x86_64`, …) and no Rust toolchain is
+needed at runtime.
 
 `class` is a Python keyword: write `class_="..."`, and the client strips the trailing underscore.
 Props and events are keyword arguments, and every node has `append`, `insert_before`, `set`,

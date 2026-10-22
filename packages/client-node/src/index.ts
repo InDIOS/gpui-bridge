@@ -1,6 +1,7 @@
 // Public API of the gpui-bridge Node client.
 
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connect, type App } from "./app.js";
@@ -10,7 +11,7 @@ export * from "./app.js";
 export * from "./protocol.js";
 
 export interface AppOptions {
-  /** Host binary. Defaults to `$GPUI_BRIDGE_HOST`, then the host bundled in this package, then the debug build in this repository. */
+  /** Host binary. Defaults to `$GPUI_BRIDGE_HOST`, then the platform package installed with this one, then the debug build in this repository. */
   hostPath?: string;
   /** Forward host logs (stderr) to the console. */
   debug?: boolean;
@@ -20,6 +21,9 @@ export interface AppOptions {
 const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
 // dist/index.js -> the package root
 const pkg = join(dirname(fileURLToPath(import.meta.url)), "..");
+const nodeRequire = createRequire(import.meta.url);
+// The platform the host must run on, and the suffix of the package that ships it.
+const platform = `${process.platform}-${process.arch}`;
 
 /**
  * Walks up from this file looking for a Cargo build of the host. The number of folders
@@ -38,11 +42,25 @@ function repoTarget(): string | undefined {
   return undefined;
 }
 
-function defaultHostPath(): string {
-  if (process.env.GPUI_BRIDGE_HOST) return process.env.GPUI_BRIDGE_HOST;
-  // `pnpm pack` puts the optimized host in bin/ (scripts/stage-host.mjs); a checkout has none.
-  const bundled = join(pkg, "bin", exe);
-  return existsSync(bundled) ? bundled : (repoTarget() ?? join(pkg, "..", "..", "..", "target", "debug", exe));
+/**
+ * The binary of `gpui-bridge-<platform>-<arch>`, an optional dependency of this package:
+ * npm and pnpm install only the one whose `os`/`cpu` match the machine, so whatever is
+ * installed here is a host this machine can run. That package carries no code, only the
+ * asset, so it is found through its manifest (it declares no `exports` to walk).
+ */
+function packagedHost(): string | undefined {
+  try {
+    const manifest = nodeRequire.resolve(`gpui-bridge-${platform}/package.json`);
+    const candidate = join(dirname(manifest), "bin", exe);
+    return existsSync(candidate) ? candidate : undefined;
+  } catch {
+    return undefined; // another platform, or a checkout where the asset was never staged
+  }
+}
+
+/** The host to run: `$GPUI_BRIDGE_HOST`, then the packaged one, then a build in this repository. */
+export function defaultHostPath(): string {
+  return process.env.GPUI_BRIDGE_HOST ?? packagedHost() ?? repoTarget() ?? join(pkg, "..", "..", "..", "target", "debug", exe);
 }
 
 /** Starts the host and completes the handshake. Rejects with a clear message if the host cannot start. */

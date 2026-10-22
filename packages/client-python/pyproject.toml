@@ -14,8 +14,12 @@ authors = [{ name = "gpui-bridge contributors" }]
 keywords = ["gpui", "gpui-component", "native", "desktop", "ui"]
 classifiers = [
   "Development Status :: 3 - Alpha",
+  "Environment :: MacOS X",
   "Environment :: Win32 (MS Windows)",
+  "Environment :: X11 Applications",
+  "Operating System :: MacOS :: MacOS X",
   "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -33,5 +37,9 @@ Protocol = "https://github.com/InDIOS/gpui-bridge/blob/main/docs/PROTOCOL.md"
 [tool.setuptools]
 packages = ["gpui_bridge"]
 
+# Cada wheel es por plataforma y lleva un único binario del host directamente en
+# `gpui_bridge/bin/` (uno por SO/arch), así que `bin/*` alcanza: no hace falta
+# `bin/*/*` ni recursividad. Si algún día se envían varios binarios por wheel,
+# revisar este glob.
 [tool.setuptools.package-data]
 gpui_bridge = ["bin/*"]

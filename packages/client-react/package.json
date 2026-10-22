@@ -37,8 +37,6 @@
     "gpui-bridge": "^0.1.0",
     "react": "^19.3.0"
   },
-  "os": ["win32"],
-  "cpu": ["x64"],
   "dependencies": {
     "react-reconciler": "0.34.0"
   },

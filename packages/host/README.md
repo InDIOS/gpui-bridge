@@ -2,8 +2,9 @@
 
 The Rust side of gpui-bridge: a GPUI/gpui-component application that owns the windows, the event
 loop and the retained tree of UI nodes, and speaks JSON Lines over stdin/stdout with a client in
-another language. It is not published on its own: the optimized binary is staged into the npm
-and Python packages as an asset (`scripts/stage-host.mjs`).
+another language. It is not published on its own: the optimized binary is staged as the asset of
+the npm platform package `gpui-bridge-<platform>-<arch>` and of the Python wheel
+(`scripts/stage-host.mjs`). It builds on Windows, macOS and Linux.
 
 ## Build
 
