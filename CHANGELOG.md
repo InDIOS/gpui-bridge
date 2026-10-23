@@ -3,6 +3,12 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## 0.2.0 — first public release
+
+- First publication to npm (`gpui-bridge`, `gpui-bridge-react`) and PyPI (`gpui-bridge` wheel).
+- Packages published via GitHub OIDC trusted publishing (no npm token or PyPI API token secrets needed).
+- Protocol version stays at 1.
+
 ## 0.1.0 — repository layout
 
 - Monorepo: Cargo workspace at the root (with `[profile.release]`), pnpm workspace with a single

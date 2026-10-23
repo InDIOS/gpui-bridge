@@ -1,6 +1,6 @@
 {
   "name": "gpui-bridge-darwin-arm64",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The gpui-bridge host binary for macOS arm64 (installed by gpui-bridge, not directly)",
   "license": "MIT",
   "author": "gpui-bridge contributors",

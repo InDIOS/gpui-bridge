@@ -10,6 +10,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -31,16 +32,13 @@ jobs:
 
       - name: Publish the clients (the host is staged by prepack / build_wheel.py)
         shell: pwsh
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
         run: |
-          if (-not $env:NODE_AUTH_TOKEN) { Write-Host "NPM_TOKEN missing: skipping npm"; exit 0 }
-
+          # Trusted publishing: npm authenticates via GitHub OIDC (no NODE_AUTH_TOKEN).
+          # Configure trusted publishers on npmjs.org pointing at this repo/branch/workflow.
           # The platform package goes first: `gpui-bridge` pulls it in as an optional
-          # dependency. Cross-platform publication (one platform package and one wheel per
-          # system) is M6: this job runs on Windows and publishes the Windows host.
+          # dependency. This job runs on Windows and publishes the Windows host.
+          # Cross-platform publication (3 platform packages + 3 wheels per release) is
+          # the rest of M6 (matrix over macOS/Linux runners).
           pnpm --dir packages/host-win32-x64 publish --no-git-checks
           pnpm --dir packages/client-node pack
           pnpm --dir packages/client-node publish --no-git-checks
@@ -48,12 +46,9 @@ jobs:
 
           node scripts/stage-host.mjs --to python
           python packages/client-python/build_wheel.py
-          if ($env:TWINE_PASSWORD) {
-            python -m pip install --quiet twine
-            twine upload packages/client-python/dist/*.whl
-          } else {
-            Write-Host "TWINE_PASSWORD missing: wheel built but not uploaded"
-          }
+
+      - name: Publish the Python wheel to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
 
       - uses: actions/upload-artifact@v6
         with:
