@@ -1389,3 +1389,39 @@ eje horizontal), `Resizable` (confirma sin `on_drag`), easing/transition,
 tests de los tres clientes, `pnpm check:package`, prueba en ventana real de
 `components`, `data`, `advanced` y `dashboard`, y entrada de cambios de
 comportamiento en este mismo historial.
+
+### Fase 35 — M6: revisión Table, Scroll, Resizable y Easing (sin cambios de código)
+
+**M6-C — `Table`/`DataTable`.** En gpui-component 0.8 persisten `DataTable`,
+`TableDelegate`, `TableState`, `TableEvent::SelectRow`/`DoubleClickedRow`/
+`ClearSelection` y `TableState::set_selected_row`. Teclado: `SelectFirst`
+(Home) → fila 0 y `SelectLast` (End) → última fila, como describe el ROADMAP.
+El handler del host (`components/table.rs`) protege la selección controlada:
+sólo llama `row_selected` cuando `current != Some(ix)`, y el re-sync sólo llama
+`set_selected_row` cuando `state.selected_row() != selected`, así que aunque
+`set_selected_row` ya no corte la propagación en 0.8 no hay bucle entre la
+selección del usuario y la selección controlada. No se requirió cambio de código.
+
+**M6-D — Scroll.** `Scrollable` en 0.8 trae `scroll_bounce: Option<bool>` y
+envuelve siempre `gpui_base::ScrollBounce`; con `scroll_bounce: None` (lo que
+deja el host) aplica el default por plataforma (rebote activo en macOS). En eje
+horizontal, gpui-component agrega `ScrollableMask::vertical_wheel`, así que la
+rueda vertical se queda con el wrapper salvo `.scroll_wheel(false)`. El host usa
+`overflow_x_scrollbar`/`overflow_y_scrollbar`/`overflow_scrollbar`, que siguen
+existiendo. No se requirió cambio de código; la verificación de comportamiento
+(VirtualList, Table, Tree, Diff y div con overflow anidado) se deja para la
+prueba en ventana real.
+
+**M6-E — `Resizable`.** `h_resizable`/`v_resizable`/`resizable_panel` son iguales
+en 0.8 y el host no usa `ResizeHandle::on_drag`. Sin cambios de código; solo
+se confirmó al compilar.
+
+**M6-F — Easing / `transition`.** `animation.rs` y `styles.rs` usan `Ease`,
+`Timing`, `Transition` y `Visual` de gpui-base; `cargo check` pasó. Se revisó
+que ningún valor del host asuma un rango cerrado `[0, 1]` (el easing es
+cubic-bezier con sobrepaso permitido y la interpolación del host trabaja sobre
+`Visual`). Sin cambios de código.
+
+Pendiente de M6: `cargo test` del host, tests de los tres clientes,
+`pnpm check:package`, y prueba en ventana real de `components`, `data`,
+`advanced` y `dashboard`.
