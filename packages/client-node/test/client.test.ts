@@ -530,7 +530,7 @@ test("a missing host binary fails with a helpful message", async () => {
 
 test("defaultHostPath prefers the packaged host, then the build in this repository", () => {
   const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
-  // The platform package (`gpui-bridge-<platform>-<arch>`) carries the asset; a checkout has
+  // The platform package (`@indios/gpui-bridge-<platform>-<arch>`) carries the asset; a checkout has
   // none until it is staged, so this asserts whichever of the two applies and the order.
   const packaged = join(import.meta.dirname, "..", "..", `host-${process.platform}-${process.arch}`, "bin", exe);
   const saved = process.env.GPUI_BRIDGE_HOST;

@@ -11,11 +11,11 @@ protocol change.
 |---|---|---|---|
 | `gpui-bridge` | npm | `dist/`; the host arrives through the platform package | no |
 | `gpui-bridge-react` | npm | `dist/src` only; `gpui-bridge` and `react` are peers | no |
-| `gpui-bridge-<platform>-<arch>` | npm | `bin/gpui-bridge-host[.exe]` + `bin/host.json` | yes, one per platform |
+| `@indios/gpui-bridge-<platform>-<arch>` | npm | `bin/gpui-bridge-host[.exe]` + `bin/host.json` | yes, one per platform |
 | `gpui-bridge` | PyPI | `gpui_bridge/` (code + `bin/host` + `host.json`) | yes (wheel is platform-tagged) |
 
 There is one npm platform package per system (`packages/host-<platform>-<arch>`):
-`gpui-bridge-win32-x64`, `gpui-bridge-darwin-arm64` and `gpui-bridge-linux-x64`. Their `os` and
+`@indios/gpui-bridge-win32-x64`, `@indios/gpui-bridge-darwin-arm64` and `@indios/gpui-bridge-linux-x64`. Their `os` and
 `cpu` fields mean npm installs only the one the machine can run, and `gpui-bridge` declares the
 three as optional dependencies, so an install downloads a single binary.
 
@@ -85,9 +85,9 @@ can go through `release.yml` from the start. In order:
    artifacts, in this order (the platform packages before the client that depends on them):
 
    ```sh
-   npm publish ./host-win32-x64/gpui-bridge-win32-x64-0.2.0.tgz --access public
-   npm publish ./host-darwin-arm64/gpui-bridge-darwin-arm64-0.2.0.tgz --access public
-   npm publish ./host-linux-x64/gpui-bridge-linux-x64-0.2.0.tgz --access public
+   npm publish ./host-win32-x64/indios-gpui-bridge-win32-x64-0.2.0.tgz --access public
+   npm publish ./host-darwin-arm64/indios-gpui-bridge-darwin-arm64-0.2.0.tgz --access public
+   npm publish ./host-linux-x64/indios-gpui-bridge-linux-x64-0.2.0.tgz --access public
    npm publish ./client-node/gpui-bridge-0.2.0.tgz --access public
    npm publish ./client-react/gpui-bridge-react-0.2.0.tgz --access public
    ```

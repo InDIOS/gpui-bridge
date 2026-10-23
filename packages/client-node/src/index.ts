@@ -43,14 +43,14 @@ function repoTarget(): string | undefined {
 }
 
 /**
- * The binary of `gpui-bridge-<platform>-<arch>`, an optional dependency of this package:
+ * The binary of `@indios/gpui-bridge-<platform>-<arch>`, an optional dependency of this package:
  * npm and pnpm install only the one whose `os`/`cpu` match the machine, so whatever is
  * installed here is a host this machine can run. That package carries no code, only the
  * asset, so it is found through its manifest (it declares no `exports` to walk).
  */
 function packagedHost(): string | undefined {
   try {
-    const manifest = nodeRequire.resolve(`gpui-bridge-${platform}/package.json`);
+    const manifest = nodeRequire.resolve(`@indios/gpui-bridge-${platform}/package.json`);
     const candidate = join(dirname(manifest), "bin", exe);
     return existsSync(candidate) ? candidate : undefined;
   } catch {

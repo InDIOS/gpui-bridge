@@ -132,7 +132,7 @@ Add `RUST_LOG=debug` to `--debug` to also see, once a second, how many frames a 
 and what its own pass costs (`window 1: 60.0 frames/s, 0.2 ms and 14 nodes per pass`).
 
 The clients look for the host in this order: an explicit path option, `$GPUI_BRIDGE_HOST`,
-the platform package installed with the client (`gpui-bridge-<platform>-<arch>`), then a Cargo
+the platform package installed with the client (`@indios/gpui-bridge-<platform>-<arch>`), then a Cargo
 build in `target/debug` or `target/release` of this repository (searched upwards, so the layout
 of the monorepo is not part of the contract).
 
@@ -196,8 +196,8 @@ See [benchmarks/README.md](benchmarks/README.md) for what each number means and 
 Every client ships the host as an asset (React has none of its own: it depends on
 `gpui-bridge`, which brings one). The host is compiled **once** per platform and staged by
 `scripts/stage-host.mjs`; nothing is built twice. The npm client does not carry the binary
-itself: one package per platform (`gpui-bridge-win32-x64`, `gpui-bridge-darwin-arm64`,
-`gpui-bridge-linux-x64`) is an optional dependency, so an install downloads only the host that
+itself: one package per platform (`@indios/gpui-bridge-win32-x64`, `@indios/gpui-bridge-darwin-arm64`,
+`@indios/gpui-bridge-linux-x64`) is an optional dependency, so an install downloads only the host that
 machine can run. The Python wheel, being platform-tagged, carries its host directly.
 
 ```sh

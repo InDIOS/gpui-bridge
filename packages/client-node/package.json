@@ -34,9 +34,9 @@
     "node": ">=22.6"
   },
   "optionalDependencies": {
-    "gpui-bridge-darwin-arm64": "workspace:*",
-    "gpui-bridge-linux-x64": "workspace:*",
-    "gpui-bridge-win32-x64": "workspace:*"
+    "@indios/gpui-bridge-darwin-arm64": "workspace:*",
+    "@indios/gpui-bridge-linux-x64": "workspace:*",
+    "@indios/gpui-bridge-win32-x64": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

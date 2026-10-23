@@ -26,7 +26,7 @@ function argument(name, fallback) {
 }
 
 /** `x86_64-pc-windows-msvc` -> `win32-x64`: the tag the clients build from `process.platform`
- *  and `process.arch`, and the suffix of the npm platform package (`gpui-bridge-win32-x64`). */
+ *  and `process.arch`, and the suffix of the npm platform package (`@indios/gpui-bridge-win32-x64`). */
 function tagOf(triple) {
   const os = ["windows", "darwin", "linux"].find((name) => triple.includes(name));
   if (os === undefined) return undefined;

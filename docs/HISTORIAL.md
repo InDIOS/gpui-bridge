@@ -1464,3 +1464,13 @@ bibliotecas de GPUI, y el wheel construido en Linux.
 Pendiente de M7, del usuario: firma de código del host de Windows (pide un certificado o un
 servicio de firma propio), repositorio público, publicadores de confianza, tag `v0.2.0` y la
 instalación desde los registros.
+
+**Nombres con scope (mismo día).** Al publicar a mano, npm rechazó `gpui-bridge-win32-x64` con
+«Package name triggered spam detection» (403). Sin nada publicado todavía, los tres paquetes de
+plataforma pasan a `@indios/gpui-bridge-<plataforma>-<arch>` (el patrón de `@esbuild/win32-x64`;
+el scope es la cuenta npm del usuario) y `gpui-bridge` y `gpui-bridge-react` conservan el nombre.
+Cambian los `package.json`, las `optionalDependencies` y la búsqueda del host en `client-node`,
+el lockfile y los docs vigentes (el historial no se reescribe). Verificado: 23 tests de Node y
+`pnpm check:package` fuera del repositorio, con el cliente resolviendo
+`node_modules/@indios/gpui-bridge-win32-x64/bin/gpui-bridge-host.exe` y las dos apps headless en
+verde.

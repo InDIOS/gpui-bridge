@@ -1,5 +1,5 @@
 {
-  "name": "gpui-bridge-win32-x64",
+  "name": "@indios/gpui-bridge-win32-x64",
   "version": "0.2.0",
   "description": "The gpui-bridge host binary for Windows x64 (installed by gpui-bridge, not directly)",
   "license": "MIT",

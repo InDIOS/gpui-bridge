@@ -26,8 +26,8 @@ npm install gpui-bridge
 ```
 
 The package pulls in an optimized `gpui-bridge-host` binary for the machine installing it: the
-npm package `gpui-bridge-<platform>-<arch>` (`gpui-bridge-win32-x64`, `gpui-bridge-linux-x64`,
-`gpui-bridge-darwin-arm64`) is an optional dependency, so only the host this machine can run is
+npm package `@indios/gpui-bridge-<platform>-<arch>` (`@indios/gpui-bridge-win32-x64`, `@indios/gpui-bridge-linux-x64`,
+`@indios/gpui-bridge-darwin-arm64`) is an optional dependency, so only the host this machine can run is
 downloaded. No Rust toolchain is needed at runtime — except on a platform without a package
 yet: set `GPUI_BRIDGE_HOST` to a host built from the repository. Node.js 22.6+ (or
 [txiki.js](https://github.com/saghul/txiki.js) through `gpui-bridge/dist/txiki.js`).
@@ -39,7 +39,7 @@ custom themes come for free. Props, events and every node type are typed.
 
 1. `createApp({ hostPath })`
 2. `$GPUI_BRIDGE_HOST`
-3. `gpui-bridge-<platform>-<arch>/bin/gpui-bridge-host[.exe]`, the platform package installed
+3. `@indios/gpui-bridge-<platform>-<arch>/bin/gpui-bridge-host[.exe]`, the platform package installed
    with this one (`defaultHostPath()` reports the path that wins)
 4. A Cargo build in `target/debug` or `target/release`, searched upwards (a checkout)
 

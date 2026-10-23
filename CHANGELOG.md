@@ -12,6 +12,9 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - New nodes: `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (`line`, `bar`, `pie`, with `xTicks`
   and `yTicks`) and `Tab` inside `Tabs` (tabs made of nodes; `Tabs` without children works as
   before). `Tabs` takes the `folder` variant.
+- The npm platform packages are scoped: `@indios/gpui-bridge-win32-x64`,
+  `@indios/gpui-bridge-darwin-arm64` and `@indios/gpui-bridge-linux-x64` (npm's spam filter
+  rejected the unscoped names). `gpui-bridge` and `gpui-bridge-react` keep their names.
 - The host is built on gpui-kit 0.8.
 - The Linux wheel is tagged with the glibc it was built against (`manylinux_2_35_x86_64`), not
   `manylinux2014`, which promised a glibc the host does not run on.
