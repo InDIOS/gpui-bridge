@@ -13,7 +13,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,6 +110,9 @@ for (const target of targets) {
   }
   mkdirSync(destination, { recursive: true });
   copyFileSync(from, join(destination, exe));
+  // `copyFileSync` no garantiza el bit de ejecución en POSIX: sin él, al instalar
+  // el paquete en Linux/macOS el host no se puede spawnear y falla con EACCES.
+  chmodSync(join(destination, exe), 0o755);
   writeFileSync(join(destination, "host.json"), hostJson);
   console.log(`host ${version} (protocol ${protocol}, ${tag}) -> ${destination}`);
 }

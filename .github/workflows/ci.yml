@@ -117,6 +117,10 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ]; then exe=".exe"; fi
           test -f "packages/host-${{ matrix.tag }}/bin/gpui-bridge-host$exe" || {
             echo "staged host missing at packages/host-${{ matrix.tag }}/bin/"; exit 1; }
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            test -x "packages/host-${{ matrix.tag }}/bin/gpui-bridge-host$exe" || {
+              echo "staged host is not executable: copyFileSync dropped the +x bit (EACCES)"; exit 1; }
+          fi
       - run: pnpm test:node
       - run: pnpm test:react
       - run: pnpm test:python
@@ -180,6 +184,15 @@ jobs:
           wheel=$(ls packages/client-python/dist/*.whl)
           python -c "import sys, zipfile; names = zipfile.ZipFile(sys.argv[1]).namelist(); missing = [n for n in ('gpui_bridge/bin/gpui-bridge-host$exe', 'gpui_bridge/bin/host.json') if n not in names]; sys.exit('missing: %s' % missing if missing else 0)" "$wheel"
           echo "the host is in the tarball and the wheel"
+      - name: The staged host inside the tarball is executable
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tarball=$(ls packages/host-${{ matrix.tag }}/*.tgz)
+          if ! tar -tvf "$tarball" | grep -q 'package/bin/gpui-bridge-host'; then
+            echo "$tarball does not carry package/bin/gpui-bridge-host"; exit 1; fi
+          if ! tar -tvf "$tarball" | grep 'package/bin/gpui-bridge-host' | grep -qE '^-rwx'; then
+            echo "package/bin/gpui-bridge-host inside $tarball is not executable (EACCES risk)"; exit 1; fi
       - name: Install the artifacts outside the repository and run them
         run: node scripts/check-package.mjs
       - uses: actions/upload-artifact@v4
