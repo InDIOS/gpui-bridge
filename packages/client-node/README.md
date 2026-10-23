@@ -1,7 +1,7 @@
 # gpui-bridge
 
 Native desktop UIs with [GPUI](https://www.gpui.rs/) (the UI framework of the Zed editor) and
-[gpui-component](https://github.com/longbridge/gpui-component), driven from JavaScript or
+[gpui-kit](https://gpui-kit.com/), driven from JavaScript or
 TypeScript. This package is the Node.js client; a Rust host owns the window, the event loop and
 the component tree, and they talk over stdin/stdout with JSON Lines.
 

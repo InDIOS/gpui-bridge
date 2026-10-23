@@ -7,7 +7,7 @@ Versions are lockstep across the host and the three clients; the protocol has it
 
 - First publication: npm (`gpui-bridge`, `gpui-bridge-react` and the three platform packages)
   and PyPI (`gpui-bridge`, one wheel per platform: Windows x64, macOS arm64, Linux x64).
-- Windows: initial position (`x`, `y`), minimum size (`minWidth`, `minHeight`), `minimized`, and
+- Window props: initial position (`x`, `y`), minimum size (`minWidth`, `minHeight`), `minimized`, and
   opt-in window events (`focus`, `blur`, `resize`, `move`, `visibility`).
 - New nodes: `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (`line`, `bar`, `pie`, with `xTicks`
   and `yTicks`) and `Tab` inside `Tabs` (tabs made of nodes; `Tabs` without children works as

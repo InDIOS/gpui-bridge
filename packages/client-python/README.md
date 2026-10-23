@@ -1,7 +1,7 @@
 # gpui-bridge (Python)
 
 Native desktop UIs with [GPUI](https://www.gpui.rs/) and
-[gpui-component](https://github.com/longbridge/gpui-component), driven from Python. A Rust host
+[gpui-kit](https://gpui-kit.com/), driven from Python. A Rust host
 owns the window, the event loop and the component tree; this client describes the UI as
 operations on that tree and receives events. Standard library only.
 

@@ -16,7 +16,8 @@ jobs:
 
   npm:
     needs: ci
-    if: startsWith(github.ref, 'refs/tags/v')
+    # A manual run on a tag is still a rehearsal: only a tag push publishes.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -54,7 +55,8 @@ jobs:
 
   pypi:
     needs: ci
-    if: startsWith(github.ref, 'refs/tags/v')
+    # A manual run on a tag is still a rehearsal: only a tag push publishes.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     # pypa/gh-action-pypi-publish is a container action: Linux only.
     runs-on: ubuntu-latest
     timeout-minutes: 15

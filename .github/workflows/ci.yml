@@ -15,7 +15,8 @@ env:
 
 # A new push to the same branch cancels the previous run: only the newest commit matters.
 concurrency:
-  group: ci-${{ github.ref }}
+  # Called from release.yml, github.workflow is "Release": a rehearsal does not cancel dev's CI.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -1,7 +1,7 @@
 # gpui-bridge-react
 
 A React renderer for [gpui-bridge](https://www.npmjs.com/package/gpui-bridge): native desktop
-windows, drawn by GPUI and gpui-component, declared as React components.
+windows, drawn by GPUI and gpui-kit, declared as React components.
 
 ```tsx
 import { useState } from "react";
