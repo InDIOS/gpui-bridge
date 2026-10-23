@@ -148,6 +148,17 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - name: The Linux libraries the host links at runtime
+        # check-package.mjs runs the installed host, so it needs them like the clients job does.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvulkan1 mesa-vulkan-drivers \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libx11-xcb1 libxcb1 libxcb-randr0 libxcb-shm0 libxcb-xfixes0 libxcb-xinput0 libxcb-xkb1 \
+            libfontconfig1 libfreetype6
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v5
         with:
