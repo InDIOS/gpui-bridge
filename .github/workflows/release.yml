@@ -47,9 +47,10 @@ jobs:
         # tarballs as they are. The client tarballs are the same on every runner. A version that
         # is already on npm (a re-run, or the first release published by hand) is skipped.
         run: |
-          for tarball in artifacts/host-*/*.tgz artifacts/client-node/*.tgz artifacts/client-react/*.tgz; do
+          for tarball in ./artifacts/host-*/*.tgz ./artifacts/client-node/*.tgz ./artifacts/client-react/*.tgz; do
             spec=$(tar -xOzf "$tarball" package/package.json | node -p "const p = JSON.parse(require('fs').readFileSync(0)); p.name + '@' + p.version")
             if npm view "$spec" version >/dev/null 2>&1; then echo "$spec is already published"; continue; fi
+            # The leading ./ matters: npm reads "dir/file.tgz" as the GitHub repository dir/file.tgz.
             npm publish "$tarball" --access public
           done
 

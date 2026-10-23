@@ -85,11 +85,11 @@ can go through `release.yml` from the start. In order:
    artifacts, in this order (the platform packages before the client that depends on them):
 
    ```sh
-   npm publish host-win32-x64/gpui-bridge-win32-x64-0.2.0.tgz --access public
-   npm publish host-darwin-arm64/gpui-bridge-darwin-arm64-0.2.0.tgz --access public
-   npm publish host-linux-x64/gpui-bridge-linux-x64-0.2.0.tgz --access public
-   npm publish client-node/gpui-bridge-0.2.0.tgz --access public
-   npm publish client-react/gpui-bridge-react-0.2.0.tgz --access public
+   npm publish ./host-win32-x64/gpui-bridge-win32-x64-0.2.0.tgz --access public
+   npm publish ./host-darwin-arm64/gpui-bridge-darwin-arm64-0.2.0.tgz --access public
+   npm publish ./host-linux-x64/gpui-bridge-linux-x64-0.2.0.tgz --access public
+   npm publish ./client-node/gpui-bridge-0.2.0.tgz --access public
+   npm publish ./client-react/gpui-bridge-react-0.2.0.tgz --access public
    ```
 
 4. **npm trusted publishers:** on npmjs.com, in each of the five packages' *Settings → Trusted
