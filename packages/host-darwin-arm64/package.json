@@ -21,5 +21,10 @@
   },
   "files": [
     "bin"
-  ]
+  ],
+  "publishConfig": {
+    "executableFiles": [
+      "./bin/gpui-bridge-host"
+    ]
+  }
 }
