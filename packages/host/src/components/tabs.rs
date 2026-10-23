@@ -110,6 +110,7 @@ pub fn build(id: NodeId, node: &Node, chips: Vec<Chip>, session: &Entity<Session
         Some("pill") => TabVariant::Pill,
         Some("segmented") => TabVariant::Segmented,
         Some("underline") => TabVariant::Underline,
+        Some("folder") => TabVariant::Folder,
         _ => TabVariant::Tab,
     };
     let values: Vec<String> = chips.iter().map(|(value, ..)| value.clone()).collect();
