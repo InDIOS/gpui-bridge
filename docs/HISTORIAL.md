@@ -1425,3 +1425,42 @@ cubic-bezier con sobrepaso permitido y la interpolación del host trabaja sobre
 Pendiente de M6: `cargo test` del host, tests de los tres clientes,
 `pnpm check:package`, y prueba en ventana real de `components`, `data`,
 `advanced` y `dashboard`.
+
+### Fase 36 — M7: preparar la primera publicación (2026-10-23)
+
+Versión **0.2.0** (decidida por el usuario en `ef0ac23`; el protocolo sigue en 1). Este paso deja
+todo listo para publicar; publicar lo hace el usuario.
+
+- `Cargo.lock` no había entrado en el commit del bump y CI corre con `--locked`: commit aparte.
+- `release.yml` corría en un solo runner de Windows: publicaba solo `gpui-bridge-win32-x64`
+  (en macOS y Linux `gpui-bridge` habría quedado sin host), usaba `pypa/gh-action-pypi-publish`
+  en Windows (es una acción de contenedor, solo Linux) y no seguía a CI (`@stable`, sin
+  `--locked`). Ahora llama a `ci.yml` entero como workflow reutilizable (`workflow_call`) y
+  publica lo que construyó su job `pack`: un job `npm` en Linux (comprueba que el tag es la
+  versión de los paquetes, publica los tres paquetes de plataforma y después `gpui-bridge` y
+  `gpui-bridge-react`, y salta las versiones que ya están en npm) y un job `pypi` en Linux con el
+  entorno `pypi` y los tres wheels. Los dos con OIDC, sin tokens. Lanzarlo a mano es el ensayo:
+  construye y sube los artefactos y no publica. El job `pack` ahora empaqueta también
+  `gpui-bridge-react`.
+- El host de Linux se compila en `ubuntu-22.04` y el wheel lleva la glibc con la que se compiló
+  (`manylinux_2_35_x86_64`): `manylinux2014` prometía glibc 2.17 y el binario de
+  `ubuntu-latest` pide la 2.39.
+- Docs coherentes sobre plataformas: README, §1 del plan, `RELEASING.md` y el README de PyPI dicen
+  lo mismo (binarios para Windows x64, macOS arm64 y Linux x64, probados en CI; en ventana real,
+  solo Windows). El README abre con `pip install` y el contador en Python, «GPUI from Python, or
+  from any language that can start a process», y presenta `PROTOCOL.md` y `conformance/` como el
+  contrato para un cliente nuevo; Node y React después. El README de PyPI enlaza el protocolo, las
+  transcripciones y los ejemplos con URLs absolutas.
+- `CHANGELOG.md` 0.2.0 con lo que reciben los usuarios (M1–M6) y `RELEASING.md` con la primera
+  publicación paso a paso: npm solo admite publicador de confianza en paquetes que ya existen, así
+  que la 0.2.0 de los cinco paquetes npm sale a mano desde los artefactos del ensayo; PyPI admite
+  publicador pendiente.
+
+Verificado: YAML de los dos workflows válido, la etiqueta del wheel con un self-check (Windows
+`win_amd64`; Linux simulado con glibc 2.35 y 2.39.1), la extracción `name@version` del tarball,
+23 tests de Python. No verificado: el workflow en GitHub (no se empujó), `ubuntu-22.04` con las
+bibliotecas de GPUI, y el wheel construido en Linux.
+
+Pendiente de M7, del usuario: firma de código del host de Windows (pide un certificado o un
+servicio de firma propio), repositorio público, publicadores de confianza, tag `v0.2.0` y la
+instalación desde los registros.

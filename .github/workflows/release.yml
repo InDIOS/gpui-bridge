@@ -1,59 +1,72 @@
 name: Release
 
+# A `v*` tag runs the whole CI (three systems) and publishes what its `pack` job built: three npm
+# platform packages, `gpui-bridge`, `gpui-bridge-react` and three wheels. Running it by hand
+# (workflow_dispatch) is the rehearsal: it builds and uploads the artifacts and publishes nothing.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
 jobs:
-  publish:
-    runs-on: windows-latest
+  ci:
+    uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+
+  npm:
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Trusted publishing: npm exchanges the GitHub OIDC token, no NODE_AUTH_TOKEN. Each package
+      # needs a trusted publisher on npmjs.com pointing at this repository and `release.yml`.
       id-token: write
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v5
+      # No `registry-url`: it writes an .npmrc that asks for NODE_AUTH_TOKEN and blocks OIDC.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: cargo test --workspace
-      - name: Build the host once
-        run: cargo build -p gpui-bridge-host --release
-
-      - name: Publish the clients (the host is staged by prepack / build_wheel.py)
-        shell: pwsh
+      - name: The tag is the version the packages carry
         run: |
-          # Trusted publishing: npm authenticates via GitHub OIDC (no NODE_AUTH_TOKEN).
-          # Configure trusted publishers on npmjs.org pointing at this repo/branch/workflow.
-          # The platform package goes first: `gpui-bridge` pulls it in as an optional
-          # dependency. This job runs on Windows and publishes the Windows host.
-          # Cross-platform publication (3 platform packages + 3 wheels per release) is
-          # the rest of M6 (matrix over macOS/Linux runners).
-          pnpm --dir packages/host-win32-x64 publish --no-git-checks
-          pnpm --dir packages/client-node pack
-          pnpm --dir packages/client-node publish --no-git-checks
-          pnpm --dir packages/client-react publish --no-git-checks
-
-          node scripts/stage-host.mjs --to python
-          python packages/client-python/build_wheel.py
-
-      - name: Publish the Python wheel to PyPI (trusted publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
-
-      - uses: actions/upload-artifact@v6
+          version=$(node -p "require('./packages/client-node/package.json').version")
+          test "${GITHUB_REF_NAME#v}" = "$version" || {
+            echo "tag $GITHUB_REF_NAME does not match package version $version"; exit 1; }
+          npm --version  # trusted publishing needs 11.5.1 or later
+      - uses: actions/download-artifact@v7
         with:
-          name: release-assets
-          path: |
-            packages/host-win32-x64/*.tgz
-            packages/client-node/*.tgz
-            packages/client-python/dist/*.whl
+          pattern: packages-*
+          merge-multiple: true
+          path: artifacts
+      - name: Publish the platform packages, then the clients that depend on them
+        # `pnpm pack` already rewrote `workspace:*` to the real version, so npm publishes the
+        # tarballs as they are. The client tarballs are the same on every runner. A version that
+        # is already on npm (a re-run, or the first release published by hand) is skipped.
+        run: |
+          for tarball in artifacts/host-*/*.tgz artifacts/client-node/*.tgz artifacts/client-react/*.tgz; do
+            spec=$(tar -xOzf "$tarball" package/package.json | node -p "const p = JSON.parse(require('fs').readFileSync(0)); p.name + '@' + p.version")
+            if npm view "$spec" version >/dev/null 2>&1; then echo "$spec is already published"; continue; fi
+            npm publish "$tarball" --access public
+          done
+
+  pypi:
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/v')
+    # pypa/gh-action-pypi-publish is a container action: Linux only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: artifacts
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: artifacts/client-python/dist/

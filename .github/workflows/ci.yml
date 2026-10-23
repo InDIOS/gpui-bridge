@@ -4,6 +4,8 @@ on:
   push:
     branches: [dev, main]
   pull_request:
+  # release.yml runs this whole workflow and publishes the artifacts of its `pack` job.
+  workflow_call:
 
 env:
   CARGO_TERM_COLOR: always
@@ -28,7 +30,8 @@ jobs:
           - os: windows-latest
             tag: win32-x64
             exe: ".exe"
-          - os: ubuntu-latest
+          # The oldest runner: its glibc (2.35) is the oldest the shipped Linux host runs on.
+          - os: ubuntu-22.04
             tag: linux-x64
             exe: ""
           - os: macos-latest
@@ -138,7 +141,8 @@ jobs:
           - os: windows-latest
             tag: win32-x64
             exe: ".exe"
-          - os: ubuntu-latest
+          # The oldest runner: its glibc (2.35) is the oldest the shipped Linux host runs on.
+          - os: ubuntu-22.04
             tag: linux-x64
             exe: ""
           - os: macos-latest
@@ -177,6 +181,7 @@ jobs:
         # `postpack` removes it again, so a checkout never keeps a stale binary.
         run: |
           pnpm --dir packages/client-node pack
+          pnpm --dir packages/client-react pack
           pnpm --dir packages/host-${{ matrix.tag }} pack
       - name: Build the platform-tagged wheel
         run: |
@@ -214,5 +219,6 @@ jobs:
           path: |
             packages/host-${{ matrix.tag }}/*.tgz
             packages/client-node/*.tgz
+            packages/client-react/*.tgz
             packages/client-python/dist/*.whl
           if-no-files-found: error

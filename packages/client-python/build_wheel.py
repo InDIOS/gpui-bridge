@@ -29,7 +29,9 @@ def plat_name() -> str:
         return "win_arm64" if arm else "win_amd64"
     if sys.platform == "darwin":
         return f"macosx_11_0_{'arm64' if arm else 'x86_64'}"
-    return f"manylinux2014_{'aarch64' if arm else 'x86_64'}"
+    # The host links the glibc of the machine that built it, so that version is the floor.
+    major, minor = platform.libc_ver()[1].split(".")[:2]
+    return f"manylinux_{major}_{minor}_{'aarch64' if arm else 'x86_64'}"
 
 
 staged = bin_dir / exe

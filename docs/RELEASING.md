@@ -1,6 +1,6 @@
 # Releasing
 
-Host and clients are versioned **in lockstep** (today `0.1.0`): the packages carry the host
+Host and clients are versioned **in lockstep** (today `0.2.0`): the packages carry the host
 binary, so a client version is also a host version. The protocol has its own number
 (`PROTOCOL_VERSION` in `packages/host/src/protocol.rs`, today 1) and only changes with an agreed
 protocol change.
@@ -39,7 +39,7 @@ quote, and `gpui-bridge-host --version` prints the same facts.
 3. Pack the client, the platform package for this machine and the platform-tagged wheel:
 
    ```sh
-   pnpm pack:node                         # packages/client-node/gpui-bridge-0.1.0.tgz
+   pnpm pack:node                         # packages/client-node/gpui-bridge-0.2.0.tgz
    pnpm --dir packages/host-<platform>-<arch> pack
    pnpm wheel                             # -> packages/client-python/dist/*.whl
    ```
@@ -54,30 +54,76 @@ quote, and `gpui-bridge-host --version` prints the same facts.
    `GPUI_BRIDGE_HOST`, runs a headless app with the Node and the Python client and reports which
    host each one resolved: the host that runs is the one the packages carry (this is the
    phase-16 acceptance test).
-5. Publish the platform package **before** the client that depends on it, then the rest:
+5. Publishing is `release.yml`'s job: push the tag `v<version>`. It runs the whole CI on the
+   three systems (`ci.yml` as a reusable workflow), then two jobs publish what CI's `pack` job
+   built, with GitHub OIDC trusted publishing (no tokens in the repository):
+
+   - `npm`: checks that the tag is the packages' version, then `npm publish` of the three
+     platform tarballs first and `gpui-bridge` and `gpui-bridge-react` after them.
+   - `pypi`: uploads the three wheels (`pypa/gh-action-pypi-publish`, Linux only), from the
+     GitHub environment `pypi`.
+
+   Running `release.yml` by hand (*Run workflow*) is the rehearsal: the same CI and artifacts
+   (`packages-<platform>-<arch>`), nothing published. A version cannot be published twice on
+   either registry, so rehearse before tagging.
+
+The Linux host is built on `ubuntu-22.04`: the glibc it links against (2.35) is the oldest it
+runs on, and the wheel's tag (`manylinux_2_35_x86_64`) says so.
+
+## First publication (0.2.0)
+
+npm can only configure a trusted publisher for a package that already exists, so the first
+version of each npm package goes out by hand; PyPI accepts a *pending* publisher, so the wheels
+can go through `release.yml` from the start. In order:
+
+1. **Make the repository public** (or accept that the package pages link to a repository nobody
+   can open, and that npm does not attach provenance to packages from private repositories).
+2. **Rehearse:** run `release.yml` by hand on the commit to release and download the
+   `packages-win32-x64`, `packages-darwin-arm64` and `packages-linux-x64` artifacts. Check that
+   CI was green on the three systems.
+3. **npm, by hand, once:** with an npm account with 2FA (`npm login`), from the downloaded
+   artifacts, in this order (the platform packages before the client that depends on them):
 
    ```sh
-   pnpm --dir packages/host-<platform>-<arch> publish --no-git-checks
-   pnpm --dir packages/client-node publish --no-git-checks
-   pnpm --dir packages/client-react publish --no-git-checks
-   twine upload packages/client-python/dist/*.whl
+   npm publish host-win32-x64/gpui-bridge-win32-x64-0.2.0.tgz --access public
+   npm publish host-darwin-arm64/gpui-bridge-darwin-arm64-0.2.0.tgz --access public
+   npm publish host-linux-x64/gpui-bridge-linux-x64-0.2.0.tgz --access public
+   npm publish client-node/gpui-bridge-0.2.0.tgz --access public
+   npm publish client-react/gpui-bridge-react-0.2.0.tgz --access public
    ```
 
-   Tag `v<version>` afterwards.
+4. **npm trusted publishers:** on npmjs.com, in each of the five packages' *Settings → Trusted
+   publisher*, choose GitHub Actions with owner `InDIOS`, repository `gpui-bridge` and workflow
+   `release.yml`. From then on, *Publishing access* can be set to require 2FA and disallow
+   tokens.
+5. **PyPI pending publisher:** on pypi.org, *Your projects → Publishing → Add a new pending
+   publisher*: project `gpui-bridge`, owner `InDIOS`, repository `gpui-bridge`, workflow
+   `release.yml`, environment `pypi`. In GitHub, create the `pypi` environment (optionally with
+   required reviewers, so a tag waits for approval before uploading).
+6. **Tag:** `git tag v0.2.0 && git push origin v0.2.0`. The `npm` job skips the versions
+   already published in step 3, and the `pypi` job uploads the three wheels.
+7. **Acceptance test from the registries,** in a clean folder, without `GPUI_BRIDGE_HOST`:
 
-CI (`release.yml`) does 1–4 for tags and publishes when `NPM_TOKEN` and `TWINE_*` secrets exist.
+   ```sh
+   npm install gpui-bridge && node -e "import('gpui-bridge').then(m => console.log(m.defaultHostPath()))"
+   pip install gpui-bridge && python -c "import gpui_bridge; print(gpui_bridge.default_host_path())"
+   ```
 
-## Before the first public release
+   then run the counter with each, and compare `gpui-bridge-host --version` with the installed
+   `bin/host.json`.
 
-- Package names are `gpui-bridge`, `gpui-bridge-react` and `gpui-bridge` (PyPI): renaming them is a
-  breaking change for every README and example, so decide now.
-- Metadata is already pointed at <https://github.com/InDIOS/gpui-bridge> (`repository`,
-  `homepage`, `bugs` in the `package.json`, `[project.urls]` in `pyproject.toml`). If the
-  organization or repository name changes, update those files plus the package READMEs.
-- The host builds and its tests run on Windows, macOS and Linux (the CI matrix), and the
-  packaging of each platform is verified there (tarball, wheel, install and headless run). What
-  is still Windows-only is *publishing*: `release.yml` runs on one runner, so M6 has to turn it
-  into a matrix that publishes the three platform packages and the three wheels of a release.
-- Code signing for the Windows host avoids SmartScreen warnings for users.
+From 0.2.1 on, a release is steps 2 and 6 only.
+
+## Still open
+
+- **Code signing for the Windows host** (avoids SmartScreen warnings). It needs a certificate or
+  a signing service (for example Azure Trusted Signing) that the maintainer owns; until then,
+  the binary is unsigned. macOS binaries installed by npm or pip are not quarantined, so
+  Gatekeeper does not block them.
 - The visual check of a real window per platform is still owed for macOS and Linux (the host is
   only drawn and clicked on Windows so far).
+- Only `x64` Windows and Linux and `arm64` macOS have a binary.
+- Package names are `gpui-bridge`, `gpui-bridge-react` and `gpui-bridge` (PyPI) and were free on
+  both registries on 2026-10-23. Metadata points at <https://github.com/InDIOS/gpui-bridge>; if
+  the organization or repository name changes, update the `package.json` files,
+  `pyproject.toml`, the package READMEs and the trusted publishers.

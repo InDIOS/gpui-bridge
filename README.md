@@ -4,13 +4,45 @@
 
 <h1 align="center">gpui-bridge</h1>
 
+GPUI from Python, or from any language that can start a process.
+
 Native desktop UIs with [GPUI](https://www.gpui.rs/) (the UI framework of the Zed editor) and
-[gpui-kit](https://gpui-kit.com/), driven from another language.
+[gpui-kit](https://gpui-kit.com/), driven from another language. The Python client is the standard
+library plus a prebuilt host binary: no Rust toolchain needed.
+
+```sh
+pip install gpui-bridge
+```
+
+```python
+from gpui_bridge import App
+
+app = App()
+count = 0
+label = app.text(content="0", class_="text-xl font-bold")
+
+def add(_event=None):
+    global count
+    count += 1
+    label.set(content=str(count))
+    app.commit()
+
+root = app.div(class_="flex flex-col items-center gap-4 p-6 size-full")
+root.append(label, app.button(label="Add", variant="primary").on("click", add))
+app.window(title="Counter", width=320, height=200, root=root)
+app.commit()
+app.run()
+```
 
 A Rust **host** owns the window, the event loop and the component tree. A **client** in your
 language describes the UI as operations on that tree (create a node, set props, append a
 child, remove) and receives events (click, change…). They talk over stdin/stdout with JSON
-Lines, so any language that can start a process can be a client.
+Lines, so a client is a small program in any language: [PROTOCOL.md](docs/PROTOCOL.md) is the
+whole contract, and the transcripts in [`conformance/`](conformance/) are the test a new client
+must pass.
+
+The same counter from Node.js (`npm install gpui-bridge`; React has its own renderer,
+`gpui-bridge-react`):
 
 ```ts
 import { createApp } from "gpui-bridge";
@@ -29,8 +61,9 @@ app.commit();
 Styles are Tailwind-like class strings (`"flex gap-2 p-4 bg-muted"`) that use the theme's
 colors, so light and dark mode and custom themes come for free.
 
-**Status:** Windows only so far (GPUI also runs on macOS and Linux, but the host has not been
-built or tested there). Protocol version 1.
+**Status:** prebuilt for Windows x64, macOS arm64 and Linux x64 (glibc 2.35 or newer). The host
+builds and passes its tests on the three in CI, but it has only been drawn and clicked in a real
+window on Windows so far. Protocol version 1.
 
 ## What it has
 
@@ -60,9 +93,9 @@ built or tested there). Protocol version 1.
 
 | Folder | Package | Language |
 |---|---|---|
+| [`packages/client-python/`](packages/client-python/) | `gpui-bridge` | Python 3.10+, standard library only |
 | [`packages/client-node/`](packages/client-node/) | `gpui-bridge` | TypeScript for Node.js 22.6+; the same core runs on [txiki.js](https://github.com/saghul/txiki.js) |
 | [`packages/client-react/`](packages/client-react/) | `gpui-bridge-react` | A React renderer on top of `gpui-bridge` (`<Div>`, `<Button onClick>`…) |
-| [`packages/client-python/`](packages/client-python/) | `gpui-bridge` | Python 3.10+, standard library only |
 
 A client for another language only needs [PROTOCOL.md](docs/PROTOCOL.md); the transcripts in
 [`conformance/`](conformance/) show the expected messages.

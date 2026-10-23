@@ -5,8 +5,18 @@ Versions are lockstep across the host and the three clients; the protocol has it
 
 ## 0.2.0 — first public release
 
-- First publication to npm (`gpui-bridge`, `gpui-bridge-react`) and PyPI (`gpui-bridge` wheel).
-- Packages published via GitHub OIDC trusted publishing (no npm token or PyPI API token secrets needed).
+- First publication: npm (`gpui-bridge`, `gpui-bridge-react` and the three platform packages)
+  and PyPI (`gpui-bridge`, one wheel per platform: Windows x64, macOS arm64, Linux x64).
+- Windows: initial position (`x`, `y`), minimum size (`minWidth`, `minHeight`), `minimized`, and
+  opt-in window events (`focus`, `blur`, `resize`, `move`, `visibility`).
+- New nodes: `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (`line`, `bar`, `pie`, with `xTicks`
+  and `yTicks`) and `Tab` inside `Tabs` (tabs made of nodes; `Tabs` without children works as
+  before). `Tabs` takes the `folder` variant.
+- The host is built on gpui-kit 0.8.
+- The Linux wheel is tagged with the glibc it was built against (`manylinux_2_35_x86_64`), not
+  `manylinux2014`, which promised a glibc the host does not run on.
+- `release.yml` runs the whole CI on the three systems and publishes with GitHub OIDC trusted
+  publishing (no npm or PyPI tokens).
 - Protocol version stays at 1.
 
 ## 0.1.0 — repository layout

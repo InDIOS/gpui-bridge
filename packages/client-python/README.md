@@ -34,8 +34,9 @@ pip install gpui-bridge
 
 Requires Python 3.10+. The wheel is built per platform and carries an optimized
 `gpui-bridge-host` binary, so its tag names that platform (`py3-none-win_amd64`,
-`py3-none-macosx_11_0_arm64`, `py3-none-manylinux2014_x86_64`, …) and no Rust toolchain is
-needed at runtime.
+`py3-none-macosx_11_0_arm64`, `py3-none-manylinux_2_35_x86_64`) and no Rust toolchain is
+needed at runtime. Those three are the platforms with a wheel; the host has been drawn in a real
+window only on Windows so far.
 
 `class` is a Python keyword: write `class_="..."`, and the client strips the trailing underscore.
 Props and events are keyword arguments, and every node has `append`, `insert_before`, `set`,
@@ -49,7 +50,10 @@ Props and events are keyword arguments, and every node has `append`, `insert_bef
 
 ## Links
 
-- Protocol specification and examples in the project repository (`docs/PROTOCOL.md`).
+- [Protocol specification](https://github.com/InDIOS/gpui-bridge/blob/main/docs/PROTOCOL.md)
+  and the [conformance transcripts](https://github.com/InDIOS/gpui-bridge/tree/main/conformance):
+  everything a client in another language needs.
+- [Examples](https://github.com/InDIOS/gpui-bridge/tree/main/examples).
 - Node.js and React clients: `gpui-bridge` and `gpui-bridge-react` on npm.
 
 Protocol version 1. MIT licensed.
