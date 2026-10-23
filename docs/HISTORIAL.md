@@ -1360,3 +1360,32 @@ del ejemplo `components`, encontró tres fallos del host y un ejemplo que se ve�
   `no_window`), `clippy` y `fmt` limpios; en ventana real (Windows): barra a todo el ancho, «×» sin
   recorte al pasar el ratón, la «×» no cambia de pestaña, «Changes» cambia el panel, y un `Tab` con
   `label` + icono los separa.
+
+### Fase 34 — M6: gpui-kit 0.8, parte A y B (2026-10-23)
+
+**M6-A — Bump de dependencias.** `gpui-kit` (y `gpui-base`, `gpui-component`,
+`gpui-component-macros`, `gpui-kit-assets`) de 0.7.3 a 0.8.0 en
+`packages/host/Cargo.toml`, con `cargo update` y `Cargo.lock` regerado.
+`cargo check`, `cargo fmt --check` y `cargo clippy -- -D warnings` pasan, y
+`cargo update --locked` reporta 0 paquetes bloqueados (consistente con CI).
+El host compila sin cambios de código: `TabVariant`, `TableEvent`,
+`TableState::set_selected_row`, `DataTable`, `ScrollableElement` y
+`h_resizable`/`v_resizable`/`resizable_panel` siguen disponibles en 0.8.
+
+**M6-B — `Tabs`/`TabVariant::Folder`.** `components/tabs.rs` acepta ahora
+`variant: "folder"` y lo mapea a `TabVariant::Folder` (nueva en 0.8). El `match`
+se sigue haciendo por string con `_ => TabVariant::Tab` de fallback, así que
+clientes existentes y strings desconocidos siguen funcionando y no se sube
+`PROTOCOL_VERSION`.
+
+**Verificación (local):** `cargo check`, `fmt --check` y `clippy -D warnings`
+limpios. La revisión del source de gpui-component 0.8.0 confirmó que
+`TabVariant` agregó `Folder` y conservó `Tab`/`Outline`/`Pill`/`Segmented`/
+`Underline`.
+
+Pendiente de M6: revisar `Table` (Home/End, `set_selected_row` sin corte de
+propagación, `ClearSelection`), scroll (`scroll_bounce`, rueda vertical en
+eje horizontal), `Resizable` (confirma sin `on_drag`), easing/transition,
+tests de los tres clientes, `pnpm check:package`, prueba en ventana real de
+`components`, `data`, `advanced` y `dashboard`, y entrada de cambios de
+comportamiento en este mismo historial.
