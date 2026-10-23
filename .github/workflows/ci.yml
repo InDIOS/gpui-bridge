@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: GPUI's Linux system libraries
         if: runner.os == 'Linux'
         run: |
@@ -62,7 +62,7 @@ jobs:
       - name: The binary reports what it is
         shell: bash
         run: ./target/release/gpui-bridge-host${{ matrix.exe }} --version
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: gpui-bridge-host-${{ matrix.tag }}
           path: target/release/gpui-bridge-host${{ matrix.exe }}
@@ -83,7 +83,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: The Linux libraries the host links at runtime
         if: runner.os == 'Linux'
         run: |
@@ -94,14 +94,14 @@ jobs:
             libxkbcommon0 libxkbcommon-x11-0 \
             libx11-xcb1 libxcb1 libxcb-randr0 libxcb-shm0 libxcb-xfixes0 libxcb-xinput0 libxcb-xkb1 \
             libfontconfig1 libfreetype6
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: gpui-bridge-host-${{ matrix.tag }}
           # Where a checkout looks for the host.
@@ -147,15 +147,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: gpui-bridge-host-${{ matrix.tag }}
           path: target/release
@@ -189,13 +189,15 @@ jobs:
         shell: bash
         run: |
           tarball=$(ls packages/host-${{ matrix.tag }}/*.tgz)
-          if ! tar -tvf "$tarball" | grep -q 'package/bin/gpui-bridge-host'; then
+          # read the listing once: piping tar into grep -q dies on SIGPIPE under pipefail
+          entry=$(tar -tvf "$tarball" | grep 'package/bin/gpui-bridge-host' || true)
+          if [ -z "$entry" ]; then
             echo "$tarball does not carry package/bin/gpui-bridge-host"; exit 1; fi
-          if ! tar -tvf "$tarball" | grep 'package/bin/gpui-bridge-host' | grep -qE '^-rwx'; then
+          if ! grep -qE '^-rwx' <<< "$entry"; then
             echo "package/bin/gpui-bridge-host inside $tarball is not executable (EACCES risk)"; exit 1; fi
       - name: Install the artifacts outside the repository and run them
         run: node scripts/check-package.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: packages-${{ matrix.tag }}
           path: |
