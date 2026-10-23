@@ -13,25 +13,51 @@ use crate::tree::{Node, Tree};
 /// A tab of a `Tabs`: the `value` it reports, whether it is disabled, and the chip to draw.
 pub type Chip = (String, bool, Tab);
 
-/// A `Tab` node's chip: its `label`, then its children (an `Icon`, a `text`, a `Badge`…) inside.
-/// With no `label`, the node's `a11y.label` names the chip: a tab of nodes has no text of its own.
-pub fn chip(node: &Node, children: Vec<AnyElement>) -> Chip {
+/// A `Tab` node's chip: its `label`, then its children (an `Icon`, a `text`, a `Badge`…) inside,
+/// and a trailing control (`suffix`, see `is_control`) after them. The node's `a11y.label`
+/// names the chip over its `label`: a tab of nodes has no text of its own.
+pub fn chip(node: &Node, mut children: Vec<AnyElement>, suffix: Option<AnyElement>) -> Chip {
     let (value, disabled) = choice(node);
+    let label = prop_str(node, "label").map(str::to_owned);
     let mut tab = Tab::new().disabled(disabled);
-    match prop_str(node, "label") {
-        Some(label) => tab = tab.label(label.to_owned()),
-        None => {
-            if let Some(label) = a11y::of(node).and_then(|spec| spec.label) {
-                tab = tab.aria_label(label);
-            }
+    if children.is_empty() {
+        if let Some(label) = &label {
+            tab = tab.label(label.clone());
         }
-    }
-    if !children.is_empty() {
-        // gpui-component only spaces the parts of a chip it builds itself (its label, a prefix
-        // and a suffix), so the nodes of a chip of our own are laid out in a row that has a gap.
+    } else {
+        // gpui-component puts no gap between its label and the children of a chip, so a chip
+        // of nodes draws its label itself, first in a row of its own that has one.
+        if let Some(label) = &label {
+            children.insert(0, SharedString::from(label.clone()).into_any_element());
+        }
         tab = tab.child(h_flex().items_center().gap_2().children(children));
     }
+    if let Some(name) = a11y::of(node).and_then(|spec| spec.label).or(label) {
+        tab = tab.aria_label(name);
+    }
+    if let Some(suffix) = suffix {
+        tab = tab.suffix(suffix);
+    }
     (value, disabled, tab)
+}
+
+/// Whether the last child of a `Tab` goes in the chip's suffix: a control there (a close
+/// button) keeps its size, where the box of the label and the children (fixed height,
+/// clipped) would cut it.
+pub fn is_control(node: &Node) -> bool {
+    matches!(
+        node.node_type,
+        NodeType::Button | NodeType::Checkbox | NodeType::Switch
+    )
+}
+
+/// The `a11y` of a `Tabs`, for the wrapper that names it: the bar already is a `tablist`
+/// (gpui-component), so the wrapper is a `group` around it unless the client asks for another role.
+pub fn named(mut spec: a11y::A11y) -> a11y::A11y {
+    if matches!(spec.role, None | Some(Role::TabList)) {
+        spec.role = Some(Role::Group);
+    }
+    spec
 }
 
 /// The `(value, disabled)` of a `Tabs`: its `Tab` children, or its `tabs` entries.
@@ -86,19 +112,16 @@ pub fn build(id: NodeId, node: &Node, chips: Vec<Chip>, session: &Entity<Session
         Some("underline") => TabVariant::Underline,
         _ => TabVariant::Tab,
     };
-    let tab_choices: Vec<(String, bool)> = chips
-        .iter()
-        .map(|(value, disabled, _)| (value.clone(), *disabled))
-        .collect();
+    let values: Vec<String> = chips.iter().map(|(value, ..)| value.clone()).collect();
     let session = session.clone();
     let bar = TabBar::new(("node", id))
         .with_variant(variant)
         .children(chips.into_iter().map(|(_, _, tab)| tab))
         .on_click(move |ix, _, cx| {
-            // A disabled tab, or the selected one again, is not a change.
-            let Some((value, _)) = tab_choices
+            // The selected tab again is not a change (gpui-component never reports a disabled one).
+            let Some(value) = values
                 .get(*ix)
-                .filter(|(value, disabled)| !disabled && Some(value) != current.as_ref())
+                .filter(|value| Some(*value) != current.as_ref())
             else {
                 return;
             };

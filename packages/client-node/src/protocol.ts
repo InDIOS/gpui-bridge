@@ -417,7 +417,8 @@ export interface TabsProps {
 }
 
 /**
- * One tab of a `Tabs`: append children to build its chip (an `Icon`, a `text`, a `Badge`…).
+ * One tab of a `Tabs`: append children to build its chip (an `Icon`, a `text`, a `Tag`…; a
+ * last `Button`, `Checkbox` or `Switch` is drawn after them, at its own size).
  * A `Tabs` with `Tab` children uses them and ignores its `tabs`, and the `Tab` reports nothing:
  * its `Tabs` sends the `change`.
  */

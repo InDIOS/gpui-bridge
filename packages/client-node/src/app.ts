@@ -392,7 +392,7 @@ export class App {
     return this.create("Tabs", props);
   }
 
-  /** One tab of a `Tabs`; append the nodes of its chip (an `Icon`, a `text`, a `Badge`…). */
+  /** One tab of a `Tabs`; append the nodes of its chip (an `Icon`, a `text`, a `Tag`…; a last `Button` is drawn after them). */
   tab(props: NodeProps["Tab"] = {}) {
     return this.create("Tab", props);
   }

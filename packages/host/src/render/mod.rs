@@ -826,7 +826,7 @@ impl RenderCx<'_> {
             NodeType::Button => self.button_node(id, node, &classes),
             NodeType::Checkbox => self.checkbox_node(id, node, &classes),
             NodeType::Switch => self.switch_node(id, node, &classes),
-            NodeType::Tabs => self.tabs_node(id, node, &classes),
+            NodeType::Tabs => self.tabs_node(id, node, &classes, accessibility.as_ref()),
             // Drawn by its `Tabs`: on its own a `Tab` is not a chip (PROTOCOL.md section 15).
             NodeType::Tab => div().into_any_element(),
             NodeType::Table => self.table_node(id, node, &classes),
@@ -875,8 +875,8 @@ impl RenderCx<'_> {
             NodeType::Sidebar => self.sidebar_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
         };
-        // `div` and `text` apply `a11y` themselves; the data components put it on their own sized
-        // wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
+        // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one).
         match accessibility {
@@ -885,6 +885,7 @@ impl RenderCx<'_> {
                     node.node_type,
                     NodeType::Div
                         | NodeType::Text
+                        | NodeType::Tabs
                         | NodeType::Tree
                         | NodeType::Diff
                         | NodeType::Carousel
@@ -1297,8 +1298,15 @@ impl RenderCx<'_> {
         self.blocking(id, switch, classes)
     }
 
-    /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`.
-    fn tabs_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+    /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`. Its `a11y`
+    /// goes on a sized wrapper, so the bar still fills the width its parent gives it.
+    fn tabs_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
         let mut chips = Vec::new();
         for &child in &node.children {
             let Some(tab) = self
@@ -1308,8 +1316,14 @@ impl RenderCx<'_> {
             else {
                 continue;
             };
-            let content = self.tab_content(tab);
-            let (value, disabled, chip) = tabs::chip(tab, content);
+            let mut content = self.tab_content(tab);
+            let suffix = tab
+                .children
+                .last()
+                .and_then(|&last| self.tree.node(last))
+                .filter(|last| tabs::is_control(last))
+                .and_then(|_| content.pop());
+            let (value, disabled, chip) = tabs::chip(tab, content, suffix);
             // The chip is the `Tab` node, so its `class` styles the chip itself (`flex-1` makes
             // the tabs share the bar's width).
             let class = tab.props.get("class").and_then(Value::as_str).unwrap_or("");
@@ -1317,7 +1331,10 @@ impl RenderCx<'_> {
             chips.push((value, disabled, styles::apply(chip, &classes, self.theme)));
         }
         let bar = tabs::build(id, node, chips, self.session);
-        self.blocking(id, bar, classes)
+        match a11y {
+            Some(spec) => self.component_a11y(id, bar, classes, Some(&tabs::named(spec.clone()))),
+            None => self.blocking(id, bar, classes),
+        }
     }
 
     /// The content of a `Tab`: here the control of a node keeps its own click, so clicking a

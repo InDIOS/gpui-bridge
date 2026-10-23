@@ -66,15 +66,13 @@ const tabs = app
     panel.append(panels[shown]);
     say(`Showing the ${shown}`);
   });
-// Each tab is a node: an icon with the row count in a `Badge` over it, and its text.
+// Each tab is a node: an icon, its text and the row count in a `Tag` beside it.
 for (const [value, label, icon] of [["list", "VirtualList", "hard-drive"], ["table", "Table", "layout-dashboard"]] as const) {
   const tab = app.tab({ value, a11y: { label } });
-  // A `Badge` draws its number over its child, so it wraps the icon and the row leaves it room.
   tab.append(
-    app.div({ class: "flex items-center gap-4" }).append(
-      app.badge({ count: COUNT, max: COUNT }).append(app.icon({ name: icon, class: "size-4" })),
-      app.text({ content: label }),
-    ),
+    app.icon({ name: icon, class: "size-4" }),
+    app.text({ content: label }),
+    app.tag({ label: COUNT.toLocaleString("en-US") }),
   );
   tabs.append(tab);
 }

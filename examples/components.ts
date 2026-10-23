@@ -73,24 +73,33 @@ const form = app
   );
 
 // A `Tabs` whose tabs are nodes: every `Tab` child holds its own chip — an icon, a text and a
-// `Badge` — instead of `tabs` entries. A control inside a chip keeps its own click, so the
-// Button in the first tab closes nothing: it does not choose the tab.
-const tabs = app
-  .tabs({ value: "files", variant: "underline", a11y: { role: "tablist", label: "Sections" } })
-  .on("change", onChange<string>((value) => (state.section = value)));
+// `Tag` with a count — instead of `tabs` entries. The bar is a tablist already, so `a11y` only
+// names it. Only the bar is drawn: the app fills the panel below with the chosen tab.
 const chips = [
-  { value: "files", label: "Files", icon: "folder", count: 12 },
-  { value: "changes", label: "Changes", icon: "replace", count: 2 },
-  { value: "history", label: "History", icon: "undo", count: 4, disabled: true },
+  { value: "files", label: "Files", icon: "folder", count: 12, panel: "12 files in the working tree." },
+  { value: "changes", label: "Changes", icon: "replace", count: 2, panel: "2 files changed since the last commit." },
+  { value: "history", label: "History", icon: "undo", count: 4, disabled: true, panel: "" },
 ];
+const panel = app.text({ class: "text-sm px-1" });
+const showPanel = () => panel.set({ content: chips.find((chip) => chip.value === state.section)?.panel ?? "" });
+showPanel();
+const tabs = app
+  .tabs({ value: state.section, variant: "underline", a11y: { label: "Sections" } })
+  .on("change", onChange<string>((value) => {
+    state.section = value;
+    showPanel();
+  }));
 for (const chip of chips) {
-  // A tab of nodes has no text of its own, so `a11y.label` names it for the reader.
+  // A `label` would come first in the chip; the icon goes before the text, so the text is a node
+  // and `a11y.label` names the tab for the reader.
   const tab = app.tab({ value: chip.value, disabled: chip.disabled, a11y: { label: chip.label } });
-  // A `Badge` counts what it holds (it draws the number over its child), so it wraps the icon.
   tab.append(
-    app.badge({ count: chip.count }).append(app.icon({ name: chip.icon, class: "size-4" })),
+    app.icon({ name: chip.icon, class: "size-4" }),
     app.text({ content: chip.label }),
+    app.tag({ label: String(chip.count), variant: chip.disabled ? "secondary" : "primary" }),
   );
+  // A control last in a chip is drawn after it at its own size, and keeps its own click: the
+  // Button closes nothing and does not choose the tab.
   if (chip.value === "files") {
     tab.append(
       app
@@ -138,7 +147,7 @@ root.append(
   ),
   row(stars, pages),
   steps,
-  tabs,
+  app.div({ class: "flex flex-col gap-2" }).append(tabs, panel),
   accordion,
   row(
     form,

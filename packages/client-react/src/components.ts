@@ -229,7 +229,7 @@ export interface TabProps extends SharedProps {
   /** The tab's text, drawn before its children. A chip of nodes names itself with `a11y.label`. */
   label?: string;
   disabled?: boolean;
-  /** Nodes inside the chip, e.g. an `Icon`, a `Text` and a `Badge`. */
+  /** Nodes inside the chip, e.g. an `Icon`, a `Text` and a `Tag`; a last `Button` is drawn after them. */
   children?: ReactNode;
   /** Styles the chip itself: `flex-1` makes the tabs share the bar's width. */
   class?: string;

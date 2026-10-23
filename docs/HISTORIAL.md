@@ -1331,3 +1331,32 @@ CI).
 - **Fuera de este paso:** los paquetes de `darwin-x64`, `linux-arm64` y demás combinaciones (el
   script los soporta en cuanto exista el paquete: `--tag`), la publicación multiplataforma (M6), la
   firma de código de Windows (M6) y la comprobación visual en ventana real de macOS y Linux.
+
+### Fase 33 — Revisión de `Tabs`/`Tab` (2026-10-23)
+
+Una revisión del pilot de M4 contra el `TabBar` de gpui-component 0.7.3, mirando la ventana real
+del ejemplo `components`, encontró tres fallos del host y un ejemplo que se veía mal.
+
+- **La barra no llenaba el ancho si el `Tabs` traía `a11y`.** El render envolvía todo componente
+  con `a11y` en `a11y::wrap`, que es una fila, y el `TabBar` se encogía a sus pestañas (la línea
+  inferior terminaba en la última). `Tabs` pasa a la lista de los que ponen su `a11y` en un wrapper
+  con tamaño (`component_a11y`). Además el `TabBar` ya es un `tablist` (gpui-base), así que el
+  wrapper es un `group` con la `label` (`tabs::named`) y no un segundo `tablist` anidado.
+- **Un control dentro del chip salía recortado.** gpui-component mete los hijos de un `Tab` en una
+  caja de alto fijo (26 px en `underline`) con `overflow_hidden`, y un `Button` mide 32 px. Ahora el
+  último hijo del `Tab`, si es `Button`, `Checkbox` o `Switch`, va al `suffix` del `Tab`, fuera de
+  esa caja y a su tamaño (`tabs::is_control`).
+- **`label` e hijos salían pegados.** gpui-component no pone separación entre su `label` y los
+  hijos; con hijos, el chip dibuja el `label` primero en su propia fila con `gap_2` (y lo pasa como
+  `aria_label`). El `a11y.label` del `Tab` gana siempre sobre el `label`, como en gpui.
+- **Sobraba una comprobación**: el `!disabled` del `on_click` de la barra; gpui-component ya no
+  reporta una pestaña deshabilitada.
+- **Ejemplos.** El `Badge` de gpui-component dibuja el número fuera de su caja, encima del icono
+  (16 px) y sobre el texto. `components.ts` y `data.ts` llevan ahora icono, texto y un `Tag` con la
+  cuenta; `components.ts` además muestra un panel que cambia con la pestaña y ya no pide
+  `role: "tablist"`. PROTOCOL.md §15 documenta el `suffix`, la altura de la fila y el `a11y` de la
+  barra.
+- **Verificación (local, 2026-10-23):** 60 tests del host (unitarios, transcripciones y
+  `no_window`), `clippy` y `fmt` limpios; en ventana real (Windows): barra a todo el ancho, «×» sin
+  recorte al pasar el ratón, la «×» no cambia de pestaña, «Changes» cambia el panel, y un `Tab` con
+  `label` + icono los separa.

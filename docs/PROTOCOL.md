@@ -708,9 +708,9 @@ altogether (a `Tabs` with `Tab` children ignores `tabs`; with none it works as b
 {"op":"create","id":40,"type":"Tabs","props":{"value":"files","variant":"underline"},"events":["change"]}
 {"op":"create","id":41,"type":"Tab","props":{"value":"files","a11y":{"label":"Files"}}}
 {"op":"create","id":42,"type":"Icon","props":{"name":"folder","class":"size-4"}}
-{"op":"create","id":43,"type":"Badge","props":{"count":12}}
-{"op":"create","id":44,"type":"text","props":{"content":"Files"}}
-{"op":"append","parent":43,"child":42}
+{"op":"create","id":43,"type":"text","props":{"content":"Files"}}
+{"op":"create","id":44,"type":"Tag","props":{"label":"12"}}
+{"op":"append","parent":41,"child":42}
 {"op":"append","parent":41,"child":43}
 {"op":"append","parent":41,"child":44}
 {"op":"append","parent":40,"child":41}
@@ -718,15 +718,19 @@ altogether (a `Tabs` with `Tab` children ignores `tabs`; with none it works as b
 
 A `Tab` is `value` —required and not empty, it is what `change` reports—, `label` (its text)
 and `disabled`. Its children are drawn inside the chip, after the `label`, in a row with a gap,
-so a tab can be **made of nodes**: an `Icon`, a `text`, a `Badge` and so on (a `Badge` counts
-what it holds, as in section 17, so it goes around the node it marks). Its `class` styles the
-chip itself, so `flex-1` makes the tabs share the bar's width. The `Tabs` still sends `change`,
-and a tab that is `disabled` or already selected does nothing. A control inside a `Tab`
-(`Button`, `Checkbox`, `Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click:
-it does not choose the tab.
+so a tab can be **made of nodes**: an `Icon`, a `text`, a `Tag` with a count and so on. The row
+has the chip's height and cuts what is taller, so a count goes beside the text (a `Badge` around
+a small icon would cover it). A `Button`, `Checkbox` or `Switch` that is the **last** child goes
+after the row instead, at its own size (a close button). Its `class` styles the chip itself, so
+`flex-1` makes the tabs share the bar's width. The `Tabs` still sends `change`, and a tab that is
+`disabled` or already selected does nothing. A control inside a `Tab` (`Button`, `Checkbox`,
+`Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click: it does not choose the
+tab.
 
-The nodes of a chip are not the chip itself: the tab is announced as a tab, with the `label`, or
-with the `a11y.label` of the `Tab` node when there is none. Three cases are the client's own
+The bar is a `tablist` and every chip a `tab` already: the `a11y` of a `Tabs` only names the bar
+(its `label` goes on a `group` around it, unless it asks for another role). The nodes of a chip
+are not the chip itself: the tab is announced as a tab, with the `a11y.label` of the `Tab` node,
+or with its `label` when there is none. Three cases are the client's own
 mistake and the host only draws around them: a `Tab` outside a `Tabs` is not drawn, a child of a
 `Tabs` that is not a `Tab` is not a tab, and with a `value` repeated among siblings the first
 one wins.
