@@ -1474,3 +1474,34 @@ el lockfile y los docs vigentes (el historial no se reescribe). Verificado: 23 t
 `pnpm check:package` fuera del repositorio, con el cliente resolviendo
 `node_modules/@indios/gpui-bridge-win32-x64/bin/gpui-bridge-host.exe` y las dos apps headless en
 verde.
+
+### Fase 37 — M8: cliente Go (2026-10-24)
+
+`packages/client-go/` (módulo `github.com/InDIOS/gpui-bridge/packages/client-go`, paquete
+`gpuibridge`), solo biblioteca estándar. El protocolo sigue en 1.
+
+- **Conformidad del lado del cliente.** Las transcripciones prueban el host y su runner ya las
+  reproduce; el test del cliente comprueba lo contrario: que lo que escribe por cada operación es
+  una línea `>` de `conformance/`. Destapó que toda `window` llevaba `"themeSet":null` (un
+  `*ThemeSet` nil pasado como `any`). Se borró la copia de `conformance/` dentro del paquete.
+- **Huecos de `PROTOCOL.md`**, corregidos: un `create` rechazado no deja nodo (§4) y qué comprueba
+  un cliente frente a las transcripciones (§9). El cliente se escribió mirando los otros, así que
+  no prueba del todo que alcance con la especificación.
+- **Goroutines.** Los handlers corren en la goroutine que lee del host; los métodos de `Node` toman
+  el lock de `App`. Un test hace fallar a `-race` sin el lock, y CI corre `go test -race`.
+- **Fallos de `App`:** `Run` tras `Close` se colgaba, `Debug` no reenviaba el stderr del host,
+  `Commit` descartaba los errores de escritura y `setEvents` salía en orden aleatorio. Se borraron
+  campos y tipos sin uso.
+- **Publicación** (decidido por el usuario): nombres idiomáticos (`NodeID`, `ProtocolVersion`,
+  `HandshakeTimeout`, `Window`…), `go 1.22`, README y LICENSE dentro del módulo. Los módulos de
+  Go son solo código, así que el host va como asset del GitHub Release: `release.yml` (job
+  `github`) adjunta los tres hosts y `SHA256SUMS` y crea el tag `packages/client-go/v<versión>`.
+  El cliente busca el host en `$GPUI_BRIDGE_HOST`, junto al ejecutable, en `PATH` y en `target/`.
+  Sale con la próxima versión común. Los binarios siguen sin firmar (Windows y macOS).
+- `examples/counter.go` junto a los demás ejemplos, con `examples/go.mod` y un `go.work` en la
+  raíz. Comentarios y mensajes del cliente en inglés, como los otros.
+
+Verificado: `gofmt`, `go vet`, `go test -race` (con el host real sin ventana), el código del
+README compilado contra el módulo local, el script de renombrado de hosts con artefactos
+simulados y el contador en ventana real (el usuario). No verificado: el job `github` de
+`release.yml` (corre con el próximo tag) y la licencia en pkg.go.dev.
