@@ -138,7 +138,7 @@ jobs:
         shell: bash
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
-          go vet ./...
+          go vet ./... ../../examples
           # -race: handlers run on the reader goroutine while the caller also uses the API.
           go test -race ./...
       - name: Type-check the examples
