@@ -1,14 +1,15 @@
 # Contributing
 
 The repository is a monorepo: one Rust host and three clients (Node, React, Python) that talk to
-it over a documented wire protocol. The host binary is shipped inside the client packages as an
-asset, so packaging is part of the build, not an afterthought.
+it over a documented wire protocol. The host binary is shipped as an asset of the packages (an npm
+platform package per system, and the platform-tagged Python wheel), so packaging is part of the
+build, not an afterthought.
 
 ## Get it running
 
-Requirements: Rust (stable, with `rustup`), Visual Studio Build Tools with the C++ workload,
-Node.js 22.6+ with pnpm, and Python 3.10+ for the Python client. The first build of GPUI takes
-several minutes.
+Requirements: Rust (stable, with `rustup`), the platform's C/C++ toolchain (Visual Studio Build
+Tools on Windows, Xcode on macOS, Vulkan/Wayland/X11 libraries on Linux), Node.js 22.6+ with pnpm,
+and Python 3.10+ for the Python client. The first build of GPUI takes several minutes.
 
 ```sh
 pnpm bootstrap                 # pnpm install + debug host + TypeScript builds
@@ -17,7 +18,10 @@ pnpm test                      # host, Node, React and Python
 ```
 
 `pnpm dev <name>` resolves the host and sets `GPUI_BRIDGE_HOST` for the example: `pnpm dev todo`,
-`pnpm dev react/todo`, `pnpm dev counter.py`. Extra arguments after `--` go to the example.
+`pnpm dev react/todo`, `pnpm dev counter.py`. It prefers the debug build in `target/debug` and
+falls back to `target/release`; `--debug` prints which host it runs and forwards its logs, e.g.
+`pnpm dev forms --debug`. Extra arguments go to the example (pnpm swallows a `--`, so both
+`--debug` and `-- --debug` work).
 
 ## Layout
 
@@ -27,11 +31,12 @@ pnpm test                      # host, Node, React and Python
 | `packages/client-node/` | npm `gpui-bridge`; also the txiki.js entry point |
 | `packages/client-react/` | npm `gpui-bridge-react` (peer of `gpui-bridge`) |
 | `packages/client-python/` | PyPI `gpui-bridge` (setuptools, not part of the pnpm workspace) |
+| `packages/host-<platform>-<arch>/` | the npm platform package that carries the host binary |
 | `examples/` | runnable examples; they import the packages by name, like a user |
 | `conformance/` | wire-level transcripts, shared by the host and every client |
 | `benchmarks/` | measurements, not tests |
 | `docs/` | protocol, plan, history, releasing, ADRs |
-| `scripts/` | `stage-host.mjs` (packaging) and `dev.mjs` (`pnpm dev`) |
+| `scripts/` | `stage-host.mjs` (packaging), `check-package.mjs` (the packaging test) and `dev.mjs` (`pnpm dev`) |
 
 The root `Cargo.toml` holds the Cargo workspace and `[profile.release]` (a profile in a member is
 ignored); `pnpm-workspace.yaml` holds the pnpm workspace and the only lockfile.
@@ -52,9 +57,17 @@ ignored); `pnpm-workspace.yaml` holds the pnpm workspace and the only lockfile.
 ## Checks before a commit
 
 ```sh
-cargo clippy --workspace --all-targets
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
 pnpm test
+pnpm --filter gpui-bridge-examples typecheck
 ```
 
-Packaging changes also need `pnpm pack:node` and `pnpm wheel`, then installing the tarball and the
-wheel **outside the repository** and running an example without `GPUI_BRIDGE_HOST`.
+CI (`.github/workflows/ci.yml`) runs exactly these on Windows, macOS and Linux (the host) and on
+Windows and Linux (the clients), plus the packaging job per platform, on the Rust version pinned
+in `rust-toolchain.toml`.
+
+Packaging changes also need the three artifacts (`pnpm pack:node`, `pnpm --dir
+packages/host-<platform>-<arch> pack`, `pnpm wheel`) and `pnpm check:package`, which installs
+them **outside the repository** and runs a headless app with both clients, without
+`GPUI_BRIDGE_HOST`.

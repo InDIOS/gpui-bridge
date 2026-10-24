@@ -50,6 +50,41 @@
 > {"op":"simulate","id":5,"event":"change","value":"off"}
 > {"op":"simulate","id":5,"event":"change","value":"chart"}
 < {"type":"error","code":"invalid_operation","op":"simulate"}
+# Tabs built from `Tab` children: they replace `tabs`, and each one's nodes go inside its chip.
+> {"op":"create","id":20,"type":"Tabs","props":{"tabs":[{"value":"ignored","label":"Ignored"}],"value":"files","variant":"underline"},"events":["change"]}
+> {"op":"create","id":21,"type":"Tab","props":{"value":"files","label":"Files"}}
+> {"op":"create","id":22,"type":"Icon","props":{"name":"folder","class":"size-4"}}
+> {"op":"create","id":23,"type":"Badge","props":{"count":3}}
+> {"op":"create","id":24,"type":"text","props":{"content":"Files"}}
+> {"op":"create","id":25,"type":"Tab","props":{"value":"shared","label":"Shared"}}
+> {"op":"create","id":26,"type":"Tab","props":{"value":"history","label":"History","disabled":true}}
+> {"op":"create","id":27,"type":"text","props":{"content":"Panel"}}
+> {"op":"append","parent":23,"child":22}
+> {"op":"append","parent":21,"child":23}
+> {"op":"append","parent":21,"child":24}
+> {"op":"append","parent":20,"child":21}
+> {"op":"append","parent":20,"child":27}
+> {"op":"append","parent":20,"child":25}
+> {"op":"append","parent":20,"child":26}
+> {"op":"commit"}
+# Choosing one reports its `value`, exactly as a `tabs` entry does.
+> {"op":"simulate","id":20,"event":"change","value":"files"}
+> {"op":"simulate","id":20,"event":"change","value":"history"}
+> {"op":"simulate","id":20,"event":"change","value":"shared"}
+< {"type":"event","id":20,"event":"change","value":"shared"}
+> {"op":"simulate","id":20,"event":"change","value":"shared"}
+# Neither the ignored `tabs` nor a child that is not a `Tab` is a tab.
+> {"op":"simulate","id":20,"event":"change","value":"ignored"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":20,"event":"change","value":"Panel"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Controlled: the host only reports the choice and keeps the client's `value`.
+> {"op":"setProps","id":20,"props":{"controlled":true,"value":"files"}}
+> {"op":"commit"}
+> {"op":"simulate","id":20,"event":"change","value":"shared"}
+< {"type":"event","id":20,"event":"change","value":"shared"}
+> {"op":"simulate","id":20,"event":"change","value":"shared"}
+< {"type":"event","id":20,"event":"change","value":"shared"}
 # A Table can take the focus.
 > {"op":"focus","id":4}
 > {"op":"commit"}
@@ -63,6 +98,11 @@
 > {"op":"create","id":16,"type":"Table","props":{"selected":1.5}}
 > {"op":"create","id":17,"type":"Tabs","props":{"tabs":[{"value":"a"}]}}
 > {"op":"create","id":18,"type":"Tabs","props":{"variant":"round"}}
+# A `Tab` without a `value`, or with an empty one, has nothing to report.
+> {"op":"create","id":30,"type":"Tab","props":{"label":"No value"}}
+> {"op":"create","id":31,"type":"Tab","props":{"value":""}}
+> {"op":"create","id":32,"type":"Tab","props":{"value":3}}
+> {"op":"setProps","id":21,"props":{"value":null}}
 > {"op":"commit"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
@@ -73,3 +113,7 @@
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"setProps"}

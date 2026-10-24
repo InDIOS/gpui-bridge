@@ -5,8 +5,9 @@
 node_modules/
 packages/*/dist/
 examples/dist/
-# The host asset that `pnpm pack` puts in the tarball (scripts/stage-host.mjs).
-packages/client-node/bin/
+# The host assets that `pnpm pack` and the wheel builder put in the packages
+# (scripts/stage-host.mjs); they are staged at packaging time and deleted afterwards.
+packages/host-*/bin/
 
 # Python
 __pycache__/

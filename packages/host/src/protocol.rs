@@ -29,11 +29,23 @@ pub enum ClientMessage {
         title: Option<String>,
         width: Option<f32>,
         height: Option<f32>,
+        /// Initial position, in logical pixels; like `frameless`, read when the window opens.
+        x: Option<f32>,
+        y: Option<f32>,
+        #[serde(rename = "minWidth")]
+        min_width: Option<f32>,
+        #[serde(rename = "minHeight")]
+        min_height: Option<f32>,
         root: Option<NodeId>,
         theme: Option<WindowTheme>,
         #[serde(rename = "themeSet")]
         theme_set: Option<CustomThemes>,
         frameless: Option<bool>,
+        /// Minimizes (`true`) or restores (`false`) on commit. An action, not a remembered state.
+        minimized: Option<bool>,
+        /// Window events the client wants (`focus`, `blur`, `resize`, `move`, `visibility`);
+        /// replaces the previous list.
+        events: Option<Vec<String>>,
     },
     Create {
         id: NodeId,
@@ -177,6 +189,22 @@ pub enum HostMessage {
     },
     WindowClosed {
         id: WindowId,
+    },
+    /// A window event the client subscribed to in `window` (PROTOCOL.md section 3).
+    /// `move` and `resize` carry the window's bounds; `visibility` carries `visible`.
+    WindowEvent {
+        id: WindowId,
+        event: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        x: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        y: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        width: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        height: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        visible: Option<bool>,
     },
     Tray {
         event: String,
@@ -384,10 +412,16 @@ mod tests {
                 title: Some("My app".into()),
                 width: Some(800.0),
                 height: Some(600.0),
+                x: None,
+                y: None,
+                min_width: None,
+                min_height: None,
                 root: Some(1),
                 theme: Some(WindowTheme::Dark),
                 theme_set: None,
                 frameless: None,
+                minimized: None,
+                events: None,
             }
         );
         assert_eq!(
@@ -397,10 +431,38 @@ mod tests {
                 title: Some("Renamed".into()),
                 width: None,
                 height: None,
+                x: None,
+                y: None,
+                min_width: None,
+                min_height: None,
                 root: None,
                 theme: None,
                 theme_set: None,
-                frameless: None
+                frameless: None,
+                minimized: None,
+                events: None
+            }
+        );
+        // Position, minimum size, minimize/restore and window events (PROTOCOL.md section 3).
+        assert_eq!(
+            parse(
+                r#"{"op":"window","id":2,"x":120,"y":80,"minWidth":320,"minHeight":200,"minimized":true,"events":["focus","resize"]}"#
+            ),
+            ClientMessage::Window {
+                id: Some(2),
+                title: None,
+                width: None,
+                height: None,
+                x: Some(120.0),
+                y: Some(80.0),
+                min_width: Some(320.0),
+                min_height: Some(200.0),
+                root: None,
+                theme: None,
+                theme_set: None,
+                frameless: None,
+                minimized: Some(true),
+                events: Some(vec!["focus".into(), "resize".into()])
             }
         );
         let err = parse_err(r#"{"op":"window","theme":"sepia"}"#);
@@ -540,6 +602,30 @@ mod tests {
             (
                 HostMessage::WindowClosed { id: 2 },
                 json!({"type": "windowClosed", "id": 2}),
+            ),
+            (
+                HostMessage::WindowEvent {
+                    id: 2,
+                    event: "resize".into(),
+                    x: Some(100.0),
+                    y: Some(80.0),
+                    width: Some(400.0),
+                    height: Some(300.0),
+                    visible: None,
+                },
+                json!({"type": "windowEvent", "id": 2, "event": "resize", "x": 100.0, "y": 80.0, "width": 400.0, "height": 300.0}),
+            ),
+            (
+                HostMessage::WindowEvent {
+                    id: 1,
+                    event: "visibility".into(),
+                    x: None,
+                    y: None,
+                    width: None,
+                    height: None,
+                    visible: Some(false),
+                },
+                json!({"type": "windowEvent", "id": 1, "event": "visibility", "visible": false}),
             ),
             (
                 HostMessage::Error {

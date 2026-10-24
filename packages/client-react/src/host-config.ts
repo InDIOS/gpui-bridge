@@ -3,7 +3,16 @@
 import { createContext } from "react";
 import createReconciler from "react-reconciler";
 import { DefaultEventPriority, NoEventPriority } from "react-reconciler/constants.js";
-import type { App, AppWindow, NodeType, TrayOptions, UINode, WindowOptions } from "gpui-bridge";
+import type {
+  App,
+  AppWindow,
+  NodeType,
+  TrayOptions,
+  UINode,
+  WindowEventName,
+  WindowEventPayload,
+  WindowOptions,
+} from "gpui-bridge";
 
 export interface Container {
   app: App;
@@ -73,24 +82,66 @@ interface WindowState {
   app: App;
   handle: AppWindow;
   onClose?: () => void;
+  /** Latest React handler per window event name. */
+  handlers: Map<WindowEventName, Handler>;
+  /** What each subscribed event calls, so it can be unsubscribed. */
+  listeners: Map<WindowEventName, (payload: WindowEventPayload) => void>;
   /** Closed by the user: the host already forgot it. */
   closed: boolean;
 }
 
-const WINDOW_OPTIONS = ["title", "width", "height", "frameless"] as const;
+const WINDOW_OPTIONS = ["title", "width", "height", "x", "y", "minWidth", "minHeight", "minimized", "frameless"] as const;
+
+/** React handler prop per window event (PROTOCOL.md section 3). */
+const WINDOW_EVENT_PROPS: Record<string, WindowEventName> = {
+  onFocus: "focus",
+  onBlur: "blur",
+  onResize: "resize",
+  onMove: "move",
+  onVisibility: "visibility",
+};
 
 function windowOptions(props: Record<string, unknown>): WindowOptions {
   return Object.fromEntries(WINDOW_OPTIONS.filter((key) => props[key] !== undefined).map((key) => [key, props[key]]));
 }
 
+/** Subscribes or unsubscribes according to the handlers present in `props`. */
+function syncWindowHandlers(state: WindowState, props: Record<string, unknown>): void {
+  for (const [prop, event] of Object.entries(WINDOW_EVENT_PROPS)) {
+    const handler = props[prop];
+    if (typeof handler === "function") {
+      state.handlers.set(event, handler as Handler);
+      if (!state.listeners.has(event)) {
+        const listener = (payload: WindowEventPayload) => state.handlers.get(event)?.(payload);
+        state.listeners.set(event, listener);
+        state.handle.on(event, listener);
+      }
+    } else {
+      state.handlers.delete(event);
+      const listener = state.listeners.get(event);
+      if (listener) {
+        state.handle.off(event, listener);
+        state.listeners.delete(event);
+      }
+    }
+  }
+}
+
 function makeWindow(app: App, props: Record<string, unknown>): Instance {
   const root = app.div({ class: (props.class as string | undefined) ?? "size-full" });
-  const state: WindowState = { app, handle: app.createWindow({ ...windowOptions(props), root }), closed: false };
+  const state: WindowState = {
+    app,
+    handle: app.createWindow({ ...windowOptions(props), root }),
+    handlers: new Map(),
+    listeners: new Map(),
+    closed: false,
+  };
   state.onClose = props.onClose as (() => void) | undefined;
   state.handle.on("closed", () => {
     state.closed = true;
     state.onClose?.();
   });
+  syncWindowHandlers(state, props);
   return { node: root, type: "Window", handlers: new Map(), window: state };
 }
 
@@ -101,6 +152,7 @@ function updateWindow(instance: Instance, prevProps: Record<string, unknown>, ne
     WINDOW_OPTIONS.filter((key) => !Object.is(prevProps[key], nextProps[key])).map((key) => [key, nextProps[key]]),
   );
   if (Object.keys(changes).length) state.handle.set(changes);
+  syncWindowHandlers(state, nextProps);
   if (prevProps.class !== nextProps.class) (instance.node as UINode<"div">).set({ class: (nextProps.class as string | undefined) ?? "size-full" });
 }
 
@@ -128,6 +180,8 @@ const EVENT_PROPS: Record<string, string> = {
   onCancel: "cancel",
   onClose: "close",
   onSort: "sort",
+  onExpand: "expand",
+  onCollapse: "collapse",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -161,6 +215,7 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
   if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
+  if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch") wire.controlled = props.checked !== undefined;
   return { wire, handlers };
 }
@@ -219,6 +274,8 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.table(wire);
     case "Tabs":
       return app.tabs(wire);
+    case "Tab":
+      return app.tab(wire);
     case "Alert":
       return app.alert(wire);
     case "Badge":
@@ -265,6 +322,16 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.resizable(wire);
     case "Calendar":
       return app.calendar(wire);
+    case "Tree":
+      return app.tree(wire);
+    case "Diff":
+      return app.diff(wire);
+    case "Carousel":
+      return app.carousel(wire);
+    case "Sidebar":
+      return app.sidebar(wire);
+    case "Chart":
+      return app.chart(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

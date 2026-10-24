@@ -2,7 +2,9 @@
 
 > Documento de trabajo, 2026-10-20. En español, como [GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md)
 > y [HISTORIAL.md](HISTORIAL.md); el protocolo y el README siguen en inglés (regla 9 del plan).
-> Complementa la §8 del plan: **no** hay nada de esto implementado todavía.
+> Complementa la §8 del plan. La tanda 1 (`Tree`, `Diff`, `Carousel`) y la tanda 2
+> (`Sidebar`, `Chart` de líneas, barras y tarta) están implementadas (HISTORIAL.md, «Fase 29» y
+> «Fase 30»); el análisis de abajo sigue siendo el de las tandas 3–5.
 
 ## 1. Resumen
 
@@ -149,11 +151,19 @@ el mismo cambio, prueba en ventana real y anotación en HISTORIAL.md.
 
 | Tanda | Componentes | Por qué en este orden | Criterios de aceptación |
 |---|---|---|---|
-| **1** | `Tree`, `Diff`, `Carousel` | Los tres son datos + un slot; no tocan el modelo. Mejor relación valor/riesgo | props validadas (incluidos árboles y el patch), selección/expansión reaplicadas tras reconstruir, transcripciones propias, ejemplo y ventana real |
-| **2** | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie` primero) | Datos con más estructura; `Chart` se puede partir por tipo de gráfico | igual, más una prueba de datos grandes (series de 1000 puntos) |
+| **1** | `Tree`, `Diff`, `Carousel` — **hecha (2026-10-21)** | Los tres son datos + un slot; no tocan el modelo. Mejor relación valor/riesgo | props validadas (incluidos árboles y el patch), selección/expansión reaplicadas tras reconstruir, transcripciones propias, ejemplo y ventana real |
+| **2** | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`) — **hecha (2026-10-21)** | Datos con más estructura; `Chart` se puede partir por tipo de gráfico | props validadas, transcripción `charts.txt`, ejemplo `dashboard.ts` con 1000 puntos y un árbol de 10 niveles, y ventana real |
 | **3** | `Command`, `Settings` | Necesitan un mini-lenguaje de datos (como `Table`) y una paleta modal | igual, más `query`/filtrado y `change` con `{key, value}` |
 | **4** | `List` | Solo si hace falta lo que `VirtualList` no da (secciones, búsqueda integrada, carga incremental) | delegate genérico probado con 10 000 filas y árbol profundo |
 | **5** | `Dock` | Requiere un ADR antes de escribir código | ADR aprobado; después, lo mismo que las demás tandas + persistencia del layout |
+
+**Subcomponentes — piloto con `Tab` dentro de `Tabs` (hecho el 2026-10-21, M4).** Un componente
+cuyo contenido es una lista de props (`tabs`, `options`, `items`) no puede llevar nodos dentro.
+El patrón de `Form`/`Field` sí: el padre mira a sus hijos y usa los del tipo del subcomponente
+(`Tab` con `value`, `label`, `disabled`, y sus propios hijos dentro), e ignora su prop de lista
+cuando los tiene. Sirve para que un `RadioGroup` tome `Radio` hijos, un `Stepper` `Step`, un
+`DescriptionList` `Entry` y un `Accordion` `Section`, sin tocar el modelo del host (nodos
+normales, `change` desde el padre). El del piloto quedó en `PROTOCOL.md` §15.
 
 ## 10. Decisiones abiertas (Dock)
 
@@ -184,5 +194,6 @@ el mismo cambio, prueba en ventana real y anotación en HISTORIAL.md.
 - `src/setting/page.rs`, `src/setting/settings.rs` — `Settings::pages([SettingPage…])`.
 - `src/dock/panel.rs` — `pub trait Panel: gpui_base::dock::Panel`.
 
-No implementado todavía: la lista de tipos de nodo sigue siendo la de PROTOCOL.md §5 (40 tipos).
+No implementado todavía: `Command`, `Settings`, `List` y `Dock`, que son las tandas 3–5 (la lista
+de tipos de nodo es ya la de PROTOCOL.md §5, 42 tipos).
 

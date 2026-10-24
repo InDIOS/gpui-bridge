@@ -4,84 +4,235 @@ on:
   push:
     branches: [dev, main]
   pull_request:
+  # release.yml runs this whole workflow and publishes the artifacts of its `pack` job.
+  workflow_call:
 
 env:
   CARGO_TERM_COLOR: always
+  # Keep CI on the same Rust the repository is developed and verified with
+  # (rust-toolchain.toml, docs/GPUI_BRIDGE_PLAN.md §3.1). Bump both together.
+  RUST_VERSION: "1.99.1"
+
+# A new push to the same branch cancels the previous run: only the newest commit matters.
+concurrency:
+  # Called from release.yml, github.workflow is "Release": a rehearsal does not cancel dev's CI.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   host:
-    # The host is Windows-only today; every job below runs on the same OS so the binary
-    # that the clients test is the binary that would ship.
-    runs-on: windows-latest
+    # The host is built, linted and tested on every platform we ship a binary for: it is the
+    # thing the clients run, and it is the only part that is platform-specific. `tag` is the
+    # platform the artifact is for (the name of the npm platform package that carries it).
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            tag: win32-x64
+            exe: ".exe"
+          # The oldest runner: its glibc (2.35) is the oldest the shipped Linux host runs on.
+          - os: ubuntu-22.04
+            tag: linux-x64
+            exe: ""
+          - os: macos-latest
+            tag: darwin-arm64
+            exe: ""
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v5
+      - name: GPUI's Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvulkan-dev libvulkan1 mesa-vulkan-drivers \
+            libwayland-dev libwayland-bin \
+            libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
+            libxcb-xfixes0-dev libxcb-xinput-dev libxcb-xkb-dev \
+            libfontconfig-dev libfreetype-dev \
+            libssl-dev pkg-config
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets
-      - run: cargo test --workspace
-      - run: cargo build -p gpui-bridge-host --release
-      - run: target/release/gpui-bridge-host.exe --version
-      - uses: actions/upload-artifact@v4
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build -p gpui-bridge-host --release --locked
+      - name: The binary reports what it is
+        shell: bash
+        run: ./target/release/gpui-bridge-host${{ matrix.exe }} --version
+      - uses: actions/upload-artifact@v6
         with:
-          name: gpui-bridge-host-win32-x64
-          path: target/release/gpui-bridge-host.exe
+          name: gpui-bridge-host-${{ matrix.tag }}
+          path: target/release/gpui-bridge-host${{ matrix.exe }}
           if-no-files-found: error
 
   clients:
     needs: host
-    runs-on: windows-latest
+    # The clients are JavaScript, Python and Go, so two systems are enough to prove the plumbing;
+    # macOS runners are the scarce ones. Node, React, Python and Go run the real host headless.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            tag: win32-x64
+          - os: ubuntu-latest
+            tag: linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - name: The Linux libraries the host links at runtime
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvulkan1 mesa-vulkan-drivers \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libx11-xcb1 libxcb1 libxcb-randr0 libxcb-shm0 libxcb-xfixes0 libxcb-xinput0 libxcb-xkb1 \
+            libfontconfig1 libfreetype6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-go@v6
         with:
-          name: gpui-bridge-host-win32-x64
-          # Where the clients look in a checkout.
+          go-version-file: packages/client-go/go.mod
+          # No dependencies, so no go.sum to key a cache on.
+          cache: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: gpui-bridge-host-${{ matrix.tag }}
+          # Where a checkout looks for the host.
           path: target/release
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Stage the host the way the packages ship it
+        run: node scripts/stage-host.mjs
+      - name: "Sanity check: staged host is where the client resolver looks"
+        shell: bash
+        run: |
+          exe=""
+          if [ "${{ runner.os }}" = "Windows" ]; then exe=".exe"; fi
+          test -f "packages/host-${{ matrix.tag }}/bin/gpui-bridge-host$exe" || {
+            echo "staged host missing at packages/host-${{ matrix.tag }}/bin/"; exit 1; }
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            test -x "packages/host-${{ matrix.tag }}/bin/gpui-bridge-host$exe" || {
+              echo "staged host is not executable: copyFileSync dropped the +x bit (EACCES)"; exit 1; }
+          fi
       - run: pnpm test:node
       - run: pnpm test:react
       - run: pnpm test:python
+      - name: Go client
+        working-directory: packages/client-go
+        shell: bash
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./... ../../examples
+          # -race: handlers run on the reader goroutine while the caller also uses the API.
+          go test -race ./...
       - name: Type-check the examples
         run: pnpm --filter gpui-bridge-examples typecheck
 
   pack:
     needs: host
-    runs-on: windows-latest
+    # Packaging is per platform: one npm platform package, one client tarball and one wheel,
+    # each carrying the host built above.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            tag: win32-x64
+            exe: ".exe"
+          # The oldest runner: its glibc (2.35) is the oldest the shipped Linux host runs on.
+          - os: ubuntu-22.04
+            tag: linux-x64
+            exe: ""
+          - os: macos-latest
+            tag: darwin-arm64
+            exe: ""
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - name: The Linux libraries the host links at runtime
+        # check-package.mjs runs the installed host, so it needs them like the clients job does.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvulkan1 mesa-vulkan-drivers \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libx11-xcb1 libxcb1 libxcb-randr0 libxcb-shm0 libxcb-xfixes0 libxcb-xinput0 libxcb-xkb1 \
+            libfontconfig1 libfreetype6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
-          name: gpui-bridge-host-win32-x64
+          name: gpui-bridge-host-${{ matrix.tag }}
           path: target/release
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Pack the npm client (stages the host asset)
-        run: pnpm --dir packages/client-node pack
-      - name: Build the platform-tagged wheel
-        run: node scripts/stage-host.mjs --to python; python packages/client-python/build_wheel.py
-      - name: The tarball carries the host
+      - name: Pack the npm platform package and the client
+        # The platform package's `prepack` stages the host (scripts/stage-host.mjs) and its
+        # `postpack` removes it again, so a checkout never keeps a stale binary.
         run: |
-          tar -tf packages/client-node/gpui-bridge-*.tgz | Select-String 'bin/gpui-bridge-host.exe'
-      - uses: actions/upload-artifact@v4
+          pnpm --dir packages/client-node pack
+          pnpm --dir packages/client-react pack
+          pnpm --dir packages/host-${{ matrix.tag }} pack
+      - name: Build the platform-tagged wheel
+        run: |
+          node scripts/stage-host.mjs --to python --tag ${{ matrix.tag }}
+          python packages/client-python/build_wheel.py
+      - name: The npm package and the wheel carry the host
+        shell: bash
+        run: |
+          set -eu
+          exe='${{ matrix.exe }}'
+          tarball=$(ls packages/host-${{ matrix.tag }}/*.tgz)
+          entries=$(tar -tzf "$tarball")
+          for file in "package/bin/gpui-bridge-host$exe" "package/bin/host.json"; do
+            echo "$entries" | grep -qx "$file" || { echo "$tarball does not carry $file"; exit 1; }
+          done
+          wheel=$(ls packages/client-python/dist/*.whl)
+          python -c "import sys, zipfile; names = zipfile.ZipFile(sys.argv[1]).namelist(); missing = [n for n in ('gpui_bridge/bin/gpui-bridge-host$exe', 'gpui_bridge/bin/host.json') if n not in names]; sys.exit('missing: %s' % missing if missing else 0)" "$wheel"
+          echo "the host is in the tarball and the wheel"
+      - name: The staged host inside the tarball is executable
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tarball=$(ls packages/host-${{ matrix.tag }}/*.tgz)
+          # read the listing once: piping tar into grep -q dies on SIGPIPE under pipefail
+          entry=$(tar -tvf "$tarball" | grep 'package/bin/gpui-bridge-host' || true)
+          if [ -z "$entry" ]; then
+            echo "$tarball does not carry package/bin/gpui-bridge-host"; exit 1; fi
+          if ! grep -qE '^-rwx' <<< "$entry"; then
+            echo "package/bin/gpui-bridge-host inside $tarball is not executable (EACCES risk)"; exit 1; fi
+      - name: Install the artifacts outside the repository and run them
+        run: node scripts/check-package.mjs
+      - uses: actions/upload-artifact@v6
         with:
-          name: packages
+          name: packages-${{ matrix.tag }}
           path: |
+            packages/host-${{ matrix.tag }}/*.tgz
             packages/client-node/*.tgz
+            packages/client-react/*.tgz
             packages/client-python/dist/*.whl
+          if-no-files-found: error

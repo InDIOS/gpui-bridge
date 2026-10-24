@@ -5,6 +5,7 @@ import type { ReactNode, Ref } from "react";
 import type {
   A11y,
   ButtonProps as WireButtonProps,
+  DiffSelection,
   ImageProps as WireImageProps,
   Menu,
   MenuItem,
@@ -18,6 +19,7 @@ import type {
   TabsProps as WireTabsProps,
   UINode,
   WindowControl,
+  WindowEventPayload,
 } from "gpui-bridge";
 
 /** A `ref` gets the node (`ref.current.focus()`). */
@@ -210,24 +212,57 @@ export interface TableProps extends SharedProps {
 }
 
 export interface TabsProps extends SharedProps {
-  tabs: Option[];
+  /** Ignored when the `Tabs` has `Tab` children. */
+  tabs?: Option[];
   /** Passing `value` makes the tabs controlled (the host waits for React to confirm choices). */
   value?: string;
   variant?: WireTabsProps["variant"];
   class?: string;
   onChange?: (value: string) => void;
+  /** One `Tab` per child. */
+  children?: ReactNode;
+}
+
+export interface TabProps extends SharedProps {
+  /** What `change` reports for this tab. Required: the host rejects a `Tab` without it. */
+  value?: string;
+  /** The tab's text, drawn before its children. A chip of nodes names itself with `a11y.label`. */
+  label?: string;
+  disabled?: boolean;
+  /** Nodes inside the chip, e.g. an `Icon`, a `Text` and a `Tag`; a last `Button` is drawn after them. */
+  children?: ReactNode;
+  /** Styles the chip itself: `flex-1` makes the tabs share the bar's width. */
+  class?: string;
 }
 
 export interface WindowProps {
   title?: string;
   width?: number;
   height?: number;
+  /** Initial position; only read when the window opens. */
+  x?: number;
+  y?: number;
+  /** Minimum size the user can resize to; only read when the window opens. */
+  minWidth?: number;
+  minHeight?: number;
+  /** Minimizes (`true`) or restores (`false`) on the next commit. */
+  minimized?: boolean;
   /** No system title bar; only read when the window opens. */
   frameless?: boolean;
   /** Classes of the window's root div (default `size-full`). */
   class?: string;
   /** The user closed the window. Unmount the `Window` (or React keeps an element for a window that is gone). */
   onClose?: () => void;
+  /** The window gained the system focus. */
+  onFocus?: (event: WindowEventPayload) => void;
+  /** The window lost the system focus. */
+  onBlur?: (event: WindowEventPayload) => void;
+  /** The user resized the window: the payload has `x`, `y`, `width`, `height`. */
+  onResize?: (bounds: WindowEventPayload) => void;
+  /** The user moved the window: the payload has `x`, `y`, `width`, `height`. */
+  onMove?: (bounds: WindowEventPayload) => void;
+  /** The window is being presented or not (`visible`); minimizing reports it too. */
+  onVisibility?: (event: WindowEventPayload) => void;
   children?: ReactNode;
 }
 
@@ -252,6 +287,8 @@ export const VirtualList = "VirtualList" as unknown as HostComponent<VirtualList
 export const Table = "Table" as unknown as HostComponent<TableProps>;
 /** A tab bar; render the chosen tab's content yourself. */
 export const Tabs = "Tabs" as unknown as HostComponent<TabsProps>;
+/** One tab of a `Tabs`: its children are the nodes of its chip. */
+export const Tab = "Tab" as unknown as HostComponent<TabProps>;
 /**
  * Shows the system tray icon while mounted (one per app). While it is shown, closing the
  * last window does not end the app; unmounting it then does.
@@ -331,3 +368,29 @@ export const Resizable = "Resizable" as unknown as HostComponent<ResizableProps>
 
 export type CalendarProps = NodeProps["Calendar"] & { onChange?: (day: string) => void };
 export const Calendar = "Calendar" as unknown as HostComponent<CalendarProps>;
+
+export type TreeProps = NodeProps["Tree"] & {
+  onChange?: (id: string) => void;
+  onExpand?: (id: string) => void;
+  onCollapse?: (id: string) => void;
+};
+export const Tree = "Tree" as unknown as HostComponent<TreeProps>;
+
+/** The selected lines, or `null` when the selection is cleared. */
+export type DiffProps = NodeProps["Diff"] & { onChange?: (selection: DiffSelection | null) => void };
+export const Diff = "Diff" as unknown as HostComponent<DiffProps>;
+
+/** Each child is one slide. */
+export type CarouselProps = NodeProps["Carousel"] & {
+  onChange?: (index: number) => void;
+  children?: ReactNode;
+};
+export const Carousel = "Carousel" as unknown as HostComponent<CarouselProps>;
+
+/** The sections are data; `onChange` gets the clicked entry's id. */
+export type SidebarProps = NodeProps["Sidebar"] & { onChange?: (id: string) => void };
+export const Sidebar = "Sidebar" as unknown as HostComponent<SidebarProps>;
+
+/** A line, bar or pie chart of the points in `data`; it has no events of its own. */
+export type ChartProps = NodeProps["Chart"];
+export const Chart = "Chart" as unknown as HostComponent<ChartProps>;

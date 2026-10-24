@@ -1,0 +1,25 @@
+{
+  "name": "@indios/gpui-bridge-win32-x64",
+  "version": "0.2.0",
+  "description": "The gpui-bridge host binary for Windows x64 (installed by gpui-bridge, not directly)",
+  "license": "MIT",
+  "author": "gpui-bridge contributors",
+  "homepage": "https://github.com/InDIOS/gpui-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InDIOS/gpui-bridge.git",
+    "directory": "packages/host-win32-x64"
+  },
+  "bugs": {
+    "url": "https://github.com/InDIOS/gpui-bridge/issues"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "scripts": {
+    "prepack": "node ../../scripts/stage-host.mjs --to node --tag win32-x64",
+    "postpack": "node -e \"require('fs').rmSync('bin',{recursive:true,force:true})\""
+  },
+  "files": [
+    "bin"
+  ]
+}

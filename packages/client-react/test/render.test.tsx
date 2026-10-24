@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
-import type { App, ClientMessage, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Checkbox, Collapsible, DescriptionList, Dialog, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tabs, Tag, Text, Textarea, Toolbar, Tray, VirtualList, Window } from "../src/index.js";
+import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
+import { Accordion, Alert, Badge, Button, Calendar, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -245,6 +245,146 @@ test("VirtualList renders rows as children; Table and Tabs get plain values", as
   // Sorted rows and the confirmed tab go back to the host.
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === table.id && JSON.stringify(m.props.rows) === JSON.stringify([{ name: "a" }, { name: "b" }])));
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === tabs.id && m.props.value === "table"));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a Tabs of Tab nodes puts their children in the chips", async () => {
+  const got: unknown[] = [];
+  function Chips() {
+    const [tab, setTab] = useState("files");
+    return (
+      <Tabs value={tab} variant="underline" onChange={(value) => (got.push(["tab", value]), setTab(value))}>
+        <Tab value="files" a11y={{ label: "Files" }}>
+          <Icon name="folder" />
+          <Text>Files</Text>
+          <Badge count={3} />
+        </Tab>
+        <Tab value="history" label="History" disabled />
+      </Tabs>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Chips />);
+  const [tabs] = created(sent, "Tabs");
+  const chips = created(sent, "Tab");
+  assert.deepEqual(chips.map((m) => m.props), [
+    { value: "files", a11y: { label: "Files" } },
+    { value: "history", label: "History", disabled: true },
+  ]);
+  assert.ok(sent.some((m) => m.op === "append" && m.parent === tabs.id && m.child === chips[0].id));
+  // The chip is built from nodes: its `Icon`, `Text` and `Badge` are inside the `Tab`.
+  assert.equal(sent.filter((m) => m.op === "append" && m.parent === chips[0].id).length, 3);
+
+  emit(app, { id: tabs.id, event: "change", value: "history" });
+  await tick();
+  assert.deepEqual(got, [["tab", "history"]]);
+  // The confirmed value goes back to the `Tabs`, which has no `tabs` list at all.
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === tabs.id && m.props.value === "history"));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Tree, Diff and Carousel render with their props and report plain values", async () => {
+  const got: unknown[] = [];
+  const items = [
+    { id: "src", label: "src", expanded: true, children: [{ id: "src/lib.rs", label: "lib.rs" }] },
+    { id: "README.md", label: "README.md" },
+  ];
+  const patch = "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n";
+  function Advanced() {
+    const [selected, setSelected] = useState("src");
+    const [slide, setSlide] = useState(0);
+    return (
+      <Div>
+        <Tree
+          items={items}
+          value={selected}
+          onChange={(id) => (got.push(["tree", id]), setSelected(id))}
+          onExpand={(id) => got.push(["expand", id])}
+          onCollapse={(id) => got.push(["collapse", id])}
+        />
+        <Diff patch={patch} mode="split" onChange={(selection) => got.push(["diff", selection])} />
+        <Carousel value={slide} pagination onChange={(index) => (got.push(["slide", index]), setSlide(index))}>
+          <Text>One</Text>
+          <Text>Two</Text>
+        </Carousel>
+      </Div>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Advanced />);
+  const [tree] = created(sent, "Tree");
+  const [diff] = created(sent, "Diff");
+  const [carousel] = created(sent, "Carousel");
+  assert.deepEqual(tree.props?.items, items);
+  assert.equal(tree.props?.controlled, true);
+  assert.equal(diff.props?.mode, "split");
+  assert.equal(carousel.props?.pagination, true);
+  assert.equal(carousel.props?.controlled, true);
+  assert.equal(sent.filter((m) => m.op === "append" && m.parent === carousel.id).length, 2);
+
+  const selection: DiffSelection = { path: "notes.txt", side: "modified", start: 1, end: 2, endSide: "modified" };
+  emit(app, { id: tree.id, event: "change", value: "README.md" });
+  emit(app, { id: tree.id, event: "expand", value: "src" });
+  emit(app, { id: tree.id, event: "collapse", value: "src" });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: selection });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: null });
+  emit(app, { id: carousel.id, event: "change", value: 1 });
+  await tick();
+  assert.deepEqual(got, [
+    ["tree", "README.md"],
+    ["expand", "src"],
+    ["collapse", "src"],
+    ["diff", selection],
+    ["diff", null],
+    ["slide", 1],
+  ]);
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === tree.id && m.props.value === "README.md"));
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === carousel.id && m.props.value === 1));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Sidebar and Chart render with their props and report plain values", async () => {
+  const got: unknown[] = [];
+  const items = [
+    {
+      label: "General",
+      items: [
+        { id: "home", label: "Home", icon: "layout-dashboard" },
+        { id: "inbox", label: "Inbox" },
+      ],
+    },
+    { items: [{ id: "settings", label: "Settings", children: [{ id: "theme", label: "Theme" }] }] },
+  ];
+  const data = [
+    { label: "Mon", value: 12 },
+    { label: "Tue", value: 18 },
+  ];
+  function Dashboard() {
+    const [active, setActive] = useState("home");
+    return (
+      <Div>
+        <Sidebar items={items} value={active} onChange={(id) => (got.push(["sidebar", id]), setActive(id))} />
+        <Chart chart="line" data={data} yAxis />
+        <Chart chart="pie" data={[{ label: "Rust", value: 60 }]} innerRadius={20} />
+      </Div>
+    );
+  }
+  const { app, sent, errors } = await renderRecorded(<Dashboard />);
+  const [sidebar] = created(sent, "Sidebar");
+  const charts = created(sent, "Chart");
+  assert.deepEqual(sidebar.props?.items, items);
+  assert.equal(sidebar.props?.controlled, true);
+  assert.equal(charts.length, 2);
+  assert.equal(charts[0].props?.chart, "line");
+  assert.equal(charts[0].props?.yAxis, true);
+  assert.deepEqual(charts[0].props?.data, data);
+  assert.equal(charts[1].props?.innerRadius, 20);
+
+  emit(app, { id: sidebar.id, event: "change", value: "theme" });
+  await tick();
+  assert.deepEqual(got, [["sidebar", "theme"]]);
+  assert.ok(sent.some((m) => m.op === "setProps" && m.id === sidebar.id && m.props.value === "theme"));
   await app.close();
   assert.deepEqual(errors, []);
 });
@@ -498,5 +638,36 @@ test("the new components render with their props and report their events", async
   await app.close();
   assert.deepEqual(seen, ["close", ["rating", 4], ["page", 2], ["accordion", "a"], ["step", "two"], ["number", "13"], ["day", "2024-09-01"]]);
   assert.deepEqual(errors, []);
+});
+
+test("Window handlers opt into window events and receive their payload", async () => {
+  const resized: number[] = [];
+  const moved: Array<[number | undefined, number | undefined]> = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Text>main</Text>
+      <Window
+        title="Settings"
+        onResize={(bounds) => resized.push(bounds.width ?? 0)}
+        onMove={(bounds) => moved.push([bounds.x, bounds.y])}
+      >
+        <Text>inside</Text>
+      </Window>
+    </Div>,
+  );
+
+  const windowOps = sent.filter(
+    (m): m is Extract<ClientMessage, { op: "window" }> => m.op === "window" && m.id !== undefined,
+  );
+  const subscribed = windowOps.at(-1)!;
+  assert.deepEqual([...subscribed.events!].sort(), ["move", "resize"]);
+  const id = windowOps[0].id!;
+
+  app.handleMessage({ type: "windowEvent", id, event: "resize", x: 40, y: 60, width: 512, height: 384 });
+  app.handleMessage({ type: "windowEvent", id, event: "move", x: 20, y: 30, width: 512, height: 384 });
+  assert.deepEqual(resized, [512]);
+  assert.deepEqual(moved, [[20, 30]]);
+  assert.deepEqual(errors, []);
+  await app.close();
 });
 

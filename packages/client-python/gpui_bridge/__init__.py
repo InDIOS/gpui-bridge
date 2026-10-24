@@ -19,6 +19,8 @@ from pathlib import Path
 PROTOCOL_VERSION = 1
 HANDSHAKE_TIMEOUT = 10.0
 STDERR_TAIL_LINES = 20
+# Window events a client can subscribe to (PROTOCOL.md section 3).
+WINDOW_EVENTS = ("focus", "blur", "resize", "move", "visibility")
 
 
 @dataclass
@@ -129,6 +131,8 @@ class Window:
         self._app = app
         self.id = window_id
         self.on_closed = None  # () -> None; the user closed the window
+        self._handlers: dict = {}  # window event -> handler
+        self._events_sent: list[str] = []
 
     def set(self, *, root: Node | None = None, **options) -> "Window":
         """Updates the window; like `App.window`, it opens on the first commit that sets `root`."""
@@ -140,6 +144,40 @@ class Window:
         self._app._pending.append({"op": "closeWindow", "id": self.id})
         self._app._open_windows.discard(self.id)
 
+    def on(self, event: str, handler) -> "Window":
+        """Subscribes to a window event (`focus`, `blur`, `resize`, `move`, `visibility`) or to
+        `closed`. Handlers get the message: bounds for `move`/`resize`, `visible` for `visibility`."""
+        if event == "closed":
+            self.on_closed = handler
+            return self
+        if event not in WINDOW_EVENTS:
+            expected = ", ".join(("closed", *WINDOW_EVENTS))
+            raise ValueError(f"unknown window event '{event}' (expected one of {expected})")
+        self._handlers[event] = handler
+        self._sync_events()
+        return self
+
+    def off(self, event: str) -> "Window":
+        """Unsubscribes; the last one removes the window's event subscription (no messages follow)."""
+        if event == "closed":
+            self.on_closed = None
+            return self
+        self._handlers.pop(event, None)
+        self._sync_events()
+        return self
+
+    def _sync_events(self) -> None:
+        """Sends the subscription list only when the set of subscribed events changes."""
+        events = list(self._handlers)
+        if events != self._events_sent:
+            self._events_sent = events
+            self._app._queue_window(self.id, None, {"events": events})
+
+    def _dispatch_window_event(self, message: dict) -> None:
+        handler = self._handlers.get(message.get("event"))
+        if handler:
+            handler(message)
+
 
 class App:
     """Starts the host and completes the handshake. Raises with a clear message if the host cannot start."""
@@ -147,6 +185,7 @@ class App:
     def __init__(self, host_path: str | None = None, *, debug: bool = False, headless: bool = False):
         self.on_error = None  # (HostError) -> None; without it errors are printed to stderr
         self.on_window_closed = None  # (window_id) -> None; the user closed a window
+        self.on_window_event = None  # (message) -> None; a window event the app subscribed to
         self.on_tray = None  # (event, item) -> None; tray "click" (item None) or "menu" (item id)
         self.on_shortcut = None  # (keys, window_id) -> None; a key registered with shortcuts()
         self.on_notification = None  # (id, window_id) -> None; the user clicked a toast that has an id
@@ -240,6 +279,13 @@ class App:
     def tabs(self, **props) -> Node:
         """A tab bar: `tabs=[{"value": ..., "label": ...}]`, `value`, `variant`. Show the content yourself."""
         return self._create("Tabs", props)
+
+    def tab(self, **props) -> Node:
+        """One tab of a `tabs` bar: `value` (required, not empty), `label` (its text, before the
+        children), `disabled` and `class` (of the chip). Append the nodes of its chip (an `icon`, a
+        `text`, a `tag`; a last `button` is drawn after them); a `Tabs` with `tab` children uses
+        them and ignores `tabs`."""
+        return self._create("Tab", props)
 
     def menu_bar(self, **props) -> Node:
         """A menu bar (PROTOCOL.md section 10): `menus=[{"label": ..., "items": [...]}]`."""
@@ -342,6 +388,36 @@ class App:
         """A month view: `value` ("YYYY-MM-DD"), `months`, `weekStartsOn`, `controlled`.
         `change` passes the chosen day."""
         return self._create("Calendar", props)
+
+    def tree(self, **props) -> Node:
+        """Items in props: `items=[{"id", "label", "children", "expanded", "disabled"}]`, `value`
+        (the selected item id), `controlled`. `change` passes the chosen id; `expand` and
+        `collapse` pass a folder's id."""
+        return self._create("Tree", props)
+
+    def diff(self, **props) -> Node:
+        """A patch: `patch` (a unified or Git diff), `mode` (unified or split), `lineNumbers`,
+        `softWrap`, `header`. `change` passes the selected lines ({path, side, start, end,
+        endSide}) or None."""
+        return self._create("Diff", props)
+
+    def carousel(self, **props) -> Node:
+        """A carousel: `value` (the selected slide index), `axis`, `looping`, `controls`,
+        `pagination`, `controlled`. Append one child per slide; `change` passes the index."""
+        return self._create("Carousel", props)
+
+    def sidebar(self, **props) -> Node:
+        """A sidebar: `items` (sections: {"label", "items": [{"id", "label", "icon",
+        "disabled", "open", "children"}]}), `value` (the active entry id), `collapsed`,
+        `collapsible` (icon, offcanvas, none), `side` (left, right), `controlled`. `change`
+        passes the clicked entry's id."""
+        return self._create("Sidebar", props)
+
+    def chart(self, **props) -> Node:
+        """A chart: `chart` (line, bar, pie), `data` ([{"label", "value"}]), `color`, `name`,
+        plus the options of each plot (`curve`, `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`,
+        `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`). It has no events."""
+        return self._create("Chart", props)
 
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
@@ -553,6 +629,12 @@ class App:
                     window.on_closed()
                 if self.on_window_closed:
                     self.on_window_closed(window_id)
+            case "windowEvent":
+                window = self._windows.get(message.get("id", 1))
+                if window:
+                    window._dispatch_window_event(message)
+                if self.on_window_event:
+                    self.on_window_event(message)
             case "notification":
                 if self.on_notification:
                     self.on_notification(message.get("id"), message.get("window"))

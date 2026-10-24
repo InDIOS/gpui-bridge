@@ -1,12 +1,48 @@
-# gpui-bridge
+<p align="center">
+  <img width="611" height="367" alt="gpui-bridge logo" src="https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259" />
+</p>
+
+<h1 align="center">gpui-bridge</h1>
+
+GPUI from Python, or from any language that can start a process.
 
 Native desktop UIs with [GPUI](https://www.gpui.rs/) (the UI framework of the Zed editor) and
-[gpui-component](https://github.com/longbridge/gpui-component), driven from another language.
+[gpui-kit](https://gpui-kit.com/), driven from another language. The Python client is the standard
+library plus a prebuilt host binary: no Rust toolchain needed.
+
+```sh
+pip install gpui-bridge
+```
+
+```python
+from gpui_bridge import App
+
+app = App()
+count = 0
+label = app.text(content="0", class_="text-xl font-bold")
+
+def add(_event=None):
+    global count
+    count += 1
+    label.set(content=str(count))
+    app.commit()
+
+root = app.div(class_="flex flex-col items-center gap-4 p-6 size-full")
+root.append(label, app.button(label="Add", variant="primary").on("click", add))
+app.window(title="Counter", width=320, height=200, root=root)
+app.commit()
+app.run()
+```
 
 A Rust **host** owns the window, the event loop and the component tree. A **client** in your
 language describes the UI as operations on that tree (create a node, set props, append a
 child, remove) and receives events (click, change…). They talk over stdin/stdout with JSON
-Lines, so any language that can start a process can be a client.
+Lines, so a client is a small program in any language: [PROTOCOL.md](docs/PROTOCOL.md) is the
+whole contract, and the transcripts in [`conformance/`](conformance/) are the test a new client
+must pass.
+
+The same counter from Node.js (`npm install gpui-bridge`; React has its own renderer,
+`gpui-bridge-react`):
 
 ```ts
 import { createApp } from "gpui-bridge";
@@ -25,8 +61,9 @@ app.commit();
 Styles are Tailwind-like class strings (`"flex gap-2 p-4 bg-muted"`) that use the theme's
 colors, so light and dark mode and custom themes come for free.
 
-**Status:** Windows only so far (GPUI also runs on macOS and Linux, but the host has not been
-built or tested there). Protocol version 1.
+**Status:** prebuilt for Windows x64, macOS arm64 and Linux x64 (glibc 2.35 or newer). The host
+builds and passes its tests on the three in CI, but it has only been drawn and clicked in a real
+window on Windows so far. Protocol version 1.
 
 ## What it has
 
@@ -35,15 +72,16 @@ built or tested there). Protocol version 1.
   `VirtualList`, `Table`, `Tabs`, and most of gpui-kit's Basic, Form and Layout groups:
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
-  `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus `Calendar`.
+  `Tab` inside `Tabs`, `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus
+  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
   `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
-  `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` and `Sidebar` are
-  not mapped yet.
+  `Dock`, `Command`, `Settings` and `List` are not mapped yet.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
   readers through AccessKit; the window root and the controls name themselves too.
-- **Windows:** several windows, frameless windows with a custom title bar, light/dark and
-  custom themes.
+- **Windows:** several windows, frameless windows with a custom title bar, initial position,
+  minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
+  `visibility`), light/dark and custom themes.
 - **Interaction:** context menus and a menu bar with shortcuts, app shortcuts, `keyDown`,
   focus, double click, tooltips, toasts, dropping files.
 - **System:** tray icon with a native menu, open/save dialogs, clipboard, opening URLs and
@@ -55,9 +93,10 @@ built or tested there). Protocol version 1.
 
 | Folder | Package | Language |
 |---|---|---|
+| [`packages/client-python/`](packages/client-python/) | `gpui-bridge` | Python 3.10+, standard library only |
 | [`packages/client-node/`](packages/client-node/) | `gpui-bridge` | TypeScript for Node.js 22.6+; the same core runs on [txiki.js](https://github.com/saghul/txiki.js) |
 | [`packages/client-react/`](packages/client-react/) | `gpui-bridge-react` | A React renderer on top of `gpui-bridge` (`<Div>`, `<Button onClick>`…) |
-| [`packages/client-python/`](packages/client-python/) | `gpui-bridge` | Python 3.10+, standard library only |
+| [`packages/client-go/`](packages/client-go/) | `github.com/InDIOS/gpui-bridge/packages/client-go` | Go 1.22+, standard library only; the host is a download from the GitHub release |
 
 A client for another language only needs [PROTOCOL.md](docs/PROTOCOL.md); the transcripts in
 [`conformance/`](conformance/) show the expected messages.
@@ -69,6 +108,7 @@ packages/host/          the Rust host (workspace member; ships inside the client
 packages/client-node/   npm package `gpui-bridge`
 packages/client-react/  npm package `gpui-bridge-react`
 packages/client-python/ PyPI package `gpui-bridge`
+packages/client-go/     Go module `github.com/InDIOS/gpui-bridge/packages/client-go`
 examples/               runnable examples, installed against the packages like a user would
 conformance/            protocol transcripts, shared by the host and the clients
 benchmarks/             transport, big-tree and payload measurements
@@ -78,24 +118,26 @@ scripts/                host staging and the `pnpm dev` runner
 
 ## Getting started (from this repository)
 
-Requirements: Rust (stable, with `rustup`), Visual Studio Build Tools with the C++ workload,
-Node.js 22.6+ with pnpm, and Python 3.10+ for the Python client. The first build of GPUI takes
-several minutes.
+Requirements: Rust (stable, with `rustup`), Node.js 22.6+ with pnpm, and Python 3.10+ for the
+Python client. The host builds on Windows (Visual Studio Build Tools with the C++ workload),
+macOS (Xcode: GPUI draws with Metal) and Linux (the Vulkan, Wayland/X11 and `libxkbcommon`
+development libraries; see §3 of the plan). The first build of GPUI takes several minutes.
 
 ```sh
 pnpm bootstrap                                 # pnpm install + debug host + TypeScript builds
 pnpm dev counter                               # opens examples/counter.ts
 pnpm dev counter -- --debug                    # host logs on stderr
 python examples/counter.py
+go run ./examples                              # examples/counter.go
 ```
 
 Add `RUST_LOG=debug` to `--debug` to also see, once a second, how many frames a window draws
 and what its own pass costs (`window 1: 60.0 frames/s, 0.2 ms and 14 nodes per pass`).
 
 The clients look for the host in this order: an explicit path option, `$GPUI_BRIDGE_HOST`,
-the host bundled in the package, then a Cargo build in `target/debug` or `target/release`
-of this repository (searched upwards, so the layout of the monorepo is not part of the
-contract).
+the platform package installed with the client (`@indios/gpui-bridge-<platform>-<arch>`), then a Cargo
+build in `target/debug` or `target/release` of this repository (searched upwards, so the layout
+of the monorepo is not part of the contract).
 
 The host asks for an 8 MB stack for its main thread (`host/build.rs`, the same Rust gives on
 Linux): a debug build spends tens of KB of stack per level of a nested tree, and Windows'
@@ -108,7 +150,7 @@ example; they import `gpui-bridge` like an installed package does):
 
 | Example | Shows |
 |---|---|
-| `counter.ts`, `counter.py`, `counter-txiki.js` | The same counter in Node, Python and txiki.js |
+| `counter.ts`, `counter.py`, `counter.go`, `counter-txiki.js` | The same counter in Node, Python, Go and txiki.js |
 | `todo.ts` | Input with submit, checkboxes, a list that changes |
 | `theme.ts` | A custom theme file, light and dark |
 | `frameless.ts` | A window with its own title bar |
@@ -121,8 +163,10 @@ example; they import `gpui-bridge` like an installed package does):
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |
 | `overlays.ts` | A dialog, toasts and tooltips |
-| `components.ts` | The Basic and Layout components, a `Form`, a `Resizable` split and accessibility |
+| `components.ts` | The Basic and Layout components, a `Form`, a `Tabs` of `Tab` nodes, a `Resizable` split and accessibility |
 | `data.ts` | A 10,000-row `VirtualList` and a sortable 10,000-row `Table` |
+| `advanced.ts` | A `Tree` with expansion, a `Diff` of a patch and a `Carousel` |
+| `dashboard.ts` | A `Sidebar`, three `Chart`s (1,000 points, bars, a pie) and a 10-level tree |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).
@@ -152,17 +196,21 @@ See [benchmarks/README.md](benchmarks/README.md) for what each number means and 
 
 ## Packaging
 
-Each client is published with the host inside it as an asset (React has no binary: it depends
-on `gpui-bridge`, which brings one). The host is compiled **once** per platform and staged by
-`scripts/stage-host.mjs`; nothing is built twice.
+Every client ships the host as an asset (React has none of its own: it depends on
+`gpui-bridge`, which brings one). The host is compiled **once** per platform and staged by
+`scripts/stage-host.mjs`; nothing is built twice. The npm client does not carry the binary
+itself: one package per platform (`@indios/gpui-bridge-win32-x64`, `@indios/gpui-bridge-darwin-arm64`,
+`@indios/gpui-bridge-linux-x64`) is an optional dependency, so an install downloads only the host that
+machine can run. The Python wheel, being platform-tagged, carries its host directly.
 
 ```sh
-pnpm pack:node                        # release host -> packages/client-node/bin/ -> pnpm pack
+pnpm pack:node                        # release host -> packages/host-<platform>-<arch>/bin/
+pnpm --dir packages/host-win32-x64 pack    # the platform package: the tarball with the host
 pnpm wheel                            # release host -> gpui_bridge/bin/ -> platform-tagged wheel
 ```
 
-Both scripts print the path of the artifact. The optimized host is about 15 MB (6 MB zipped).
-With txiki.js, a whole app is about 19 MB.
+These commands print the path of the artifact they stage. The optimized host is about 15 MB
+(6 MB zipped). With txiki.js, a whole app is about 19 MB.
 
 ## Documents
 

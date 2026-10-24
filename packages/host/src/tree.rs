@@ -21,14 +21,25 @@ pub struct Node {
     pub parent: Option<NodeId>,
 }
 
+/// Window events a client can subscribe to (PROTOCOL.md section 3).
+pub const WINDOW_EVENTS: [&str; 5] = ["focus", "blur", "resize", "move", "visibility"];
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WindowSpec {
     pub title: Option<String>,
     pub width: Option<f32>,
     pub height: Option<f32>,
+    /// Initial position; only read when the window opens.
+    pub x: Option<f32>,
+    pub y: Option<f32>,
+    /// Minimum size the user can resize to; only read when the window opens.
+    pub min_width: Option<f32>,
+    pub min_height: Option<f32>,
     pub root: Option<NodeId>,
     /// No system title bar; only read when the window opens.
     pub frameless: Option<bool>,
+    /// Events the client asked for; `window.events` replaces the set.
+    pub events: BTreeSet<String>,
 }
 
 /// The system tray icon (PROTOCOL.md section 11). `revision` grows with every `tray` message,
@@ -60,6 +71,9 @@ pub struct Tree {
     focus_request: Option<NodeId>,
     /// The last commit removed the tray: with no window open, the host exits.
     tray_removed: bool,
+    /// `minimized` requests, applied by `sync_windows` after opening or updating windows:
+    /// an action, not a remembered state (the user can restore the window at any time).
+    window_requests: Vec<(WindowId, bool)>,
     pending: Vec<ClientMessage>,
     /// Number of commits applied, so each window view applies `value_writes` once.
     commits: u64,
@@ -83,6 +97,19 @@ impl Tree {
 
     pub fn windows(&self) -> &BTreeMap<WindowId, WindowSpec> {
         &self.windows
+    }
+
+    /// Whether the window subscribed to a window event (`window.events`, PROTOCOL.md section 3).
+    pub fn wants_window_event(&self, id: WindowId, event: &str) -> bool {
+        self.windows
+            .get(&id)
+            .is_some_and(|spec| spec.events.contains(event))
+    }
+
+    /// `minimized` requests of the last commit: `true` minimizes, `false` restores.
+    /// `sync_windows` drains them once the window is open.
+    pub fn take_window_requests(&mut self) -> Vec<(WindowId, bool)> {
+        std::mem::take(&mut self.window_requests)
     }
 
     pub fn theme(&self) -> &ThemeSpec {
@@ -154,8 +181,10 @@ impl Tree {
         self.commits += 1;
         self.value_writes.clear();
         self.tray_removed = false;
-        // Reloads not taken since the previous commit had no window to apply them.
+        // Reloads and `minimized` requests not taken since the previous commit had no window
+        // to apply them (or the host runs with `--no-window`).
         self.image_reloads.clear();
+        self.window_requests.clear();
         std::mem::take(&mut self.pending)
             .into_iter()
             .filter_map(|op| self.apply(op).err())
@@ -277,10 +306,16 @@ impl Tree {
                 title,
                 width,
                 height,
+                x,
+                y,
+                min_width,
+                min_height,
                 root,
                 theme,
                 theme_set,
                 frameless,
+                minimized,
+                events,
             } => {
                 let id = id.unwrap_or(1);
                 if id == 0 {
@@ -300,12 +335,37 @@ impl Tree {
                         format!("Node {root} is already the root of window {}", other.0),
                     ));
                 }
-                let window = self.windows.entry(id).or_default();
-                window.title = title.or(window.title.take());
-                window.width = width.or(window.width);
-                window.height = height.or(window.height);
-                window.root = root.or(window.root);
-                window.frameless = frameless.or(window.frameless);
+                if let Some(events) = &events
+                    && let Some(bad) = events
+                        .iter()
+                        .find(|event| !WINDOW_EVENTS.contains(&event.as_str()))
+                {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        format!(
+                            "Unknown window event '{bad}' (expected one of {})",
+                            WINDOW_EVENTS.join(", ")
+                        ),
+                    ));
+                }
+                {
+                    let window = self.windows.entry(id).or_default();
+                    window.title = title.or(window.title.take());
+                    window.width = width.or(window.width);
+                    window.height = height.or(window.height);
+                    window.x = x.or(window.x);
+                    window.y = y.or(window.y);
+                    window.min_width = min_width.or(window.min_width);
+                    window.min_height = min_height.or(window.min_height);
+                    window.root = root.or(window.root);
+                    window.frameless = frameless.or(window.frameless);
+                    if let Some(events) = events {
+                        window.events = events.into_iter().collect();
+                    }
+                }
+                if let Some(minimized) = minimized {
+                    self.window_requests.push((id, minimized));
+                }
                 self.theme.theme = theme.or(self.theme.theme);
                 self.theme.theme_set = theme_set.or(self.theme.theme_set.take());
             }
@@ -401,6 +461,9 @@ impl Tree {
                 })?;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                node_type
+                    .check_required(&props)
+                    .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 if matches!(node_type, NodeType::Input | NodeType::Textarea)
                     && props.get("value").is_some_and(|v| !v.is_null())
                 {
@@ -462,6 +525,12 @@ impl Tree {
                     .node_type;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                // Only when the op touches it: a `Tab` keeps the `value` it was created with.
+                if props.contains_key("value") {
+                    node_type
+                        .check_required(&props)
+                        .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                }
                 if matches!(node_type, NodeType::Input | NodeType::Textarea)
                     && props.contains_key("value")
                 {
@@ -592,6 +661,26 @@ impl Tree {
             );
             if w.frameless == Some(true) {
                 out.push_str(" frameless");
+            }
+            if w.x.is_some() || w.y.is_some() {
+                let _ = write!(
+                    out,
+                    " pos={}x{}",
+                    w.x.map_or("-".into(), |v| v.to_string()),
+                    w.y.map_or("-".into(), |v| v.to_string())
+                );
+            }
+            if w.min_width.is_some() || w.min_height.is_some() {
+                let _ = write!(
+                    out,
+                    " min={}x{}",
+                    w.min_width.map_or("-".into(), |v| v.to_string()),
+                    w.min_height.map_or("-".into(), |v| v.to_string())
+                );
+            }
+            if !w.events.is_empty() {
+                let events: Vec<&str> = w.events.iter().map(String::as_str).collect();
+                let _ = write!(out, " events=[{}]", events.join(","));
             }
             out.push('\n');
         }
@@ -1096,7 +1185,7 @@ mod tests {
                 width: Some(400.0),
                 height: Some(300.0),
                 root: Some(1),
-                frameless: None,
+                ..WindowSpec::default()
             })
         );
         assert_eq!(
@@ -1106,6 +1195,33 @@ mod tests {
                 theme_set: None
             }
         );
+    }
+
+    #[test]
+    fn window_events_and_minimize_requests() {
+        let mut tree = Tree::default();
+        let errors = run(
+            &mut tree,
+            vec![
+                json!({"op": "window", "root": 1, "events": ["focus", "resize"]}),
+                json!({"op": "window", "events": ["hover"]}),
+                json!({"op": "window", "minimized": true}),
+            ],
+        );
+        assert_eq!(errors, [ErrorCode::InvalidJson]);
+        assert!(tree.wants_window_event(1, "focus"));
+        assert!(tree.wants_window_event(1, "resize"));
+        assert!(!tree.wants_window_event(1, "visibility"));
+        // `minimized` is an action: each message queues one, and the host drains them once.
+        assert_eq!(tree.take_window_requests(), [(1, true)]);
+        assert!(tree.take_window_requests().is_empty());
+
+        // A new list replaces the previous one; an empty list unsubscribes.
+        run(&mut tree, vec![json!({"op": "window", "events": ["blur"]})]);
+        assert!(!tree.wants_window_event(1, "focus"));
+        assert!(tree.wants_window_event(1, "blur"));
+        run(&mut tree, vec![json!({"op": "window", "events": []})]);
+        assert!(!tree.wants_window_event(1, "blur"));
     }
 
     #[test]

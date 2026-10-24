@@ -2,7 +2,7 @@
 
 How a client process drives the gpui-bridge host. The protocol is language-neutral:
 any language that can spawn a process and read and write lines can be a client
-(today: Node, txiki.js and Python, all in this repository).
+(today: Node, txiki.js. Go and Python, all in this repository).
 
 The host is a child process of the client. It owns the window, the event loop, the
 component tree and rendering. The client describes the UI as **operations on a tree**
@@ -71,6 +71,19 @@ interpreted safely.
   keeps its resize borders, shadow and taskbar title; the app draws its own title bar with
   `windowControl` divs (section 5). Read only when the window opens: a later change is
   ignored, with a warning on stderr.
+- `x`, `y` (optional): the window's initial position, in logical pixels, from the top-left
+  corner of the screen. Read only when the window opens (a later change warns on stderr).
+  With neither, the window opens centered; with only one, the other is 0.
+- `minWidth`, `minHeight` (optional): the smallest size the user can resize the window to.
+  Read only when the window opens; a missing one leaves that axis unconstrained.
+- `minimized` (optional): `true` minimizes the window on the next `commit`, `false` restores
+  it and brings it to the front. It is an **action, not a remembered state**: send it again
+  to act again, and the user can restore or minimize the window at any time. A window that is
+  not open is not an error; the host warns on stderr. GPUI (0.3.9) has no "hide" for an open
+  window, so `minimized` is the way to take one out of sight without closing it.
+- `events` (optional): the window events the client wants (see "Window events" below). It
+  **replaces** the previous list, so `[]` unsubscribes, and an unknown name is `invalid_json`.
+  Like node events, they are opt-in; `windowClosed` is always sent.
 - `themeSet` (optional): a gpui-component theme file, used in place of the default theme.
   `theme` picks its first theme with that `mode`; a mode it does not define uses the default
   theme. Each `themeSet` replaces the previous one, so `{"themes":[]}` restores the defaults.
@@ -88,6 +101,33 @@ interpreted safely.
   `neutral-200`. A missing field uses gpui-component's built-in value, and so does a color
   value that does not parse, without an error. A field with the wrong type, or a `mode`
   other than `light`/`dark`, rejects the message with `invalid_json`.
+
+### Window events
+
+```json
+{"op":"window","id":2,"events":["focus","resize"]}
+{"type":"windowEvent","id":2,"event":"focus"}
+{"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
+{"type":"windowEvent","id":2,"event":"move","x":160,"y":80,"width":400,"height":300}
+{"type":"windowEvent","id":2,"event":"visibility","visible":false}
+```
+
+| event | when | fields |
+|---|---|---|
+| `focus` | the window gained the system focus (an opening window reports it too) | — |
+| `blur` | the window lost it | — |
+| `resize` | the size changed, by the user or by `width`/`height` | `x`, `y`, `width`, `height` |
+| `move` | only the position changed | `x`, `y`, `width`, `height` |
+| `visibility` | the platform stopped or resumed presenting the window (minimizing, covering it, display sleep) | `visible` |
+
+Only changes are sent: opening a window does not report its initial size or position (they
+are the ones the client asked for). `resize` and `move` carry the full bounds, in the same
+coordinates `x`, `y`, `width` and `height` take — the window frame's top-left and the client
+size — so a client can feed a reported `x`, `y`, `width`, `height` straight back into `window`
+to restore it. While the window is minimized the platform moves it off screen; the host does
+not report that as a `move`. They are sent while the user drags or resizes, at the
+platform's pace; a client that only needs the final size can debounce. Events for a window
+whose `events` list does not include them are not sent at all.
 
 ## 4. Tree operations
 
@@ -114,6 +154,7 @@ Rules:
   A node cannot be placed inside itself or one of its descendants.
 - On `commit`, an operation that fails is dropped and answered with an `error`; the rest of
   the batch is still applied, in order.
+- A rejected `create` leaves no node: later operations that name its id get `unknown_node`.
 
 ## 5. Node types
 
@@ -136,6 +177,7 @@ Rules:
 | `VirtualList` | `rowHeight`, `class`                                      | —                  |
 | `Table`    | `columns`, `rows`, `selected`, `stripe`, `bordered`, `controlled`, `class` | `change`, `doubleClick`, `sort` |
 | `Tabs`     | `tabs`, `value`, `variant`, `controlled`, `class`            | `change`           |
+| `Tab`      | `value`, `label`, `disabled`, `class`                        | —                  |
 | `Alert`    | `message`, `title`, `variant`, `banner`, `closable`, `class` | `close`            |
 | `Badge`    | `count`, `max`, `dot`, `icon`, `class`                       | —                  |
 | `Tag`      | `label`, `variant`, `outline`, `icon`, `class`               | —                  |
@@ -159,9 +201,15 @@ Rules:
 | `Toolbar`  | `class`                                                      | —                  |
 | `Resizable` | `axis`, `sizes`, `class`                                    | —                  |
 | `Calendar` | `value`, `months`, `weekStartsOn`, `disabled`, `controlled`, `class` | `change`    |
+| `Tree`     | `items`, `value`, `controlled`, `class`                      | `change`, `expand`, `collapse` |
+| `Diff`     | `patch`, `mode` (`unified`, `split`), `lineNumbers`, `softWrap`, `header`, `class` | `change` |
+| `Carousel` | `value`, `axis` (`horizontal`, `vertical`), `looping`, `controls`, `pagination`, `controlled`, `class` | `change` |
+| `Sidebar`  | `items`, `value`, `collapsed`, `collapsible` (`icon`, `offcanvas`, `none`), `side` (`left`, `right`), `controlled`, `class` | `change` |
+| `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
-and Advanced groups are described in section 17.
+and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
+`Carousel`) in section 18, and `Sidebar` and `Chart` in section 19.
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -234,6 +282,7 @@ and Advanced groups are described in section 17.
 {"type":"event","id":11,"event":"change","value":7.5}
 {"type":"event","id":13,"event":"sort","value":{"column":"name","direction":"asc"}}
 {"type":"windowClosed","id":2}
+{"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
 {"type":"tray","event":"menu","value":"quit"}
 {"type":"shortcut","keys":"ctrl-s","window":1}
 {"type":"notification","id":"saved","window":1}
@@ -241,12 +290,16 @@ and Advanced groups are described in section 17.
 {"type":"error","code":"unknown_node","message":"Node 42 does not exist","op":"setProps"}
 ```
 
-`value` is a string, except for `Slider` (a number) and `Table` (a row index, `null` when
-the selection is cleared, or the `sort` object of section 15).
+`value` is a string, except for `Slider` and `Carousel` (a number), `Table` (a row index,
+`null` when the selection is cleared, or the `sort` object of section 15) and `Diff` (the
+selected lines object of section 18, or `null` when the selection is cleared).
 
 `windowClosed` is sent only when the user closes a window, with the window's `id` (1 for
 the main window); after the last open window the host exits. A window the client closes with
 `closeWindow` does not produce it. If the client closes stdin, the host exits without sending it.
+
+`windowEvent` carries a window event the client opted into with `window.events` (section 3);
+its `event` is `focus`, `blur`, `resize`, `move` or `visibility`.
 
 `message` is human-readable and not part of the contract; match on `code` (and `op`).
 
@@ -334,6 +387,8 @@ file is one session against `host --no-window`:
   no stdout output beyond the `<` lines.
 
 The runner is `packages/host/tests/conformance.rs` (`cargo test --workspace` at the root).
+The transcripts test the host. A client checks the other side: the lines it writes for each
+operation must appear among the `>` lines (field order aside).
 
 **`simulate` (fixtures only).** With `--no-window`, and only then, the host also accepts a
 `simulate` message that plays a user action, so fixtures can cover section 6. It is not part
@@ -353,6 +408,10 @@ of the client contract: without `--no-window` it is `unknown_op`.
 {"op":"simulate","event":"trayMenu","value":"quit"}
 {"op":"simulate","id":13,"event":"change","value":2}
 {"op":"simulate","id":13,"event":"sort","value":{"column":"name","direction":"desc"}}
+{"op":"simulate","id":15,"event":"change","value":"src/lib.rs"}
+{"op":"simulate","id":15,"event":"expand","value":"src"}
+{"op":"simulate","id":17,"event":"change","value":{"path":"notes.txt","side":"modified","start":1,"end":2,"endSide":"modified"}}
+{"op":"simulate","id":19,"event":"change","value":2}
 ```
 
 - It acts at once on the committed tree, like a user acting on the screen: pending
@@ -377,11 +436,19 @@ of the client contract: without `--no-window` it is `unknown_op`.
 - `drop` on a `div` plays files dropped on it; `value` is the list of paths.
 - `ok` and `cancel` on an open `Dialog` play the user's answer: the event is sent and `open`
   becomes `false`. On a closed one they are `invalid_operation`.
-- `change` on `Tabs` works like on `RadioGroup` (over `tabs`). On a `Table`, `change` selects
+- `change` on `Tabs` works like on `RadioGroup` (over `tabs`, or over its `Tab` children).
+  On a `Table`, `change` selects
   the row index in `value` (`null` clears the selection; the selected row again does
   nothing) and `doubleClick` selects the row, then reports it. A row past the end is
   `invalid_operation`. `sort` takes the column and direction in `value` (the window cycles
   them, `simulate` names them); a column that is not `sortable` is `invalid_operation`.
+- `change` on a `Tree` selects the item whose `id` is `value` (the selected item again does
+  nothing, a `disabled` one does nothing, an unknown one is `invalid_operation`); `expand`
+  and `collapse` report a folder's `id` (a leaf does nothing, an unknown id is
+  `invalid_operation`).
+  `change` on a `Diff` takes `null` or the selected lines object of section 18 (a path the
+  patch does not have is `invalid_operation`, a malformed object is `invalid_json`).
+  `change` on a `Carousel` takes a slide index (past the last slide is `invalid_json`).
 - `trayClick` and `trayMenu` (with the item `id` in `value`) play a left click on the tray
   icon and choosing an item of its menu. Without a tray they are `invalid_operation`; a
   disabled item does nothing and an unknown one is `invalid_operation`. An unknown window is `invalid_operation`.
@@ -637,6 +704,40 @@ commits; removing the list from the window (or moving it out) resets it.
 the app shows the selected tab's content itself, for example by moving the matching panel
 into the window.
 
+A `Tabs` may instead take **`Tab` children**, one per tab, which then replace `tabs`
+altogether (a `Tabs` with `Tab` children ignores `tabs`; with none it works as before):
+
+```json
+{"op":"create","id":40,"type":"Tabs","props":{"value":"files","variant":"underline"},"events":["change"]}
+{"op":"create","id":41,"type":"Tab","props":{"value":"files","a11y":{"label":"Files"}}}
+{"op":"create","id":42,"type":"Icon","props":{"name":"folder","class":"size-4"}}
+{"op":"create","id":43,"type":"text","props":{"content":"Files"}}
+{"op":"create","id":44,"type":"Tag","props":{"label":"12"}}
+{"op":"append","parent":41,"child":42}
+{"op":"append","parent":41,"child":43}
+{"op":"append","parent":41,"child":44}
+{"op":"append","parent":40,"child":41}
+```
+
+A `Tab` is `value` —required and not empty, it is what `change` reports—, `label` (its text)
+and `disabled`. Its children are drawn inside the chip, after the `label`, in a row with a gap,
+so a tab can be **made of nodes**: an `Icon`, a `text`, a `Tag` with a count and so on. The row
+has the chip's height and cuts what is taller, so a count goes beside the text (a `Badge` around
+a small icon would cover it). A `Button`, `Checkbox` or `Switch` that is the **last** child goes
+after the row instead, at its own size (a close button). Its `class` styles the chip itself, so
+`flex-1` makes the tabs share the bar's width. The `Tabs` still sends `change`, and a tab that is
+`disabled` or already selected does nothing. A control inside a `Tab` (`Button`, `Checkbox`,
+`Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click: it does not choose the
+tab.
+
+The bar is a `tablist` and every chip a `tab` already: the `a11y` of a `Tabs` only names the bar
+(its `label` goes on a `group` around it, unless it asks for another role). The nodes of a chip
+are not the chip itself: the tab is announced as a tab, with the `a11y.label` of the `Tab` node,
+or with its `label` when there is none. Three cases are the client's own
+mistake and the host only draws around them: a `Tab` outside a `Tabs` is not drawn, a child of a
+`Tabs` that is not a `Tab` is not a tab, and with a `value` repeated among siblings the first
+one wins.
+
 Not supported: cells with anything but text, cell or column selection, moving columns, a
 context menu per row, loading more rows at the end, rows of different heights, and tabs that
 can be closed or reordered.
@@ -695,14 +796,16 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` and
-`Sidebar` keep their own delegates and state machines and are not mapped yet.
+binary. `Dock`, `Command`, `Settings` and `List` keep their own delegates and state machines
+and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, and `Sidebar` and
+`Chart` in section 19.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
   `close`. The app removes the node, or clears `closable`.
 - **Badge** — `count` (hidden at 0) up to `max` (default 99), or `dot`, or a bundled `icon`; its
-  children are shown under the badge.
+  children are shown under the badge, with the count drawn over them, so a `Badge` without
+  children has nothing to sit on.
 - **Tag** — a label with a `variant` (`primary`, `secondary` (default), `danger`, `success`,
   `warning`, `info`), `outline` and an optional `icon`.
 - **Kbd** — `keys` as one keystroke (`ctrl-s`, `f5`, `shift-enter`); `outline`. A string that is
@@ -748,3 +851,160 @@ binary. `Dock`, `Command`, `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Char
 The transcripts in `conformance/basic.txt`, `conformance/layout.txt` and
 `conformance/a11y.txt` are the reference for their props and events.
 
+## 18. Trees, diffs and carousels
+
+These three describe data in props instead of plain values. They keep one state per node in
+the host and rebuild it only when the data changes, so scroll position, selection and
+expansion are not lost on every commit.
+
+### Tree
+
+```json
+{"op":"create","id":15,"type":"Tree","props":{"items":[
+  {"id":"src","label":"src","expanded":true,"children":[
+    {"id":"src/lib.rs","label":"lib.rs"},
+    {"id":"src/ui","label":"ui","children":[{"id":"src/ui/tree.rs","label":"tree.rs"}]}
+  ]},
+  {"id":"README.md","label":"README.md"},
+  {"id":"target","label":"target","disabled":true}
+],"value":"src"},"events":["change","expand","collapse"]}
+```
+
+- `items` is a list of `{"id", "label"}` with optional `children` (the same shape, any depth),
+  `expanded` (open when the tree is first built; default false) and `disabled`. `id` is a
+  string chosen by the client and must be unique across the whole tree; a repeated one, a
+  missing `id`/`label`, or `children` that is not a list is `invalid_props`.
+- `value` is the selected item's `id`; one that is not in `items` (or a collapsed one)
+  selects nothing, and a value that points inside a collapsed folder expands its ancestors.
+  Selecting an item sends `change` with its `id`; in synced mode the host keeps it in
+  `value`, in controlled mode the host shows the client's `value` again until it is confirmed.
+- Clicking a folder selects it and toggles it, sending `expand` or `collapse` with its `id`
+  (opt-in, like every event). The expansion is kept in the host while the node lives and is
+  reapplied when `items` is rebuilt, except for items the client changes explicitly with
+  `expanded`.
+- The tree scrolls itself and virtualizes its rows: give it a bounded height (`h-64`,
+  `flex-1`) with `class`.
+- `focus` works on a Tree: the arrow keys move the selection, Enter toggles a folder.
+
+### Diff
+
+```json
+{"op":"create","id":17,"type":"Diff","props":{
+  "patch":"diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n",
+  "mode":"split","lineNumbers":true,"softWrap":true,"header":true
+},"events":["change"]}
+```
+
+- `patch` is a unified or Git diff, parsed by the host; a malformed patch is `invalid_props`.
+  An empty patch draws nothing. The state is rebuilt only when the patch (or `mode`) changes.
+- `mode` is `unified` (default) or `split`; `lineNumbers`, `softWrap` and `header` default to
+  `true`, `false` and `true`.
+- Selecting source lines sends `change` with
+  `{"path", "side", "start", "end", "endSide"}` (`side` and `endSide` are `original` or
+  `modified`, the lines are 1-based), or `null` when the selection is cleared. The selection
+  is the component's: it is not a prop.
+- Like the tree, the diff scrolls itself: give it a bounded height in `class`.
+
+### Carousel
+
+```json
+{"op":"create","id":19,"type":"Carousel","props":{"value":0,"axis":"horizontal",
+  "looping":false,"controls":true,"pagination":true},"events":["change"]}
+{"op":"create","id":20,"type":"text","props":{"content":"One"}}
+{"op":"create","id":21,"type":"text","props":{"content":"Two"}}
+{"op":"append","parent":19,"child":20}
+{"op":"append","parent":19,"child":21}
+```
+
+- Each child is one slide; the host counts the node's children. Adding or removing a child
+  changes the slide count and clamps the selection.
+- `value` is the selected slide index (0-based); one past the last slide selects the last one.
+  `axis` is `horizontal` (default) or `vertical`; `looping` wraps at the ends (default false);
+  `controls` shows the previous/next buttons (default true); `pagination` shows one dot per
+  slide (default false).
+- Moving with the buttons, dots, the pointer or the arrow keys sends `change` with the new
+  index; in synced mode the host keeps it in `value`, in controlled mode it goes back to the
+  client's index until it is confirmed.
+
+The transcript in `conformance/advanced.txt` is the reference for their props and events.
+
+## 19. Sidebar and charts
+
+Two more components whose content is data rather than children: a navigation sidebar and a
+chart. Neither adds dependencies and both are props-only for the client.
+
+### Sidebar
+
+```json
+{"op":"create","id":30,"type":"Sidebar","props":{
+  "items":[
+    {"label":"General","items":[
+      {"id":"home","label":"Home","icon":"layout-dashboard"},
+      {"id":"inbox","label":"Inbox","icon":"inbox"},
+      {"id":"soon","label":"Soon","disabled":true}
+    ]},
+    {"items":[{"id":"settings","label":"Settings","open":true,
+               "children":[{"id":"theme","label":"Theme"}]}]}
+  ],
+  "value":"home","collapsed":false,"collapsible":"icon","side":"left"
+},"events":["change"]}
+```
+
+- `items` is a list of sections. A section is `{"label", "items"}`; without `label` its entries
+  have no heading. Each entry is `{"id", "label"}` with optional `icon` (a bundled icon name),
+  `disabled`, `open` (its submenu starts open, default false) and `children` (a submenu of
+  entries, the same shape, any depth).
+- `id` is a string chosen by the client and must be unique across the whole sidebar; a
+  repeated one, an entry without `id` or `label`, a section without `items`, an icon that is
+  not bundled, or an unknown field type is `invalid_props`.
+- `value` is the active entry's `id`; one that is not in `items` leaves none active. Clicking
+  an entry sends `change` with its `id`; in synced mode the host keeps it in `value`, in
+  controlled mode the host shows the client's `value` again until it is confirmed. A disabled
+  entry, or the active one again, sends nothing. A parent entry reports its own `id` and
+  toggles its submenu.
+- `collapsed` folds the sidebar to icon width (48 px); `collapsible` says what folding does:
+  `icon` (default), `offcanvas` (it leaves the layout) or `none` (it ignores `collapsed`). The
+  toggle is the app's: a `Button` that sets `collapsed`.
+- `side` is `left` (default) or `right`. The sidebar fills the height of its box and is 255 px
+  wide (`w-64` in `class` changes it); give it a bounded parent (`h-full` in a `flex` row).
+- The node takes **no children**: its content is `items`. A header or a footer is the app's,
+  composed next to it.
+
+### Chart
+
+```json
+{"op":"create","id":31,"type":"Chart","props":{
+  "chart":"line","name":"Visits","color":"primary",
+  "data":[{"label":"Mon","value":12},{"label":"Tue","value":18},{"label":"Wed","value":9}],
+  "curve":"natural","dot":true,"yAxis":true,"grid":true
+}}
+```
+
+- `chart` is `line` (default), `bar` or `pie`. `data` is a list of `{"label", "value"}`: the
+  category of a point or a bar, or the name of a slice. A point without a `label` string or
+  with a value that is not a finite number is `invalid_props`. A thousand points are fine: the
+  host parses `data` once per change and keeps it while the node lives.
+- `color` names a theme color, so light, dark and custom themes come for free: `chart-1`
+  (default) to `chart-5`, `primary`, `secondary`, `muted`, `accent`, `danger`, `success`,
+  `warning` or `info`. A line uses it as its stroke and a bar chart as its fill; a pie cycles
+  `chart-1` to `chart-5` slice by slice. `name` is the series name the hover tooltip shows (a
+  pie's tooltip names the slice instead).
+- A line: `curve` is `linear` (default), `natural` or `step`; `dot` puts a dot on each point;
+  `yMin` and `yMax` (both, with `yMin < yMax`) pin the value axis instead of fitting the line
+  from zero.
+- A bar chart: `horizontal` grows the bars to the right from a left baseline (default false,
+  they grow up from the bottom).
+- `xAxis` (default true) shows the category axis and `yAxis` (default false) the value axis;
+  `xTicks` is how many category labels a line or bar chart draws, spread evenly from the first
+  point to the last (default 12; 0 draws none, and one at or above the number of points labels
+  every point); `yTicks` is how many ticks the value axis carries, both ends included, which
+  places its labels and the horizontal grid lines (default 5; anything below 2 counts as 2);
+  `grid` (default true) draws the grid lines. `interactive` (default true) turns the hover
+  crosshair, the dots and the tooltip off.
+- A pie: `innerRadius` is the hole in the middle in pixels (default 0, a donut from there in)
+  and `padAngle` the gap between slices in **radians** (`0.03` is a thin gap; `2` would
+  swallow every slice narrower than 115 degrees).
+- A chart fills its box and has **no events**: nothing it does is the app's business. Give it
+  a bounded size in `class` (`h-56 w-full`, `h-64 flex-1`).
+
+The transcript in `conformance/charts.txt` is the reference for their props and events.

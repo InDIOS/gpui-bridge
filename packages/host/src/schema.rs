@@ -2,6 +2,8 @@
 
 use serde_json::Value;
 
+use crate::protocol::Props;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropKind {
     Str,
@@ -35,6 +37,14 @@ pub enum PropKind {
     Entries,
     /// A Resizable's `sizes`: one initial size in pixels per child.
     Sizes,
+    /// A Tree's `items`: `{id, label, children?, expanded?, disabled?}`, recursively.
+    TreeItems,
+    /// A Diff's `patch`: a unified or Git diff gpui-component can parse.
+    Patch,
+    /// A Sidebar's `items`: sections of `{id, label, ...}` entries (PROTOCOL.md section 19).
+    Sections,
+    /// A Chart's `data`: `{label, value}` points.
+    Series,
 }
 
 impl PropKind {
@@ -52,7 +62,11 @@ impl PropKind {
             | Self::Accessibility
             | Self::Items
             | Self::Entries
-            | Self::Sizes => self.check(value).is_ok(),
+            | Self::Sizes
+            | Self::TreeItems
+            | Self::Patch
+            | Self::Sections
+            | Self::Series => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -82,6 +96,14 @@ impl PropKind {
                 .map_err(|err| format!("a list of entries ({err})")),
             Self::Sizes => crate::components::layout::check_sizes(value)
                 .map_err(|err| format!("a list of sizes ({err})")),
+            Self::TreeItems => crate::components::tree::check_items(value)
+                .map_err(|err| format!("a list of tree items ({err})")),
+            Self::Patch => crate::components::diff::check_patch(value)
+                .map_err(|err| format!("a patch ({err})")),
+            Self::Sections => crate::components::sidebar::check_items(value)
+                .map_err(|err| format!("a list of sidebar sections ({err})")),
+            Self::Series => crate::components::chart::check_data(value)
+                .map_err(|err| format!("a list of data points ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -105,6 +127,10 @@ impl PropKind {
             Self::Items => "a list of accordion items".into(),
             Self::Entries => "a list of entries".into(),
             Self::Sizes => "a list of positive sizes".into(),
+            Self::TreeItems => "a list of tree items".into(),
+            Self::Patch => "a unified diff string".into(),
+            Self::Sections => "a list of sidebar sections".into(),
+            Self::Series => "a list of data points".into(),
         }
     }
 }
@@ -128,6 +154,8 @@ pub enum NodeType {
     VirtualList,
     Table,
     Tabs,
+    /// The chip of a `Tabs` built from nodes (PROTOCOL.md section 15).
+    Tab,
     // Basic components (PROTOCOL.md section 5).
     Alert,
     Badge,
@@ -155,6 +183,13 @@ pub enum NodeType {
     Resizable,
     // Advanced components.
     Calendar,
+    // Data components (PROTOCOL.md section 18).
+    Tree,
+    Diff,
+    Carousel,
+    // Data components (PROTOCOL.md section 19).
+    Sidebar,
+    Chart,
 }
 
 impl NodeType {
@@ -177,6 +212,7 @@ impl NodeType {
             "VirtualList" => Some(Self::VirtualList),
             "Table" => Some(Self::Table),
             "Tabs" => Some(Self::Tabs),
+            "Tab" => Some(Self::Tab),
             "Alert" => Some(Self::Alert),
             "Badge" => Some(Self::Badge),
             "Tag" => Some(Self::Tag),
@@ -200,6 +236,11 @@ impl NodeType {
             "Toolbar" => Some(Self::Toolbar),
             "Resizable" => Some(Self::Resizable),
             "Calendar" => Some(Self::Calendar),
+            "Tree" => Some(Self::Tree),
+            "Diff" => Some(Self::Diff),
+            "Carousel" => Some(Self::Carousel),
+            "Sidebar" => Some(Self::Sidebar),
+            "Chart" => Some(Self::Chart),
             _ => None,
         }
     }
@@ -237,6 +278,8 @@ impl NodeType {
             (Self::Tabs, "variant") => {
                 Some(OneOf(&["tab", "outline", "pill", "segmented", "underline"]))
             }
+            (Self::Tab, "value" | "label") => Some(Str),
+            (Self::Tab, "disabled") => Some(Bool),
             (Self::Icon, "name") => Some(Icon),
             (Self::Div, "windowControl") => Some(OneOf(&["drag", "minimize", "maximize", "close"])),
             (Self::Image, "src") => Some(Str),
@@ -300,6 +343,31 @@ impl NodeType {
             (Self::Calendar, "value") => Some(Str),
             (Self::Calendar, "months") => Some(Positive),
             (Self::Calendar, "weekStartsOn") => Some(OneOf(&["monday", "sunday"])),
+            // Data components (PROTOCOL.md section 18).
+            (Self::Tree, "items") => Some(TreeItems),
+            (Self::Tree, "value") => Some(Str),
+            (Self::Diff, "patch") => Some(Patch),
+            (Self::Diff, "mode") => Some(OneOf(&["unified", "split"])),
+            (Self::Diff, "lineNumbers" | "softWrap" | "header") => Some(Bool),
+            (Self::Carousel, "value") => Some(Index),
+            (Self::Carousel, "axis") => Some(OneOf(&["horizontal", "vertical"])),
+            (Self::Carousel, "looping" | "controls" | "pagination") => Some(Bool),
+            // Data components (PROTOCOL.md section 19).
+            (Self::Sidebar, "items") => Some(Sections),
+            (Self::Sidebar, "value") => Some(Str),
+            (Self::Sidebar, "collapsible") => Some(OneOf(&["icon", "offcanvas", "none"])),
+            (Self::Sidebar, "side") => Some(OneOf(&["left", "right"])),
+            (Self::Sidebar, "collapsed") => Some(Bool),
+            (Self::Chart, "data") => Some(Series),
+            (Self::Chart, "chart") => Some(OneOf(&["line", "bar", "pie"])),
+            (Self::Chart, "color") => Some(OneOf(crate::components::chart::COLORS)),
+            (Self::Chart, "name") => Some(Str),
+            (Self::Chart, "curve") => Some(OneOf(&["linear", "natural", "step"])),
+            (Self::Chart, "dot" | "horizontal" | "grid" | "xAxis" | "yAxis" | "interactive") => {
+                Some(Bool)
+            }
+            (Self::Chart, "yMin" | "yMax" | "innerRadius" | "padAngle") => Some(Number),
+            (Self::Chart, "xTicks" | "yTicks") => Some(Index),
             (
                 Self::Input
                 | Self::Checkbox
@@ -314,7 +382,10 @@ impl NodeType {
                 | Self::Stepper
                 | Self::NumberInput
                 | Self::OtpInput
-                | Self::Calendar,
+                | Self::Calendar
+                | Self::Tree
+                | Self::Carousel
+                | Self::Sidebar,
                 "controlled",
             ) => Some(Bool),
             (
@@ -339,6 +410,21 @@ impl NodeType {
         }
     }
 
+    /// The props a node cannot be built without. Only a `Tab` has one: the `value` it reports
+    /// (PROTOCOL.md section 15). `props` is the whole message, so this also rejects a `setProps`
+    /// that removes or empties `value`.
+    pub fn check_required(self, props: &Props) -> Result<(), String> {
+        if self != Self::Tab
+            || props
+                .get("value")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.is_empty())
+        {
+            return Ok(());
+        }
+        Err("A Tab needs a non-empty 'value' string".into())
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Div => "div",
@@ -358,6 +444,7 @@ impl NodeType {
             Self::VirtualList => "VirtualList",
             Self::Table => "Table",
             Self::Tabs => "Tabs",
+            Self::Tab => "Tab",
             Self::Alert => "Alert",
             Self::Badge => "Badge",
             Self::Tag => "Tag",
@@ -381,6 +468,11 @@ impl NodeType {
             Self::Toolbar => "Toolbar",
             Self::Resizable => "Resizable",
             Self::Calendar => "Calendar",
+            Self::Tree => "Tree",
+            Self::Diff => "Diff",
+            Self::Carousel => "Carousel",
+            Self::Sidebar => "Sidebar",
+            Self::Chart => "Chart",
         }
     }
 }
@@ -405,6 +497,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::VirtualList,
     NodeType::Table,
     NodeType::Tabs,
+    NodeType::Tab,
     NodeType::Alert,
     NodeType::Badge,
     NodeType::Tag,
@@ -428,6 +521,11 @@ pub const ALL: &[NodeType] = &[
     NodeType::Toolbar,
     NodeType::Resizable,
     NodeType::Calendar,
+    NodeType::Tree,
+    NodeType::Diff,
+    NodeType::Carousel,
+    NodeType::Sidebar,
+    NodeType::Chart,
 ];
 
 #[cfg(test)]
