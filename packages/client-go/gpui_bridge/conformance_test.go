@@ -31,7 +31,7 @@ func TestMessagesMatchConformance(t *testing.T) {
 	}
 
 	// La ventana pasa por App para cubrir la conversión de WindowOptions.
-	app := &App{tree: newTree(), openWindows: map[WindowId]*window{}, nextWindowId: 2}
+	app := &App{tree: newTree(), nextWindowId: 2}
 	app.CreateWindow(WindowOptions{Root: &Node{id: 3}})
 	window := app.tree.pending[0]
 

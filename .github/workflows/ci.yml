@@ -139,7 +139,8 @@ jobs:
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
           go vet ./...
-          go test ./...
+          # -race: handlers run on the reader goroutine while the caller also uses the API.
+          go test -race ./...
       - name: Type-check the examples
         run: pnpm --filter gpui-bridge-examples typecheck
 

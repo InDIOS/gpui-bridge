@@ -27,7 +27,6 @@ func (a *App) CreateWindow(opts WindowOptions) *window {
 	id := a.nextWindowId
 	a.nextWindowId++
 	w := &window{app: a, id: id}
-	a.openWindows[id] = w
 	a.mu.Unlock()
 	a.window(opts, id)
 	return w

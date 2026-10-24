@@ -2,9 +2,11 @@ package gpui_bridge
 
 import (
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func f64(v float64) *float64 { return &v }
@@ -160,5 +162,41 @@ func TestMissingHostBinaryFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "host no encontrado en does-not-exist.exe") {
 		t.Fatalf("mensaje de error no útil: %v", err)
+	}
+}
+
+func TestHandlersCanUseTheAPIWhileMainDoes(t *testing.T) {
+	app := mustApp(t)
+	clicked := make(chan struct{})
+	label := app.Text(Props{"content": "0"})
+	button := app.Button(Props{"label": "Go"})
+	button.On("click", func(any) {
+		label.Set(Props{"content": "1"})
+		_ = app.Commit()
+		close(clicked)
+	})
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(label, button)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(button.Id(), "click", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	// La goroutine principal usa la API mientras corre el handler, para que -race lo vea.
+	timeout := time.After(5 * time.Second)
+	for running := true; running; {
+		select {
+		case <-clicked:
+			running = false
+		case <-timeout:
+			t.Fatal("el click simulado no llegó al handler")
+		default:
+			app.Div(nil)
+		}
+	}
+
+	exit := app.Close()
+	if again := app.Run(); !reflect.DeepEqual(again, exit) {
+		t.Fatalf("Run tras Close devolvió %#v, se esperaba %#v", again, exit)
 	}
 }

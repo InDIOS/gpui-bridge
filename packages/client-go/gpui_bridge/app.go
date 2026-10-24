@@ -66,14 +66,11 @@ type App struct {
 	transport *Transport
 	tree      *Tree
 	hostPath  string
-	debug     bool
 
-	mu       sync.Mutex
-	closing  bool
-	hasTray  bool
-	exitChan chan HostExit
+	mu   sync.Mutex
+	done chan struct{} // se cierra cuando el host sale; exit queda fijo desde entonces
+	exit HostExit
 
-	openWindows  map[WindowId]*window
 	nextWindowId WindowId
 
 	// Handlers (invocados fuera de mu desde el bucle de lectura).
@@ -96,7 +93,7 @@ func NewApp(opts AppOptions) (*App, error) {
 	if opts.Headless {
 		args = append(args, "--no-window")
 	}
-	tr, err := Spawn(path, args...)
+	tr, err := Spawn(path, opts.Debug, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,16 +102,17 @@ func NewApp(opts AppOptions) (*App, error) {
 		transport:    tr,
 		tree:         newTree(),
 		hostPath:     path,
-		debug:        opts.Debug,
-		exitChan:     make(chan HostExit, 1),
-		openWindows:  make(map[WindowId]*window),
+		done:         make(chan struct{}),
 		nextWindowId: 2, // la ventana 1 es la principal
 	}
 
 	// Handshake: el cliente envía primero y espera `ready`. Se hace de forma síncrona
 	// y SOLO entonces se arranca el bucle de lectura, así nunca hay dos lectores
 	// concurrentes sobre stdout (bufio.Reader no es seguro para eso).
-	tr.Send(helloMsg())
+	if err := tr.Send(helloMsg()); err != nil {
+		tr.Wait()
+		return nil, fmt.Errorf("no se pudo escribir al host gpui-bridge: %w", err)
+	}
 	line, err := tr.ReadLineTimeout(time.Duration(HANDSHAKE_TIMEOUT_MS) * time.Millisecond)
 	if err != nil {
 		tr.Close()
@@ -131,11 +129,18 @@ func NewApp(opts AppOptions) (*App, error) {
 	return app, nil
 }
 
-// Commit envía todas las operaciones encoladas y un `commit` al host.
-func (a *App) Commit() {
+// Commit envía todas las operaciones encoladas y un `commit` al host. Devuelve el primer
+// error de escritura (p. ej. el host ya salió); el resto del lote no se envía.
+func (a *App) Commit() error {
 	a.mu.Lock()
-	a.tree.commit(func(m ClientMessage) { _ = a.transport.Send(m) })
-	a.mu.Unlock()
+	defer a.mu.Unlock()
+	var err error
+	a.tree.commit(func(m ClientMessage) {
+		if err == nil {
+			err = a.transport.Send(m)
+		}
+	})
+	return err
 }
 
 // Simulate juega una acción de usuario sobre un nodo. Solo funciona con --no-window
@@ -148,17 +153,16 @@ func (a *App) Simulate(id NodeId, event string, value any, hasValue bool) error 
 
 // Close cierra stdin y espera a que el host termine, devolviendo su HostExit.
 func (a *App) Close() HostExit {
-	a.mu.Lock()
-	a.closing = true
-	a.mu.Unlock()
 	_ = a.transport.Close()
-	return <-a.exitChan
+	<-a.done
+	return a.exit
 }
 
-// Run bloquea la goroutine actual leyendo eventos del host hasta que este termine,
-// y devuelve su HostExit.
+// Run bloquea la goroutine actual hasta que el host termine y devuelve su HostExit.
+// Los handlers corren en otra goroutine; la API de App y Node es segura desde ellos.
 func (a *App) Run() HostExit {
-	return <-a.exitChan
+	<-a.done
+	return a.exit
 }
 
 // readLoop lee líneas del host y las despacha. Termina (y publica el exit) cuando
@@ -167,7 +171,8 @@ func (a *App) readLoop() {
 	for {
 		line, err := a.transport.ReadLine()
 		if err != nil {
-			a.exitChan <- a.transport.Wait()
+			a.exit = a.transport.Wait()
+			close(a.done)
 			return
 		}
 		msg, err := parseHostMessage(line)
@@ -235,10 +240,6 @@ func (a *App) handleEvent(msg map[string]any) {
 func (a *App) handleWindowClosed(msg map[string]any) {
 	id := WindowId(num(msg, "id"))
 	a.mu.Lock()
-	delete(a.openWindows, id)
-	if len(a.openWindows) == 0 && !a.hasTray {
-		a.closing = true
-	}
 	handler := a.onWindowClosed
 	a.mu.Unlock()
 	if handler != nil {

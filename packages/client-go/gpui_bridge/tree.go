@@ -1,5 +1,7 @@
 package gpui_bridge
 
+import "sort"
+
 // nodeRecord es la copia local que el cliente mantiene de un nodo del árbol del host.
 type nodeRecord struct {
 	typ      string
@@ -103,6 +105,7 @@ func (t *Tree) setHandler(id NodeId, event string, handler func(any)) {
 		for e := range rec.handlers {
 			evs = append(evs, e)
 		}
+		sort.Strings(evs) // el mapa no tiene orden; el alambre sí
 		t.pending = append(t.pending, setEventsMsg(id, evs))
 	}
 }

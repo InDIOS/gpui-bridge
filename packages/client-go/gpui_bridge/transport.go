@@ -41,16 +41,6 @@ type HostError struct {
 	Op      string
 }
 
-// HostExitedError se devuelve cuando se opera contra un host ya terminado.
-type HostExitedError struct {
-	Message string
-	Exit    HostExit
-}
-
-func (e *HostExitedError) Error() string {
-	return e.Message
-}
-
 const stderrTailLines = 20
 
 // Transport posee un proceso de host arrancado y sus flujos JSON Lines stdin/stdout.
@@ -68,8 +58,9 @@ type Transport struct {
 	done    chan struct{}
 }
 
-// Spawn arranca el host y devuelve un Transport listo para Send/ReadLine.
-func Spawn(path string, args ...string) (*Transport, error) {
+// Spawn arranca el host y devuelve un Transport listo para Send/ReadLine. Con debug, el
+// stderr del host se reenvía al del proceso además de guardarse para HostExit.
+func Spawn(path string, debug bool, args ...string) (*Transport, error) {
 	cmd := exec.Command(path, args...)
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
@@ -94,15 +85,18 @@ func Spawn(path string, args ...string) (*Transport, error) {
 		stderr: bufio.NewReader(stderrPipe),
 		done:   make(chan struct{}),
 	}
-	go t.drainStderr()
+	go t.drainStderr(debug)
 	go t.wait()
 	return t, nil
 }
 
-func (t *Transport) drainStderr() {
+func (t *Transport) drainStderr(debug bool) {
 	scanner := bufio.NewScanner(t.stderr)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if debug {
+			fmt.Fprintln(os.Stderr, line)
+		}
 		t.stderrMu.Lock()
 		t.stderrTail = append(t.stderrTail, line)
 		if len(t.stderrTail) > stderrTailLines {
