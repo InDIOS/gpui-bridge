@@ -2,7 +2,7 @@
 
 How a client process drives the gpui-bridge host. The protocol is language-neutral:
 any language that can spawn a process and read and write lines can be a client
-(today: Node, txiki.js and Python, all in this repository).
+(today: Node, txiki.js. Go and Python, all in this repository).
 
 The host is a child process of the client. It owns the window, the event loop, the
 component tree and rendering. The client describes the UI as **operations on a tree**
@@ -1008,4 +1008,3 @@ chart. Neither adds dependencies and both are props-only for the client.
   a bounded size in `class` (`h-56 w-full`, `h-64 flex-1`).
 
 The transcript in `conformance/charts.txt` is the reference for their props and events.
-
