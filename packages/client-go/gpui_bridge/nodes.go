@@ -1,27 +1,27 @@
 package gpui_bridge
 
-// window es una ventana abierta por el cliente.
+// window is a window opened by the client.
 type window struct {
 	app *App
 	id  WindowId
 }
 
-// ID devuelve el identificador de la ventana.
+// ID returns the window's id.
 func (w *window) ID() WindowId { return w.id }
 
-// Close cierra la ventana en el próximo commit (PROTOCOL.md §3).
+// Close closes the window on the next commit (PROTOCOL.md §3).
 func (w *window) Close() {
 	w.app.mu.Lock()
 	defer w.app.mu.Unlock()
 	w.app.tree.pending = append(w.app.tree.pending, closeWindowMsg(w.id))
 }
 
-// Window crea (o actualiza) la ventana principal (id 1) y la asocia al árbol.
+// Window creates (or updates) the main window (id 1) and attaches it to the tree.
 func (a *App) Window(opts WindowOptions) {
 	a.window(opts, 1)
 }
 
-// CreateWindow abre una ventana adicional con un id asignado por el cliente.
+// CreateWindow opens an extra window with a client-assigned id.
 func (a *App) CreateWindow(opts WindowOptions) *window {
 	a.mu.Lock()
 	id := a.nextWindowId
@@ -44,7 +44,7 @@ func (a *App) window(opts WindowOptions, id WindowId) {
 	a.mu.Unlock()
 }
 
-// --- constructores por tipo de nodo (PROTOCOL.md §5) -----------------------
+// --- constructors per node type (PROTOCOL.md §5) ---------------------------
 
 func (a *App) Create(kind string, props Props) *Node {
 	a.mu.Lock()

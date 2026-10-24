@@ -11,14 +11,14 @@ import (
 
 func f64(v float64) *float64 { return &v }
 
-// findHost resuelve el binario del host para las pruebas; salta si no está construido.
+// findHost resolves the host binary for the tests; it skips if the host is not built.
 func findHost(t *testing.T) (string, bool) {
 	t.Helper()
 	path := defaultHostPath()
 	if _, err := os.Stat(path); err == nil {
 		return path, true
 	}
-	t.Logf("host no encontrado en %s", path)
+	t.Logf("host not found at %s", path)
 	return "", false
 }
 
@@ -26,7 +26,7 @@ func mustApp(t *testing.T) *App {
 	t.Helper()
 	hostPath, ok := findHost(t)
 	if !ok {
-		t.Skip("host gpui-bridge no disponible (compílalo con `cargo build -p gpui-bridge-host`)")
+		t.Skip("gpui-bridge host not available (build it with `cargo build -p gpui-bridge-host`)")
 	}
 	app, err := NewApp(AppOptions{HostPath: hostPath, Headless: true})
 	if err != nil {
@@ -39,7 +39,7 @@ func TestHandshakeCompletes(t *testing.T) {
 	app := mustApp(t)
 	exit := app.Close()
 	if exit.Code == nil || *exit.Code != 0 {
-		t.Fatalf("el host salió con código %v, se esperaba 0", exit.Code)
+		t.Fatalf("the host exited with code %v, want 0", exit.Code)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestValidTreeCommitsWithoutErrors(t *testing.T) {
 
 	exit := app.Close()
 	if exit.Code == nil || *exit.Code != 0 {
-		t.Fatalf("el host salió con código %v, se esperaba 0", exit.Code)
+		t.Fatalf("the host exited with code %v, want 0", exit.Code)
 	}
 	if len(errors) != 0 {
 		t.Fatalf("errores inesperados: %#v", errors)
@@ -76,7 +76,7 @@ func TestImageBase64InvalidProps(t *testing.T) {
 	var errors []HostError
 	app.OnError(func(err HostError) { errors = append(errors, err) })
 
-	// Un create rechazado no deja nodo, así que los datos malos llegan con setProps.
+	// A rejected create leaves no node, so the bad data comes with setProps.
 	image := app.Image(Props{"data": "aGVsbG8=", "fit": "contain"})
 	app.Window(WindowOptions{Root: app.Div(Props{}).Append(image)})
 	app.Commit()
@@ -85,7 +85,7 @@ func TestImageBase64InvalidProps(t *testing.T) {
 
 	app.Close()
 	if len(errors) != 1 || errors[0].Code != "invalid_props" || errors[0].Op != "setProps" {
-		t.Fatalf("esperaba invalid_props en setProps, obtuve %#v", errors)
+		t.Fatalf("want invalid_props on setProps, got %#v", errors)
 	}
 }
 
@@ -97,13 +97,13 @@ func TestHostErrorsTypedAndHostKeepsRunning(t *testing.T) {
 	gone := app.Text(Props{"content": "gone"})
 	gone.Remove()
 	root := app.Div(Props{})
-	root.Append(gone) // el host ya no conoce este nodo
+	root.Append(gone) // the host no longer knows this node
 	app.Button(Props{"label": "x"}).Set(Props{"disabled": "yes"})
 	app.Commit()
 
 	exit := app.Close()
 	if exit.Code == nil || *exit.Code != 0 {
-		t.Fatalf("el host salió con código %v, se esperaba 0", exit.Code)
+		t.Fatalf("the host exited with code %v, want 0", exit.Code)
 	}
 	if len(errors) != 2 || errors[0].Code != "unknown_node" || errors[1].Code != "invalid_props" {
 		t.Fatalf("errores inesperados: %#v", errors)
@@ -117,10 +117,10 @@ func TestEventsDispatched(t *testing.T) {
 		seen = append(seen, "click")
 	})
 	app.Commit()
-	// Inyecta un evento del host como si viniera de la red.
-	app.dispatch(map[string]any{"type": "event", "id": float64(btn.Id()), "event": "click"}) // el JSON real trae los números como float64
+	// Inject a host event as if it came over the wire.
+	app.dispatch(map[string]any{"type": "event", "id": float64(btn.Id()), "event": "click"}) // real JSON decodes numbers as float64
 	if len(seen) != 1 || seen[0] != "click" {
-		t.Fatalf("evento click no despachado: %v", seen)
+		t.Fatalf("click event not dispatched: %v", seen)
 	}
 	app.Close()
 }
@@ -143,25 +143,25 @@ func TestDefaultHostPath(t *testing.T) {
 	path := defaultHostPath()
 	if _, err := os.Stat(path); err == nil {
 		if !strings.Contains(path, "target") || !strings.HasSuffix(path, exe) {
-			t.Fatalf("defaultHostPath no apunta a un target del host: %s", path)
+			t.Fatalf("defaultHostPath does not point at a host target: %s", path)
 		}
 	} else {
-		t.Skipf("host no construido en %s", path)
+		t.Skipf("host not built at %s", path)
 	}
 
-	os.Setenv("GPUI_BRIDGE_HOST", "un-host-explicito")
-	if got := defaultHostPath(); got != "un-host-explicito" {
-		t.Fatalf("defaultHostPath ignoró GPUI_BRIDGE_HOST: %s", got)
+	os.Setenv("GPUI_BRIDGE_HOST", "an-explicit-host")
+	if got := defaultHostPath(); got != "an-explicit-host" {
+		t.Fatalf("defaultHostPath ignored GPUI_BRIDGE_HOST: %s", got)
 	}
 }
 
 func TestMissingHostBinaryFails(t *testing.T) {
 	_, err := NewApp(AppOptions{HostPath: "does-not-exist.exe", Headless: true})
 	if err == nil {
-		t.Fatal("esperaba un error por host faltante")
+		t.Fatal("want an error for a missing host")
 	}
-	if !strings.Contains(err.Error(), "host no encontrado en does-not-exist.exe") {
-		t.Fatalf("mensaje de error no útil: %v", err)
+	if !strings.Contains(err.Error(), "host not found at does-not-exist.exe") {
+		t.Fatalf("unhelpful error message: %v", err)
 	}
 }
 
@@ -182,14 +182,14 @@ func TestHandlersCanUseTheAPIWhileMainDoes(t *testing.T) {
 	if err := app.Simulate(button.Id(), "click", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	// La goroutine principal usa la API mientras corre el handler, para que -race lo vea.
+	// The main goroutine uses the API while the handler runs, so -race can see it.
 	timeout := time.After(5 * time.Second)
 	for running := true; running; {
 		select {
 		case <-clicked:
 			running = false
 		case <-timeout:
-			t.Fatal("el click simulado no llegó al handler")
+			t.Fatal("the simulated click never reached the handler")
 		default:
 			app.Div(nil)
 		}
@@ -197,6 +197,6 @@ func TestHandlersCanUseTheAPIWhileMainDoes(t *testing.T) {
 
 	exit := app.Close()
 	if again := app.Run(); !reflect.DeepEqual(again, exit) {
-		t.Fatalf("Run tras Close devolvió %#v, se esperaba %#v", again, exit)
+		t.Fatalf("Run after Close returned %#v, want %#v", again, exit)
 	}
 }

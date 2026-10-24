@@ -12,29 +12,29 @@ import (
 	"time"
 )
 
-// HostEvents informa de lo que sucede mientras el host corre.
+// HostEvents reports what happens while the host runs.
 type HostEvents struct {
-	// OnMessage recibe cada mensaje host → cliente ya parseado (clave `type`).
+	// OnMessage gets every parsed host → client message (key `type`).
 	OnMessage func(message map[string]any)
-	// OnCorruptLine recibe una línea de stdout que no es un mensaje de protocolo.
+	// OnCorruptLine gets a stdout line that is not a protocol message.
 	OnCorruptLine func(line string)
-	// OnExit se invoca cuando el host termina.
+	// OnExit is called when the host exits.
 	OnExit func(exit HostExit)
 }
 
-// HostExit describe cómo terminó el host.
+// HostExit describes how the host exited.
 type HostExit struct {
-	// Código de salida del proceso, si se pudo leer.
+	// The process exit code, if it could be read.
 	Code *int
-	// Nombre de la señal, si terminó por señal.
+	// The signal name, if a signal ended it.
 	Signal string
-	// Últimas líneas que el host escribió a stderr, para informes de fallo.
+	// The last lines the host wrote to stderr, for crash reports.
 	StderrTail []string
-	// Error de arranque, si el proceso ni siquiera pudo iniciarse.
+	// The spawn error, if the process could not even start.
 	SpawnError error
 }
 
-// HostError es un mensaje `error` del host: la operación fue rechazada y el host sigue vivo.
+// HostError is an `error` message from the host: the operation was rejected and the host keeps running.
 type HostError struct {
 	Code    string
 	Message string
@@ -43,7 +43,7 @@ type HostError struct {
 
 const stderrTailLines = 20
 
-// Transport posee un proceso de host arrancado y sus flujos JSON Lines stdin/stdout.
+// Transport owns a running host process and its JSON Lines stdin/stdout streams.
 type Transport struct {
 	proc   *os.Process
 	state  *os.ProcessState
@@ -58,24 +58,24 @@ type Transport struct {
 	done    chan struct{}
 }
 
-// Spawn arranca el host y devuelve un Transport listo para Send/ReadLine. Con debug, el
-// stderr del host se reenvía al del proceso además de guardarse para HostExit.
+// Spawn starts the host and returns a Transport ready for Send/ReadLine. With debug, the
+// host's stderr is forwarded to this process's stderr as well as kept for HostExit.
 func Spawn(path string, debug bool, args ...string) (*Transport, error) {
 	cmd := exec.Command(path, args...)
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("host %s: no se pudo crear stdin: %w", path, err)
+		return nil, fmt.Errorf("host %s: could not create stdin: %w", path, err)
 	}
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("host %s: no se pudo crear stdout: %w", path, err)
+		return nil, fmt.Errorf("host %s: could not create stdout: %w", path, err)
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("host %s: no se pudo crear stderr: %w", path, err)
+		return nil, fmt.Errorf("host %s: could not create stderr: %w", path, err)
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("host no encontrado en %s: %w", path, err)
+		return nil, fmt.Errorf("host not found at %s: %w", path, err)
 	}
 
 	t := &Transport{
@@ -111,7 +111,7 @@ func (t *Transport) wait() {
 	t.state, t.waitErr = t.proc.Wait()
 }
 
-// Send envía un mensaje cliente como una línea JSON terminada en \n.
+// Send writes a client message as one JSON line ending in \n.
 func (t *Transport) Send(message ClientMessage) error {
 	line, err := json.Marshal(message)
 	if err != nil {
@@ -121,13 +121,13 @@ func (t *Transport) Send(message ClientMessage) error {
 	return err
 }
 
-// SendRaw envía una línea ya serializada (útil para reproducir transcripciones byte a byte).
+// SendRaw writes an already serialized line (useful to replay transcripts byte for byte).
 func (t *Transport) SendRaw(line string) error {
 	_, err := t.stdin.Write(append([]byte(line), '\n'))
 	return err
 }
 
-// ReadLine espera la siguiente línea de salida del host.
+// ReadLine waits for the host's next output line.
 func (t *Transport) ReadLine() (string, error) {
 	line, err := t.stdout.ReadString('\n')
 	if err != nil {
@@ -136,7 +136,7 @@ func (t *Transport) ReadLine() (string, error) {
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
-// ReadLineTimeout espera como máximo d la siguiente línea de salida del host.
+// ReadLineTimeout waits at most d for the host's next output line.
 func (t *Transport) ReadLineTimeout(d time.Duration) (string, error) {
 	type res struct {
 		line string
@@ -151,16 +151,16 @@ func (t *Transport) ReadLineTimeout(d time.Duration) (string, error) {
 	case r := <-ch:
 		return r.line, r.err
 	case <-time.After(d):
-		return "", fmt.Errorf("timeout esperando salida del host")
+		return "", fmt.Errorf("timed out waiting for host output")
 	}
 }
 
-// Close cierra stdin; el host sale al recibir EOF.
+// Close closes stdin; the host exits on EOF.
 func (t *Transport) Close() error {
 	return t.stdin.Close()
 }
 
-// Wait espera a que el host termine y devuelve su HostExit.
+// Wait waits for the host to exit and returns its HostExit.
 func (t *Transport) Wait() HostExit {
 	<-t.done
 	t.stderrMu.Lock()
@@ -178,8 +178,8 @@ func (t *Transport) Wait() HostExit {
 	return exit
 }
 
-// Mensajes host → cliente (clave `type`), parseados a map para comparar con las
-// transcripciones y despachar en App.
+// Host → client messages (key `type`), parsed into a map to compare with the
+// transcripts and to dispatch in App.
 func parseHostMessage(line string) (map[string]any, error) {
 	var msg map[string]any
 	if err := json.Unmarshal([]byte(line), &msg); err != nil {

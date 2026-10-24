@@ -9,13 +9,13 @@ import (
 	"testing"
 )
 
-// TestMessagesMatchConformance comprueba que lo que el cliente escribe es una línea `>` de
-// conformance/ (PROTOCOL.md §9). El host ya reproduce las transcripciones; aquí se prueba
-// el otro lado: que el cliente sabe producir esas líneas.
+// TestMessagesMatchConformance checks that what the client writes is a `>` line of
+// conformance/ (PROTOCOL.md §9). The host already replays the transcripts; this tests the
+// other side: that the client can produce those lines.
 func TestMessagesMatchConformance(t *testing.T) {
 	paths, _ := filepath.Glob(filepath.Join("..", "..", "..", "conformance", "*.txt"))
 	if len(paths) == 0 {
-		t.Fatal("no hay transcripciones en conformance/ de la raíz")
+		t.Fatal("no transcripts in the root conformance/")
 	}
 	sent := map[string]bool{}
 	for _, path := range paths {
@@ -30,7 +30,7 @@ func TestMessagesMatchConformance(t *testing.T) {
 		}
 	}
 
-	// La ventana pasa por App para cubrir la conversión de WindowOptions.
+	// The window goes through App to cover the WindowOptions conversion.
 	app := &App{tree: newTree(), nextWindowId: 2}
 	app.CreateWindow(WindowOptions{Root: &Node{id: 3}})
 	window := app.tree.pending[0]
@@ -59,7 +59,7 @@ func TestMessagesMatchConformance(t *testing.T) {
 	}
 	for _, c := range cases {
 		if !sent[c.want] {
-			t.Errorf("la línea no está en conformance/: %s", c.want)
+			t.Errorf("line is not in conformance/: %s", c.want)
 			continue
 		}
 		line, err := json.Marshal(c.got)
@@ -70,7 +70,7 @@ func TestMessagesMatchConformance(t *testing.T) {
 		_ = json.Unmarshal(line, &got)
 		_ = json.Unmarshal([]byte(c.want), &want)
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("el cliente escribe %s, la transcripción dice %s", line, c.want)
+			t.Errorf("the client writes %s, the transcript says %s", line, c.want)
 		}
 	}
 }

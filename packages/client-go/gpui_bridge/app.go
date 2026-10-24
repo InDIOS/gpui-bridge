@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// WindowOptions configura una ventana (PROTOCOL.md §3).
+// WindowOptions configures a window (PROTOCOL.md §3).
 type WindowOptions struct {
 	Title     string
 	Width     *float64
@@ -24,13 +24,13 @@ type WindowOptions struct {
 	Events    []string
 }
 
-// ThemeSet es un fichero de tema de gpui-component (PROTOCOL.md §3).
+// ThemeSet is a gpui-component theme file (PROTOCOL.md §3).
 type ThemeSet struct {
 	Name   string        `json:"name,omitempty"`
 	Themes []ThemeConfig `json:"themes"`
 }
 
-// ThemeConfig es una entrada de tema (PROTOCOL.md §3).
+// ThemeConfig is one theme entry (PROTOCOL.md §3).
 type ThemeConfig struct {
 	Name       string            `json:"name,omitempty"`
 	Mode       string            `json:"mode,omitempty"`
@@ -40,7 +40,7 @@ type ThemeConfig struct {
 	Colors     map[string]string `json:"colors,omitempty"`
 }
 
-// WindowEventPayload es un evento de ventana (PROTOCOL.md §3 y §6).
+// WindowEventPayload is a window event (PROTOCOL.md §3 and §6).
 type WindowEventPayload struct {
 	Id      WindowId
 	Event   string
@@ -51,29 +51,29 @@ type WindowEventPayload struct {
 	Visible *bool
 }
 
-// AppOptions configura la creación de un App.
+// AppOptions configures how an App is created.
 type AppOptions struct {
-	// HostPath es la ruta al binario del host. Vacío significa defaultHostPath().
+	// HostPath is the path to the host binary. Empty means defaultHostPath().
 	HostPath string
-	// Debug reenvía los logs del host (stderr) a la consola.
+	// Debug forwards the host's logs (stderr) to the console.
 	Debug bool
-	// Headless arranca el host con --no-window (sin ventana real; para pruebas).
+	// Headless starts the host with --no-window (no real window; for tests).
 	Headless bool
 }
 
-// App es el cliente conectado a un host gpui-bridge.
+// App is the client connected to a gpui-bridge host.
 type App struct {
 	transport *Transport
 	tree      *Tree
 	hostPath  string
 
 	mu   sync.Mutex
-	done chan struct{} // se cierra cuando el host sale; exit queda fijo desde entonces
+	done chan struct{} // closed when the host exits; exit is fixed from then on
 	exit HostExit
 
 	nextWindowId WindowId
 
-	// Handlers (invocados fuera de mu desde el bucle de lectura).
+	// Handlers (called outside mu from the read loop).
 	onError        func(HostError)
 	onWindowEvent  func(WindowEventPayload)
 	onWindowClosed func(WindowId)
@@ -83,7 +83,7 @@ type App struct {
 	onResult       func(request uint64, body map[string]any)
 }
 
-// NewApp arranca el host, hace el handshake y devuelve un App listo para usar.
+// NewApp starts the host, performs the handshake and returns an App ready to use.
 func NewApp(opts AppOptions) (*App, error) {
 	path := opts.HostPath
 	if path == "" {
@@ -103,34 +103,34 @@ func NewApp(opts AppOptions) (*App, error) {
 		tree:         newTree(),
 		hostPath:     path,
 		done:         make(chan struct{}),
-		nextWindowId: 2, // la ventana 1 es la principal
+		nextWindowId: 2, // window 1 is the main window
 	}
 
-	// Handshake: el cliente envía primero y espera `ready`. Se hace de forma síncrona
-	// y SOLO entonces se arranca el bucle de lectura, así nunca hay dos lectores
-	// concurrentes sobre stdout (bufio.Reader no es seguro para eso).
+	// Handshake: the client sends first and waits for `ready`. It runs synchronously and
+	// ONLY then starts the read loop, so stdout never has two concurrent readers
+	// (bufio.Reader is not safe for that).
 	if err := tr.Send(helloMsg()); err != nil {
 		tr.Wait()
-		return nil, fmt.Errorf("no se pudo escribir al host gpui-bridge: %w", err)
+		return nil, fmt.Errorf("could not write to the gpui-bridge host: %w", err)
 	}
 	line, err := tr.ReadLineTimeout(time.Duration(HANDSHAKE_TIMEOUT_MS) * time.Millisecond)
 	if err != nil {
 		tr.Close()
 		tr.Wait()
-		return nil, fmt.Errorf("el host gpui-bridge no respondió el handshake en %d ms: %w", HANDSHAKE_TIMEOUT_MS, err)
+		return nil, fmt.Errorf("the gpui-bridge host did not answer the handshake within %d ms: %w", HANDSHAKE_TIMEOUT_MS, err)
 	}
 	var ready map[string]any
 	if err := json.Unmarshal([]byte(line), &ready); err != nil || ready["type"] != "ready" {
 		tr.Close()
 		tr.Wait()
-		return nil, fmt.Errorf("handshake del host gpui-bridge falló: %s", line)
+		return nil, fmt.Errorf("gpui-bridge host handshake failed: %s", line)
 	}
 	go app.readLoop()
 	return app, nil
 }
 
-// Commit envía todas las operaciones encoladas y un `commit` al host. Devuelve el primer
-// error de escritura (p. ej. el host ya salió); el resto del lote no se envía.
+// Commit sends every queued operation and a `commit` to the host. It returns the first
+// write error (e.g. the host already exited); the rest of the batch is not sent.
 func (a *App) Commit() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -143,30 +143,30 @@ func (a *App) Commit() error {
 	return err
 }
 
-// Simulate juega una acción de usuario sobre un nodo. Solo funciona con --no-window
-// y solo en fixtures (PROTOCOL.md §9); útil para pruebas sin ventana real.
+// Simulate plays a user action on a node. It only works with --no-window and only in
+// fixtures (PROTOCOL.md §9); useful for tests without a real window.
 func (a *App) Simulate(id NodeId, event string, value any, hasValue bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.transport.Send(simulateMsg(&id, event, value, hasValue))
 }
 
-// Close cierra stdin y espera a que el host termine, devolviendo su HostExit.
+// Close closes stdin, waits for the host to exit and returns its HostExit.
 func (a *App) Close() HostExit {
 	_ = a.transport.Close()
 	<-a.done
 	return a.exit
 }
 
-// Run bloquea la goroutine actual hasta que el host termine y devuelve su HostExit.
-// Los handlers corren en otra goroutine; la API de App y Node es segura desde ellos.
+// Run blocks the current goroutine until the host exits and returns its HostExit.
+// Handlers run on another goroutine; the App and Node API is safe to call from them.
 func (a *App) Run() HostExit {
 	<-a.done
 	return a.exit
 }
 
-// readLoop lee líneas del host y las despacha. Termina (y publica el exit) cuando
-// stdout se cierra (el host salió).
+// readLoop reads the host's lines and dispatches them. It ends (and publishes the exit)
+// when stdout closes (the host exited).
 func (a *App) readLoop() {
 	for {
 		line, err := a.transport.ReadLine()
@@ -185,7 +185,7 @@ func (a *App) readLoop() {
 }
 
 func (a *App) dispatchCorrupt(line string) {
-	// No hay handler de corrupt lines en la API pública por ahora; se ignora.
+	// The public API has no corrupt-line handler yet; ignore it.
 	_ = line
 }
 
@@ -307,56 +307,56 @@ func (a *App) handleResult(msg map[string]any) {
 	}
 }
 
-// OnError registra un handler para los errores tipados del host.
+// OnError registers a handler for the host's typed errors.
 func (a *App) OnError(handler func(HostError)) {
 	a.mu.Lock()
 	a.onError = handler
 	a.mu.Unlock()
 }
 
-// OnWindowEvent registra un handler para eventos de ventana.
+// OnWindowEvent registers a handler for window events.
 func (a *App) OnWindowEvent(handler func(WindowEventPayload)) {
 	a.mu.Lock()
 	a.onWindowEvent = handler
 	a.mu.Unlock()
 }
 
-// OnWindowClosed registra un handler para el cierre de ventanas.
+// OnWindowClosed registers a handler for closed windows.
 func (a *App) OnWindowClosed(handler func(WindowId)) {
 	a.mu.Lock()
 	a.onWindowClosed = handler
 	a.mu.Unlock()
 }
 
-// OnNotification registra un handler para notificaciones (toasts).
+// OnNotification registers a handler for notifications (toasts).
 func (a *App) OnNotification(handler func(id string, window WindowId)) {
 	a.mu.Lock()
 	a.onNotification = handler
 	a.mu.Unlock()
 }
 
-// OnShortcut registra un handler para atajos de teclado.
+// OnShortcut registers a handler for keyboard shortcuts.
 func (a *App) OnShortcut(handler func(keys string, window WindowId)) {
 	a.mu.Lock()
 	a.onShortcut = handler
 	a.mu.Unlock()
 }
 
-// OnTray registra un handler para eventos del icono de la bandeja.
+// OnTray registers a handler for tray icon events.
 func (a *App) OnTray(handler func(event, value string)) {
 	a.mu.Lock()
 	a.onTray = handler
 	a.mu.Unlock()
 }
 
-// OnResult registra un handler para respuestas de acciones del sistema.
+// OnResult registers a handler for system action results.
 func (a *App) OnResult(handler func(request uint64, body map[string]any)) {
 	a.mu.Lock()
 	a.onResult = handler
 	a.mu.Unlock()
 }
 
-// --- helpers de extracción --------------------------------------------------
+// --- extraction helpers -----------------------------------------------------
 
 func str(m map[string]any, k string) string {
 	v, _ := m[k].(string)
@@ -384,7 +384,7 @@ func bptr(m map[string]any, k string) *bool {
 	return &v
 }
 
-// payloadMap devuelve el cuerpo de un evento: el mensaje sin las claves type/id/event.
+// payloadMap returns an event's body: the message without the type/id/event keys.
 func payloadMap(msg map[string]any) map[string]any {
 	p := make(map[string]any)
 	for k, v := range msg {

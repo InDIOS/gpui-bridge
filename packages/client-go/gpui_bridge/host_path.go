@@ -6,16 +6,14 @@ import (
 	"runtime"
 )
 
-// defaultHostPath resuelve el binario del host con el mismo orden que los otros clientes
-// (PROTOCOL.md §1, implícito en el comportamiento de createApp / App):
+// defaultHostPath resolves the host binary in the same order as the other clients:
 //
-//  1. $GPUI_BRIDGE_HOST, si está definido.
-//  2. bin/ junto a este paquete (donde lo deja stage-host.mjs o el paquete publicado).
-//  3. Una build de Cargo caminando hacia arriba desde este paquete
-//     (target/debug o target/release).
+//  1. $GPUI_BRIDGE_HOST, if set.
+//  2. bin/ next to this package (where stage-host.mjs or the published package puts it).
+//  3. A Cargo build, walking up from this package (target/debug or target/release).
 //
-// Ninguna de estas opciones requiere conocer cuántos niveles separan al cliente de la raíz
-// del repositorio, así que sobrevive a que el cliente se mueva dentro de packages/.
+// None of these needs to know how many folders separate the client from the repository
+// root, so the lookup survives the client moving inside packages/.
 func defaultHostPath() string {
 	if env := os.Getenv("GPUI_BRIDGE_HOST"); env != "" {
 		return env
@@ -25,7 +23,7 @@ func defaultHostPath() string {
 		exe += ".exe"
 	}
 
-	// Directorio de este paquete (gpui_bridge/), independientemente del cwd.
+	// This package's directory (gpui_bridge/), whatever the cwd.
 	_, file, _, _ := runtime.Caller(0)
 	pkgDir := filepath.Dir(file)
 
@@ -43,7 +41,7 @@ func defaultHostPath() string {
 			}
 		}
 		if dir == filepath.Dir(dir) {
-			break // llegó a la raíz del sistema de archivos
+			break // reached the filesystem root
 		}
 	}
 	return filepath.Join(pkgDir, "..", "..", "..", "target", "debug", exe) // fallback

@@ -2,7 +2,7 @@ package gpui_bridge
 
 import "sort"
 
-// nodeRecord es la copia local que el cliente mantiene de un nodo del árbol del host.
+// nodeRecord is the client's local copy of a node in the host's tree.
 type nodeRecord struct {
 	typ      string
 	parent   *NodeId
@@ -10,8 +10,8 @@ type nodeRecord struct {
 	handlers map[string]func(any)
 }
 
-// Tree lleva la contabilidad del cliente: asignación de ids, operaciones pendientes
-// y los handlers de eventos de cada nodo.
+// Tree is the client's bookkeeping: id allocation, pending operations and each node's
+// event handlers.
 type Tree struct {
 	nextId  NodeId
 	pending []ClientMessage
@@ -26,8 +26,8 @@ func newTree() *Tree {
 	}
 }
 
-// create registra un nodo, le asigna el siguiente id y encola su operación create.
-// Los ids son positivos, únicos por sesión y nunca se reutilizan.
+// create registers a node, gives it the next id and queues its create operation.
+// Ids are positive, unique per session and never reused.
 func (t *Tree) create(typ string, props Props, events []string) NodeId {
 	id := t.nextId
 	t.nextId++
@@ -41,8 +41,8 @@ func (t *Tree) create(typ string, props Props, events []string) NodeId {
 	return id
 }
 
-// attach mueve `child` bajo `parent` en la copia local (espeja la semántica de
-// movimiento del host para que `remove` pueda soltar los handlers de los descendientes).
+// attach moves `child` under `parent` in the local copy (it mirrors the host's move
+// semantics so `remove` can drop the descendants' handlers).
 func (t *Tree) attach(parent, child NodeId) {
 	rec, ok := t.nodes[child]
 	if !ok {
@@ -59,7 +59,7 @@ func (t *Tree) attach(parent, child NodeId) {
 	}
 }
 
-// remove descarga `id` y todos sus descendientes de la copia local y encola remove.
+// remove drops `id` and all its descendants from the local copy and queues remove.
 func (t *Tree) remove(id NodeId) {
 	rec, ok := t.nodes[id]
 	if !ok {
@@ -86,8 +86,8 @@ func (t *Tree) remove(id NodeId) {
 	t.pending = append(t.pending, removeMsg(id))
 }
 
-// setHandler asigna o quita el handler de un evento y, si el conjunto cambió,
-// encola setEvents con la lista completa de eventos del nodo.
+// setHandler sets or clears an event's handler and, if the set changed, queues
+// setEvents with the node's full event list.
 func (t *Tree) setHandler(id NodeId, event string, handler func(any)) {
 	rec, ok := t.nodes[id]
 	if !ok {
@@ -105,12 +105,12 @@ func (t *Tree) setHandler(id NodeId, event string, handler func(any)) {
 		for e := range rec.handlers {
 			evs = append(evs, e)
 		}
-		sort.Strings(evs) // el mapa no tiene orden; el alambre sí
+		sort.Strings(evs) // map order is random; the wire's is not
 		t.pending = append(t.pending, setEventsMsg(id, evs))
 	}
 }
 
-// handler devuelve el handler registrado para un evento del nodo, si lo hay.
+// handler returns the handler registered for one of the node's events, if any.
 func (t *Tree) handler(id NodeId, event string) (func(any), bool) {
 	rec, ok := t.nodes[id]
 	if !ok {
@@ -120,7 +120,7 @@ func (t *Tree) handler(id NodeId, event string) (func(any), bool) {
 	return h, ok
 }
 
-// commit envía todas las operaciones pendientes y luego `commit`.
+// commit sends every pending operation and then `commit`.
 func (t *Tree) commit(send func(ClientMessage)) {
 	for _, op := range t.pending {
 		send(op)

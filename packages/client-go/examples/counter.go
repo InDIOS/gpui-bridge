@@ -1,7 +1,7 @@
-// Counter: un texto y dos botones, impulsado enteramente desde Go.
-// Run: go run examples/counter.go   (tras compilar el host: cargo build en host/)
+// Counter: a label and two buttons, driven entirely from Go.
+// Run: go run ./examples   (after building the host: cargo build -p gpui-bridge-host)
 //
-//	go run examples/counter.go --debug  (muestra los logs del host en stderr)
+//	go run ./examples --debug  (shows the host's logs on stderr)
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	debug := flag.Bool("debug", false, "muestra los logs del host")
+	debug := flag.Bool("debug", false, "show the host's logs")
 	flag.Parse()
 
 	app, err := gpui.NewApp(gpui.AppOptions{Debug: *debug})
@@ -45,6 +45,6 @@ func main() {
 
 	exit := app.Run()
 	if exit.Code != nil && *exit.Code != 0 {
-		fmt.Printf("el host salió con código %d\n", *exit.Code)
+		fmt.Printf("the host exited with code %d\n", *exit.Code)
 	}
 }

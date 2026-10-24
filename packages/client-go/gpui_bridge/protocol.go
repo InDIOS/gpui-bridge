@@ -1,35 +1,34 @@
-// Package gpui_bridge es el cliente de Go para el host nativo gpui-bridge.
+// Package gpui_bridge is the Go client for the native gpui-bridge host.
 //
-// Habla el protocolo JSON Lines, independiente del lenguaje, documentado en
-// docs/PROTOCOL.md y usa solo la biblioteca estándar de Go
-// (encoding/json, os/exec). Basta con arrancar un proceso y leer/escribir líneas:
-// no hace falta leer el host ni ningún otro cliente.
+// It speaks the language-independent JSON Lines protocol documented in
+// docs/PROTOCOL.md and uses only the Go standard library (encoding/json, os/exec).
+// Starting a process and reading/writing lines is enough: there is no need to read the
+// host or any other client.
 package gpui_bridge
 
 import (
 	"encoding/json"
 )
 
-// PROTOCOL_VERSION es la versión del protocolo de alambre que habla el host (PROTOCOL.md §2).
+// PROTOCOL_VERSION is the wire protocol version the host speaks (PROTOCOL.md §2).
 const PROTOCOL_VERSION = 1
 
-// HANDSHAKE_TIMEOUT_MS es cuánto se espera a la respuesta `ready` del host.
+// HANDSHAKE_TIMEOUT_MS is how long to wait for the host's `ready` answer.
 const HANDSHAKE_TIMEOUT_MS = 10_000
 
-// NodeId es un identificador de nodo asignado por el cliente: positivo, único por
-// sesión y nunca reutilizado (PROTOCOL.md §5).
+// NodeId is a client-assigned node id: positive, unique per session and never reused
+// (PROTOCOL.md §5).
 type NodeId = uint64
 
-// WindowId es un identificador de ventana asignado por el cliente; la ventana 1 es la
-// ventana principal y nunca necesita llevar `id` (PROTOCOL.md §3).
+// WindowId is a client-assigned window id; window 1 is the main window and never needs
+// an `id` (PROTOCOL.md §3).
 type WindowId = uint64
 
-// Props son las props de un nodo en el alambre. Un valor `null` elimina la prop
-// (PROTOCOL.md §5). En Go `class` es una clave de mapa normal, así que no hace falta
-// el truco `class_` de Python.
+// Props are a node's props on the wire. A `null` value removes the prop (PROTOCOL.md §5).
+// In Go `class` is an ordinary map key.
 type Props map[string]any
 
-// WindowTheme es el modo del tema de gpui-component (PROTOCOL.md §3).
+// WindowTheme is the gpui-component theme mode (PROTOCOL.md §3).
 type WindowTheme = string
 
 const (
@@ -37,10 +36,10 @@ const (
 	ThemeDark  WindowTheme = "dark"
 )
 
-// ClientMessage es un mensaje cliente → host (clave `op`).
+// ClientMessage is a client → host message (key `op`).
 type ClientMessage map[string]any
 
-// --- constructores de mensajes cliente → host --------------------------------
+// --- client → host message constructors -------------------------------------
 
 func helloMsg() ClientMessage {
 	return ClientMessage{"op": "hello", "protocol": PROTOCOL_VERSION}
@@ -224,9 +223,9 @@ func openPathMsg(path string) ClientMessage {
 	return ClientMessage{"op": "openPath", "path": path}
 }
 
-// simulate juega una acción de usuario. Solo funciona con --no-window y solo en
-// fixtures (PROTOCOL.md §9). `value` se incluye incluso cuando es nil si
-// hasValue es true (p. ej. `"value":null`).
+// simulate plays a user action. It only works with --no-window and only in fixtures
+// (PROTOCOL.md §9). `value` is included even when nil if hasValue is true
+// (e.g. `"value":null`).
 func simulateMsg(id *NodeId, event string, value any, hasValue bool) ClientMessage {
 	m := ClientMessage{"op": "simulate", "event": event}
 	if id != nil {
@@ -238,13 +237,13 @@ func simulateMsg(id *NodeId, event string, value any, hasValue bool) ClientMessa
 	return m
 }
 
-// jsonLine serializa un mensaje cliente en una línea JSON compacta.
+// jsonLine serializes a client message as one compact JSON line.
 func jsonLine(m ClientMessage) ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Ptr devuelve un puntero a v; útil para rellenar los campos opcionales *float64 / *bool
-// de WindowOptions y Props sin variables auxiliares.
+// Ptr returns a pointer to v; handy for the optional *float64 / *bool fields of
+// WindowOptions and Props without helper variables.
 func Ptr[T any](v T) *T {
 	return &v
 }
