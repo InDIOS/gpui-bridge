@@ -1,16 +1,16 @@
-package gpui_bridge
+package gpuibridge
 
-// window is a window opened by the client.
-type window struct {
+// Window is a window opened by the client.
+type Window struct {
 	app *App
-	id  WindowId
+	id  WindowID
 }
 
 // ID returns the window's id.
-func (w *window) ID() WindowId { return w.id }
+func (w *Window) ID() WindowID { return w.id }
 
 // Close closes the window on the next commit (PROTOCOL.md §3).
-func (w *window) Close() {
+func (w *Window) Close() {
 	w.app.mu.Lock()
 	defer w.app.mu.Unlock()
 	w.app.tree.pending = append(w.app.tree.pending, closeWindowMsg(w.id))
@@ -18,22 +18,22 @@ func (w *window) Close() {
 
 // Window creates (or updates) the main window (id 1) and attaches it to the tree.
 func (a *App) Window(opts WindowOptions) {
-	a.window(opts, 1)
+	a.queueWindow(opts, 1)
 }
 
 // CreateWindow opens an extra window with a client-assigned id.
-func (a *App) CreateWindow(opts WindowOptions) *window {
+func (a *App) CreateWindow(opts WindowOptions) *Window {
 	a.mu.Lock()
-	id := a.nextWindowId
-	a.nextWindowId++
-	w := &window{app: a, id: id}
+	id := a.nextWindowID
+	a.nextWindowID++
+	w := &Window{app: a, id: id}
 	a.mu.Unlock()
-	a.window(opts, id)
+	a.queueWindow(opts, id)
 	return w
 }
 
-func (a *App) window(opts WindowOptions, id WindowId) {
-	var rootId *NodeId
+func (a *App) queueWindow(opts WindowOptions, id WindowID) {
+	var rootId *NodeID
 	if opts.Root != nil {
 		rootId = &opts.Root.id
 	}

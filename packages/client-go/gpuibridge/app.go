@@ -1,10 +1,9 @@
-package gpui_bridge
+package gpuibridge
 
 import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 )
 
 // WindowOptions configures a window (PROTOCOL.md §3).
@@ -42,7 +41,7 @@ type ThemeConfig struct {
 
 // WindowEventPayload is a window event (PROTOCOL.md §3 and §6).
 type WindowEventPayload struct {
-	Id      WindowId
+	ID      WindowID
 	Event   string
 	X       *float64
 	Y       *float64
@@ -71,14 +70,14 @@ type App struct {
 	done chan struct{} // closed when the host exits; exit is fixed from then on
 	exit HostExit
 
-	nextWindowId WindowId
+	nextWindowID WindowID
 
 	// Handlers (called outside mu from the read loop).
 	onError        func(HostError)
 	onWindowEvent  func(WindowEventPayload)
-	onWindowClosed func(WindowId)
-	onNotification func(id string, window WindowId)
-	onShortcut     func(keys string, window WindowId)
+	onWindowClosed func(WindowID)
+	onNotification func(id string, window WindowID)
+	onShortcut     func(keys string, window WindowID)
 	onTray         func(event, value string)
 	onResult       func(request uint64, body map[string]any)
 }
@@ -95,7 +94,7 @@ func NewApp(opts AppOptions) (*App, error) {
 	}
 	tr, err := Spawn(path, opts.Debug, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w (%s)", err, hostDownloadHint)
 	}
 
 	app := &App{
@@ -103,7 +102,7 @@ func NewApp(opts AppOptions) (*App, error) {
 		tree:         newTree(),
 		hostPath:     path,
 		done:         make(chan struct{}),
-		nextWindowId: 2, // window 1 is the main window
+		nextWindowID: 2, // window 1 is the main window
 	}
 
 	// Handshake: the client sends first and waits for `ready`. It runs synchronously and
@@ -113,11 +112,11 @@ func NewApp(opts AppOptions) (*App, error) {
 		tr.Wait()
 		return nil, fmt.Errorf("could not write to the gpui-bridge host: %w", err)
 	}
-	line, err := tr.ReadLineTimeout(time.Duration(HANDSHAKE_TIMEOUT_MS) * time.Millisecond)
+	line, err := tr.ReadLineTimeout(HandshakeTimeout)
 	if err != nil {
 		tr.Close()
 		tr.Wait()
-		return nil, fmt.Errorf("the gpui-bridge host did not answer the handshake within %d ms: %w", HANDSHAKE_TIMEOUT_MS, err)
+		return nil, fmt.Errorf("the gpui-bridge host did not answer the handshake within %v: %w", HandshakeTimeout, err)
 	}
 	var ready map[string]any
 	if err := json.Unmarshal([]byte(line), &ready); err != nil || ready["type"] != "ready" {
@@ -145,7 +144,7 @@ func (a *App) Commit() error {
 
 // Simulate plays a user action on a node. It only works with --no-window and only in
 // fixtures (PROTOCOL.md §9); useful for tests without a real window.
-func (a *App) Simulate(id NodeId, event string, value any, hasValue bool) error {
+func (a *App) Simulate(id NodeID, event string, value any, hasValue bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.transport.Send(simulateMsg(&id, event, value, hasValue))
@@ -238,7 +237,7 @@ func (a *App) handleEvent(msg map[string]any) {
 }
 
 func (a *App) handleWindowClosed(msg map[string]any) {
-	id := WindowId(num(msg, "id"))
+	id := WindowID(num(msg, "id"))
 	a.mu.Lock()
 	handler := a.onWindowClosed
 	a.mu.Unlock()
@@ -249,7 +248,7 @@ func (a *App) handleWindowClosed(msg map[string]any) {
 
 func (a *App) handleWindowEvent(msg map[string]any) {
 	p := WindowEventPayload{
-		Id:      WindowId(num(msg, "id")),
+		ID:      WindowID(num(msg, "id")),
 		Event:   str(msg, "event"),
 		X:       f64ptr(msg, "x"),
 		Y:       f64ptr(msg, "y"),
@@ -270,7 +269,7 @@ func (a *App) handleNotification(msg map[string]any) {
 	handler := a.onNotification
 	a.mu.Unlock()
 	if handler != nil {
-		handler(str(msg, "id"), WindowId(num(msg, "window")))
+		handler(str(msg, "id"), WindowID(num(msg, "window")))
 	}
 }
 
@@ -279,7 +278,7 @@ func (a *App) handleShortcut(msg map[string]any) {
 	handler := a.onShortcut
 	a.mu.Unlock()
 	if handler != nil {
-		handler(str(msg, "keys"), WindowId(num(msg, "window")))
+		handler(str(msg, "keys"), WindowID(num(msg, "window")))
 	}
 }
 
@@ -322,21 +321,21 @@ func (a *App) OnWindowEvent(handler func(WindowEventPayload)) {
 }
 
 // OnWindowClosed registers a handler for closed windows.
-func (a *App) OnWindowClosed(handler func(WindowId)) {
+func (a *App) OnWindowClosed(handler func(WindowID)) {
 	a.mu.Lock()
 	a.onWindowClosed = handler
 	a.mu.Unlock()
 }
 
 // OnNotification registers a handler for notifications (toasts).
-func (a *App) OnNotification(handler func(id string, window WindowId)) {
+func (a *App) OnNotification(handler func(id string, window WindowID)) {
 	a.mu.Lock()
 	a.onNotification = handler
 	a.mu.Unlock()
 }
 
 // OnShortcut registers a handler for keyboard shortcuts.
-func (a *App) OnShortcut(handler func(keys string, window WindowId)) {
+func (a *App) OnShortcut(handler func(keys string, window WindowID)) {
 	a.mu.Lock()
 	a.onShortcut = handler
 	a.mu.Unlock()

@@ -1,4 +1,4 @@
-package gpui_bridge
+package gpuibridge
 
 import (
 	"encoding/json"
@@ -31,11 +31,11 @@ func TestMessagesMatchConformance(t *testing.T) {
 	}
 
 	// The window goes through App to cover the WindowOptions conversion.
-	app := &App{tree: newTree(), nextWindowId: 2}
+	app := &App{tree: newTree(), nextWindowID: 2}
 	app.CreateWindow(WindowOptions{Root: &Node{id: 3}})
 	window := app.tree.pending[0]
 
-	id := func(v NodeId) *NodeId { return &v }
+	id := func(v NodeID) *NodeID { return &v }
 	cases := []struct {
 		got  ClientMessage
 		want string

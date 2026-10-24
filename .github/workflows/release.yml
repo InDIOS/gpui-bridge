@@ -1,7 +1,8 @@
 name: Release
 
 # A `v*` tag runs the whole CI (three systems) and publishes what its `pack` job built: three npm
-# platform packages, `gpui-bridge`, `gpui-bridge-react` and three wheels. Running it by hand
+# platform packages, `gpui-bridge`, `gpui-bridge-react`, three wheels, and a GitHub release with the
+# three host binaries plus the tag of the Go module. Running it by hand
 # (workflow_dispatch) is the rehearsal: it builds and uploads the artifacts and publishes nothing.
 on:
   push:
@@ -75,3 +76,55 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: artifacts/client-python/dist/
+
+  github:
+    needs: ci
+    # A manual run on a tag is still a rehearsal: only a tag push publishes.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Create the release and push the Go module's tag.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: The tag is the version the packages carry
+        run: |
+          version=$(node -p "require('./packages/client-node/package.json').version")
+          test "${GITHUB_REF_NAME#v}" = "$version" || {
+            echo "tag $GITHUB_REF_NAME does not match package version $version"; exit 1; }
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: gpui-bridge-host-*
+          path: hosts
+      - name: Name the hosts by platform and list their checksums
+        run: |
+          mkdir release
+          for dir in hosts/gpui-bridge-host-*; do
+            tag=${dir#hosts/gpui-bridge-host-}
+            for file in "$dir"/*; do
+              ext=""; case "$file" in *.exe) ext=".exe";; esac
+              mv "$file" "release/gpui-bridge-host-$tag$ext"
+            done
+          done
+          (cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+      - name: Attach the hosts to the release (the Go module does not carry them)
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+      - name: Tag the Go module (it lives in a subdirectory, so its tags carry the path)
+        run: |
+          gotag="packages/client-go/$GITHUB_REF_NAME"
+          if git ls-remote --exit-code --tags origin "refs/tags/$gotag" >/dev/null; then
+            echo "$gotag already exists"
+          else
+            git tag "$gotag" "$GITHUB_SHA" && git push origin "$gotag"
+          fi
+          # Ask the module proxy for the version so pkg.go.dev lists it; "InDIOS" is
+          # case-encoded as "!in!d!i!o!s". The proxy can lag, so a miss does not fail the job.
+          curl -sf "https://proxy.golang.org/github.com/!in!d!i!o!s/gpui-bridge/packages/client-go/@v/$GITHUB_REF_NAME.info" || echo "the module proxy does not list $GITHUB_REF_NAME yet"

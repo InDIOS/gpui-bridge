@@ -3,6 +3,16 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## Unreleased
+
+- Go client (`packages/client-go/`, module `github.com/InDIOS/gpui-bridge/packages/client-go`,
+  package `gpuibridge`), standard library only. Its first version is tagged
+  `packages/client-go/v<version>` by `release.yml`.
+- The GitHub release of each version carries the three host binaries and `SHA256SUMS`: Go
+  modules are source only, so a Go program downloads its host from there.
+- PROTOCOL.md: a rejected `create` leaves no node (§4); what a client checks against the
+  transcripts (§9).
+
 ## 0.2.0 — first public release
 
 - First publication: npm (`gpui-bridge`, `gpui-bridge-react` and the three platform packages)

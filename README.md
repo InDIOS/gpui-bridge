@@ -96,6 +96,7 @@ window on Windows so far. Protocol version 1.
 | [`packages/client-python/`](packages/client-python/) | `gpui-bridge` | Python 3.10+, standard library only |
 | [`packages/client-node/`](packages/client-node/) | `gpui-bridge` | TypeScript for Node.js 22.6+; the same core runs on [txiki.js](https://github.com/saghul/txiki.js) |
 | [`packages/client-react/`](packages/client-react/) | `gpui-bridge-react` | A React renderer on top of `gpui-bridge` (`<Div>`, `<Button onClick>`…) |
+| [`packages/client-go/`](packages/client-go/) | `github.com/InDIOS/gpui-bridge/packages/client-go` | Go 1.22+, standard library only; the host is a download from the GitHub release |
 
 A client for another language only needs [PROTOCOL.md](docs/PROTOCOL.md); the transcripts in
 [`conformance/`](conformance/) show the expected messages.
@@ -107,6 +108,7 @@ packages/host/          the Rust host (workspace member; ships inside the client
 packages/client-node/   npm package `gpui-bridge`
 packages/client-react/  npm package `gpui-bridge-react`
 packages/client-python/ PyPI package `gpui-bridge`
+packages/client-go/     Go module `github.com/InDIOS/gpui-bridge/packages/client-go`
 examples/               runnable examples, installed against the packages like a user would
 conformance/            protocol transcripts, shared by the host and the clients
 benchmarks/             transport, big-tree and payload measurements
@@ -126,6 +128,7 @@ pnpm bootstrap                                 # pnpm install + debug host + Typ
 pnpm dev counter                               # opens examples/counter.ts
 pnpm dev counter -- --debug                    # host logs on stderr
 python examples/counter.py
+go run ./examples                              # examples/counter.go
 ```
 
 Add `RUST_LOG=debug` to `--debug` to also see, once a second, how many frames a window draws
@@ -147,7 +150,7 @@ example; they import `gpui-bridge` like an installed package does):
 
 | Example | Shows |
 |---|---|
-| `counter.ts`, `counter.py`, `counter-txiki.js` | The same counter in Node, Python and txiki.js |
+| `counter.ts`, `counter.py`, `counter.go`, `counter-txiki.js` | The same counter in Node, Python, Go and txiki.js |
 | `todo.ts` | Input with submit, checkboxes, a list that changes |
 | `theme.ts` | A custom theme file, light and dark |
 | `frameless.ts` | A window with its own title bar |

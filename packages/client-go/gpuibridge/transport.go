@@ -1,4 +1,4 @@
-package gpui_bridge
+package gpuibridge
 
 import (
 	"bufio"

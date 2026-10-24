@@ -1,40 +1,40 @@
-package gpui_bridge
+package gpuibridge
 
 import "sort"
 
 // nodeRecord is the client's local copy of a node in the host's tree.
 type nodeRecord struct {
 	typ      string
-	parent   *NodeId
-	children map[NodeId]bool
+	parent   *NodeID
+	children map[NodeID]bool
 	handlers map[string]func(any)
 }
 
 // Tree is the client's bookkeeping: id allocation, pending operations and each node's
 // event handlers.
 type Tree struct {
-	nextId  NodeId
+	nextId  NodeID
 	pending []ClientMessage
-	nodes   map[NodeId]*nodeRecord
+	nodes   map[NodeID]*nodeRecord
 }
 
 func newTree() *Tree {
 	return &Tree{
 		nextId:  1,
-		nodes:   make(map[NodeId]*nodeRecord),
+		nodes:   make(map[NodeID]*nodeRecord),
 		pending: nil,
 	}
 }
 
 // create registers a node, gives it the next id and queues its create operation.
 // Ids are positive, unique per session and never reused.
-func (t *Tree) create(typ string, props Props, events []string) NodeId {
+func (t *Tree) create(typ string, props Props, events []string) NodeID {
 	id := t.nextId
 	t.nextId++
 	t.nodes[id] = &nodeRecord{
 		typ:      typ,
 		parent:   nil,
-		children: make(map[NodeId]bool),
+		children: make(map[NodeID]bool),
 		handlers: make(map[string]func(any)),
 	}
 	t.pending = append(t.pending, createMsg(id, typ, props, events))
@@ -43,7 +43,7 @@ func (t *Tree) create(typ string, props Props, events []string) NodeId {
 
 // attach moves `child` under `parent` in the local copy (it mirrors the host's move
 // semantics so `remove` can drop the descendants' handlers).
-func (t *Tree) attach(parent, child NodeId) {
+func (t *Tree) attach(parent, child NodeID) {
 	rec, ok := t.nodes[child]
 	if !ok {
 		return
@@ -60,7 +60,7 @@ func (t *Tree) attach(parent, child NodeId) {
 }
 
 // remove drops `id` and all its descendants from the local copy and queues remove.
-func (t *Tree) remove(id NodeId) {
+func (t *Tree) remove(id NodeID) {
 	rec, ok := t.nodes[id]
 	if !ok {
 		return
@@ -70,7 +70,7 @@ func (t *Tree) remove(id NodeId) {
 			delete(p.children, id)
 		}
 	}
-	stack := []NodeId{id}
+	stack := []NodeID{id}
 	for len(stack) > 0 {
 		cur := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
@@ -88,7 +88,7 @@ func (t *Tree) remove(id NodeId) {
 
 // setHandler sets or clears an event's handler and, if the set changed, queues
 // setEvents with the node's full event list.
-func (t *Tree) setHandler(id NodeId, event string, handler func(any)) {
+func (t *Tree) setHandler(id NodeID, event string, handler func(any)) {
 	rec, ok := t.nodes[id]
 	if !ok {
 		return
@@ -111,7 +111,7 @@ func (t *Tree) setHandler(id NodeId, event string, handler func(any)) {
 }
 
 // handler returns the handler registered for one of the node's events, if any.
-func (t *Tree) handler(id NodeId, event string) (func(any), bool) {
+func (t *Tree) handler(id NodeID, event string) (func(any), bool) {
 	rec, ok := t.nodes[id]
 	if !ok {
 		return nil, false

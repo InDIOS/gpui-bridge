@@ -10,28 +10,28 @@ import (
 	"log"
 	"strconv"
 
-	gpui "github.com/InDIOS/gpui-bridge/packages/client-go/gpui_bridge"
+	"github.com/InDIOS/gpui-bridge/packages/client-go/gpuibridge"
 )
 
 func main() {
 	debug := flag.Bool("debug", false, "show the host's logs")
 	flag.Parse()
 
-	app, err := gpui.NewApp(gpui.AppOptions{Debug: *debug})
+	app, err := gpuibridge.NewApp(gpuibridge.AppOptions{Debug: *debug})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	count := 0
-	root := app.Div(gpui.Props{"class": "flex flex-col items-center justify-center gap-4 p-6 size-full bg-background"})
-	label := app.Text(gpui.Props{"content": "0", "class": "text-xl font-bold text-foreground"})
-	buttons := app.Div(gpui.Props{"class": "flex flex-row gap-2"})
-	subtract := app.Button(gpui.Props{"label": "Subtract", "variant": "secondary"})
-	add := app.Button(gpui.Props{"label": "Add", "variant": "primary"})
+	root := app.Div(gpuibridge.Props{"class": "flex flex-col items-center justify-center gap-4 p-6 size-full bg-background"})
+	label := app.Text(gpuibridge.Props{"content": "0", "class": "text-xl font-bold text-foreground"})
+	buttons := app.Div(gpuibridge.Props{"class": "flex flex-row gap-2"})
+	subtract := app.Button(gpuibridge.Props{"label": "Subtract", "variant": "secondary"})
+	add := app.Button(gpuibridge.Props{"label": "Add", "variant": "primary"})
 
 	update := func(delta int) {
 		count += delta
-		label.Set(gpui.Props{"content": strconv.Itoa(count)})
+		label.Set(gpuibridge.Props{"content": strconv.Itoa(count)})
 		app.Commit()
 	}
 
@@ -40,7 +40,7 @@ func main() {
 
 	buttons.Append(subtract, add)
 	root.Append(label, buttons)
-	app.Window(gpui.WindowOptions{Title: "Counter (Go)", Width: gpui.Ptr(320.0), Height: gpui.Ptr(200.0), Root: root})
+	app.Window(gpuibridge.WindowOptions{Title: "Counter (Go)", Width: gpuibridge.Ptr(320.0), Height: gpuibridge.Ptr(200.0), Root: root})
 	app.Commit()
 
 	exit := app.Run()

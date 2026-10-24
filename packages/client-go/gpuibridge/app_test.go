@@ -1,7 +1,8 @@
-package gpui_bridge
+package gpuibridge
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -118,7 +119,7 @@ func TestEventsDispatched(t *testing.T) {
 	})
 	app.Commit()
 	// Inject a host event as if it came over the wire.
-	app.dispatch(map[string]any{"type": "event", "id": float64(btn.Id()), "event": "click"}) // real JSON decodes numbers as float64
+	app.dispatch(map[string]any{"type": "event", "id": float64(btn.ID()), "event": "click"}) // real JSON decodes numbers as float64
 	if len(seen) != 1 || seen[0] != "click" {
 		t.Fatalf("click event not dispatched: %v", seen)
 	}
@@ -179,7 +180,7 @@ func TestHandlersCanUseTheAPIWhileMainDoes(t *testing.T) {
 	if err := app.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.Simulate(button.Id(), "click", nil, false); err != nil {
+	if err := app.Simulate(button.ID(), "click", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	// The main goroutine uses the API while the handler runs, so -race can see it.
@@ -198,5 +199,22 @@ func TestHandlersCanUseTheAPIWhileMainDoes(t *testing.T) {
 	exit := app.Close()
 	if again := app.Run(); !reflect.DeepEqual(again, exit) {
 		t.Fatalf("Run after Close returned %#v, want %#v", again, exit)
+	}
+}
+
+func TestDefaultHostPathFindsTheHostOnPath(t *testing.T) {
+	exe := "gpui-bridge-host"
+	if runtime.GOOS == "windows" {
+		exe += ".exe"
+	}
+	dir := t.TempDir()
+	host := filepath.Join(dir, exe)
+	if err := os.WriteFile(host, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GPUI_BRIDGE_HOST", "")
+	t.Setenv("PATH", dir)
+	if got := defaultHostPath(); got != host {
+		t.Fatalf("defaultHostPath = %s, want the host on PATH %s", got, host)
 	}
 }

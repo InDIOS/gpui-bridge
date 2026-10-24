@@ -1,15 +1,15 @@
-package gpui_bridge
+package gpuibridge
 
 // Node is a tree node, identified by its id. Its methods queue operations in the
 // client's Tree; they reach the host on the next Commit().
 type Node struct {
 	app *App
-	id  NodeId
+	id  NodeID
 	typ string
 }
 
-// Id returns the node's id.
-func (n *Node) Id() NodeId { return n.id }
+// ID returns the node's id.
+func (n *Node) ID() NodeID { return n.id }
 
 // Type returns the node type (PROTOCOL.md §5).
 func (n *Node) Type() string { return n.typ }

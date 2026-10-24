@@ -1,28 +1,29 @@
-// Package gpui_bridge is the Go client for the native gpui-bridge host.
+// Package gpuibridge is the Go client for the native gpui-bridge host.
 //
 // It speaks the language-independent JSON Lines protocol documented in
 // docs/PROTOCOL.md and uses only the Go standard library (encoding/json, os/exec).
 // Starting a process and reading/writing lines is enough: there is no need to read the
 // host or any other client.
-package gpui_bridge
+package gpuibridge
 
 import (
 	"encoding/json"
+	"time"
 )
 
-// PROTOCOL_VERSION is the wire protocol version the host speaks (PROTOCOL.md §2).
-const PROTOCOL_VERSION = 1
+// ProtocolVersion is the wire protocol version the host speaks (PROTOCOL.md §2).
+const ProtocolVersion = 1
 
-// HANDSHAKE_TIMEOUT_MS is how long to wait for the host's `ready` answer.
-const HANDSHAKE_TIMEOUT_MS = 10_000
+// HandshakeTimeout is how long to wait for the host's `ready` answer.
+const HandshakeTimeout = 10 * time.Second
 
-// NodeId is a client-assigned node id: positive, unique per session and never reused
+// NodeID is a client-assigned node id: positive, unique per session and never reused
 // (PROTOCOL.md §5).
-type NodeId = uint64
+type NodeID = uint64
 
-// WindowId is a client-assigned window id; window 1 is the main window and never needs
+// WindowID is a client-assigned window id; window 1 is the main window and never needs
 // an `id` (PROTOCOL.md §3).
-type WindowId = uint64
+type WindowID = uint64
 
 // Props are a node's props on the wire. A `null` value removes the prop (PROTOCOL.md §5).
 // In Go `class` is an ordinary map key.
@@ -42,15 +43,15 @@ type ClientMessage map[string]any
 // --- client → host message constructors -------------------------------------
 
 func helloMsg() ClientMessage {
-	return ClientMessage{"op": "hello", "protocol": PROTOCOL_VERSION}
+	return ClientMessage{"op": "hello", "protocol": ProtocolVersion}
 }
 
 func commitMsg() ClientMessage {
 	return ClientMessage{"op": "commit"}
 }
 
-func windowMsg(id WindowId, title string, width, height, x, y, minWidth, minHeight *float64,
-	root *NodeId, theme string, themeSet *ThemeSet, frameless, minimized *bool, events []string) ClientMessage {
+func windowMsg(id WindowID, title string, width, height, x, y, minWidth, minHeight *float64,
+	root *NodeID, theme string, themeSet *ThemeSet, frameless, minimized *bool, events []string) ClientMessage {
 
 	m := ClientMessage{"op": "window", "id": id}
 	if title != "" {
@@ -95,7 +96,7 @@ func windowMsg(id WindowId, title string, width, height, x, y, minWidth, minHeig
 	return m
 }
 
-func createMsg(id NodeId, typ string, props Props, events []string) ClientMessage {
+func createMsg(id NodeID, typ string, props Props, events []string) ClientMessage {
 	m := ClientMessage{"op": "create", "id": id, "type": typ}
 	if props != nil {
 		m["props"] = props
@@ -106,31 +107,31 @@ func createMsg(id NodeId, typ string, props Props, events []string) ClientMessag
 	return m
 }
 
-func appendMsg(parent, child NodeId) ClientMessage {
+func appendMsg(parent, child NodeID) ClientMessage {
 	return ClientMessage{"op": "append", "parent": parent, "child": child}
 }
 
-func insertBeforeMsg(parent, child, before NodeId) ClientMessage {
+func insertBeforeMsg(parent, child, before NodeID) ClientMessage {
 	return ClientMessage{"op": "insertBefore", "parent": parent, "child": child, "before": before}
 }
 
-func setPropsMsg(id NodeId, props Props) ClientMessage {
+func setPropsMsg(id NodeID, props Props) ClientMessage {
 	return ClientMessage{"op": "setProps", "id": id, "props": props}
 }
 
-func setEventsMsg(id NodeId, events []string) ClientMessage {
+func setEventsMsg(id NodeID, events []string) ClientMessage {
 	return ClientMessage{"op": "setEvents", "id": id, "events": events}
 }
 
-func removeMsg(id NodeId) ClientMessage {
+func removeMsg(id NodeID) ClientMessage {
 	return ClientMessage{"op": "remove", "id": id}
 }
 
-func closeWindowMsg(id WindowId) ClientMessage {
+func closeWindowMsg(id WindowID) ClientMessage {
 	return ClientMessage{"op": "closeWindow", "id": id}
 }
 
-func focusMsg(id NodeId) ClientMessage {
+func focusMsg(id NodeID) ClientMessage {
 	return ClientMessage{"op": "focus", "id": id}
 }
 
@@ -156,7 +157,7 @@ func shortcutsMsg(keys []string) ClientMessage {
 	return ClientMessage{"op": "shortcuts", "keys": keys}
 }
 
-func notifyMsg(window *WindowId, id, message, typ, title string, autohide, system *bool) ClientMessage {
+func notifyMsg(window *WindowID, id, message, typ, title string, autohide, system *bool) ClientMessage {
 	m := ClientMessage{"op": "notify", "message": message}
 	if window != nil {
 		m["window"] = *window
@@ -226,7 +227,7 @@ func openPathMsg(path string) ClientMessage {
 // simulate plays a user action. It only works with --no-window and only in fixtures
 // (PROTOCOL.md §9). `value` is included even when nil if hasValue is true
 // (e.g. `"value":null`).
-func simulateMsg(id *NodeId, event string, value any, hasValue bool) ClientMessage {
+func simulateMsg(id *NodeID, event string, value any, hasValue bool) ClientMessage {
 	m := ClientMessage{"op": "simulate", "event": event}
 	if id != nil {
 		m["id"] = *id
