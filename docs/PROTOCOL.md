@@ -154,6 +154,7 @@ Rules:
   A node cannot be placed inside itself or one of its descendants.
 - On `commit`, an operation that fails is dropped and answered with an `error`; the rest of
   the batch is still applied, in order.
+- A rejected `create` leaves no node: later operations that name its id get `unknown_node`.
 
 ## 5. Node types
 
@@ -386,6 +387,8 @@ file is one session against `host --no-window`:
   no stdout output beyond the `<` lines.
 
 The runner is `packages/host/tests/conformance.rs` (`cargo test --workspace` at the root).
+The transcripts test the host. A client checks the other side: the lines it writes for each
+operation must appear among the `>` lines (field order aside).
 
 **`simulate` (fixtures only).** With `--no-window`, and only then, the host also accepts a
 `simulate` message that plays a user action, so fixtures can cover section 6. It is not part
