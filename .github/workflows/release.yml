@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # `packageManager: pnpm@…` turns on a pnpm cache that needs pnpm; this job installs nothing.
+          package-manager-cache: false
       - name: The tag is the version the packages carry
         run: |
           version=$(node -p "require('./packages/client-node/package.json').version")
