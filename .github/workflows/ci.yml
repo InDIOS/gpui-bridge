@@ -115,6 +115,10 @@ jobs:
           name: gpui-bridge-host-${{ matrix.tag }}
           # Where a checkout looks for the host.
           path: target/release
+      - name: Restore the +x bit that artifacts drop
+        # The Go client runs target/release directly, not the staged copy.
+        if: runner.os != 'Windows'
+        run: chmod +x target/release/gpui-bridge-host
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Stage the host the way the packages ship it
