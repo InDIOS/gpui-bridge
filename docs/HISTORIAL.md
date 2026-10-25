@@ -1570,8 +1570,8 @@ paso es `Command`; `PROTOCOL.md` §21 es la referencia. El protocolo sigue en 1.
 
 Verificado: `cargo fmt`, `clippy -D warnings`, 63 tests del host más la conformidad (24
 transcripciones) y `no_window`, 23 de Node, 20 de React, 23 de Python, `go test -race`, `go vet`
-y el type-check de los ejemplos. **Pendiente (usuario):** en ventana real, escribir para
-filtrar, flechas y Enter, clic en una entrada, y Escape dentro del diálogo.
+y el type-check de los ejemplos. **Probado a mano por el usuario** (2026-10-25): filtrar,
+flechas y Enter, clic en una entrada, y Escape dentro del diálogo.
 
 ### Fase 40 — M10, paso 2: `Settings` (2026-10-25)
 
@@ -1606,5 +1606,6 @@ protocolo sigue en 1.
 
 Verificado: `cargo fmt`, `clippy -D warnings`, 65 tests del host más la conformidad (25
 transcripciones) y `no_window`, 23 de Node, 21 de React, 23 de Python, `go test`, `go vet`,
-`gofmt` y el type-check de los ejemplos.
+`gofmt` y el type-check de los ejemplos. **Probado a mano por el usuario** (2026-10-25) en
+`node examples/settings.ts`: búsqueda, los cinco campos y el campo deshabilitado.
 
