@@ -80,6 +80,13 @@ fn check_item(item: &Value, seen: &mut HashSet<String>) -> Result<(), String> {
     {
         return Err("'step' must be above 0".into());
     }
+    // gpui-kit clamps typed numbers with `f64::clamp`, which panics when min > max.
+    let bound = |key| item.get(key).and_then(Value::as_f64);
+    if let (Some(min), Some(max)) = (bound("min"), bound("max"))
+        && min > max
+    {
+        return Err("'min' must not be above 'max'".into());
+    }
     if item.get("disabled").is_some_and(|d| !d.is_boolean()) {
         return Err("'disabled' must be a boolean".into());
     }
@@ -219,7 +226,14 @@ fn item(id: NodeId, path: Path, spec: &Value, session: &Entity<Session>) -> Sett
                 SettingField::number_input(
                     options,
                     move |_| n,
-                    move |n: f64, cx: &mut App| set(json!(n), cx),
+                    // A whole number goes out as one (`11`, not `11.0`), like the props it came from.
+                    move |n: f64, cx: &mut App| {
+                        if n.fract() == 0. && n.abs() < 1e15 {
+                            set(json!(n as i64), cx)
+                        } else {
+                            set(json!(n), cx)
+                        }
+                    },
                 ),
             )
         }
@@ -334,6 +348,12 @@ mod tests {
             .is_err()
         );
         assert!(check_pages(&item(json!({"type": "number", "value": 1, "step": 0}))).is_err());
+        assert!(
+            check_pages(&item(
+                json!({"type": "number", "value": 10, "min": 32, "max": 8})
+            ))
+            .is_err()
+        );
         assert!(check_pages(&item(json!({"disabled": "yes"}))).is_err());
         let twice = json!([{"title": "P", "groups": [{"items": [
             {"key": "k", "label": "A", "type": "switch", "value": true},

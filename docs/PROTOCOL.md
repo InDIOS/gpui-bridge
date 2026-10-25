@@ -1146,7 +1146,7 @@ split the node's box, so give it a size (`size-full`, `flex-1`, `h-96`).
   | `checkbox` | boolean  | — |
   | `input`    | string   | — |
   | `dropdown` | string, one of the options' `value` | `options`: `[{"value", "label"}]` (required) |
-  | `number`   | number   | `min`, `max`, `step` (above 0, default 1) |
+  | `number`   | number   | `min`, `max` (`min` not above `max`), `step` (above 0, default 1) |
 
 - `key` is a string chosen by the client and must be unique across all pages. A repeated key, a
   missing field, an unknown `type`, a `value` that does not fit its `type`, an icon that is not

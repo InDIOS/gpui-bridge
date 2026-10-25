@@ -32,6 +32,8 @@
 < {"type":"error","code":"invalid_props","op":"setProps"}
 > {"op":"setProps","id":1,"props":{"pages":[{"title":"P","groups":[{"items":[{"key":"a","label":"A","type":"switch","value":true},{"key":"a","label":"B","type":"switch","value":true}]}]}]}}
 < {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"pages":[{"title":"P","groups":[{"items":[{"key":"a","label":"A","type":"number","value":10,"min":32,"max":8}]}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
 > {"op":"commit"}
 # The rejected setProps left the old pages, with the values the user set: "dark" is false now.
 > {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":true}}
