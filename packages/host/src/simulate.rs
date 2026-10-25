@@ -177,6 +177,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Div | NodeType::MenuBar, "menu")
             | (NodeType::Alert, "close")
             | (NodeType::Canvas, "pointerDown")
+            | (NodeType::Command, "confirm")
     );
     if !known {
         return Err(fail(
@@ -599,6 +600,20 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             };
             if !spec.disabled && node.props.get("value").and_then(Value::as_str) != Some(&entry) {
                 components::sidebar::entry_clicked(tree, id, &entry);
+            }
+        }
+        // An entry of a Command: an unknown id is an error; a disabled one does nothing.
+        (NodeType::Command, "confirm") => {
+            let entry = text()?;
+            let sections = components::command::sections(node);
+            let Some(spec) = components::command::find_entry(&sections, &entry) else {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no entry '{entry}'"),
+                ));
+            };
+            if !spec.disabled {
+                components::command::confirmed(tree, id, &entry);
             }
         }
         (NodeType::Input | NodeType::NumberInput, "submit") => {

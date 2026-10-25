@@ -207,6 +207,7 @@ Rules:
 | `Sidebar`  | `items`, `value`, `collapsed`, `collapsible` (`icon`, `offcanvas`, `none`), `side` (`left`, `right`), `controlled`, `class` | `change` |
 | `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
 | `Canvas`   | `commands`, `class` | `pointerDown` |
+| `Command`  | `items`, `placeholder`, `class` | `confirm` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -797,9 +798,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock`, `Command`, `Settings` and `List` keep their own delegates and state machines
-and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, and `Sidebar` and
-`Chart` in section 19.
+binary. `Dock`, `Settings` and `List` keep their own delegates and state machines
+and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
+`Chart` in section 19, and `Command` in section 21.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
@@ -1064,3 +1065,48 @@ local to the canvas, in the same coordinates as the commands:
 `unknown_type` to it and nothing else changes.
 
 The transcript in `conformance/canvas.txt` is the reference for its props and events.
+
+## 21. Command
+
+A command palette: a search field over a filtered list of entries. Like a `Sidebar`, its
+content is data in props and it takes no children.
+
+```json
+{"op":"create","id":40,"type":"Command","props":{
+  "placeholder":"Type a command...",
+  "items":[
+    {"label":"File","items":[
+      {"id":"open","label":"Open","icon":"folder","keywords":["load"]},
+      {"id":"save","label":"Save","checked":true},
+      {"id":"soon","label":"Soon","disabled":true}
+    ]},
+    {"items":[{"id":"quit","label":"Quit"}]}
+  ]
+},"events":["confirm"]}
+```
+
+- `items` is a list of sections, the same shape as a Sidebar's. A section is `{"label",
+  "items"}`; without `label` its entries have no heading. Each entry is `{"id", "label"}` with
+  optional `icon` (a bundled icon name), `keywords` (a list of extra terms the search matches),
+  `checked` (draws a check at the end of the row) and `disabled`.
+- `id` is a string chosen by the client and must be unique across the whole palette; a repeated
+  one, an entry without `id` or `label`, a section without `items`, an icon that is not bundled
+  or a mistyped field is `invalid_props`, and the operation is not applied.
+- The palette filters the entries by the query itself (label and `keywords`, ignoring case); the
+  query is not reported. Up and down move the highlight, Enter or a click confirms it.
+- `confirm` (opt-in) reports the confirmed entry's `id`. A palette holds no value: nothing is
+  kept in the host, and a disabled entry cannot be confirmed.
+- A modal palette is a `Command` inside a `Dialog` (section 14): Escape with an empty query
+  reaches the dialog, which closes and sends its `cancel`.
+
+```json
+{"type":"event","id":40,"event":"confirm","value":"quit"}
+```
+
+`simulate` takes the same `value`: `{"op":"simulate","id":40,"event":"confirm","value":"quit"}`.
+An unknown `id` is `invalid_operation`; a disabled one sends nothing.
+
+`PROTOCOL_VERSION` stays at 1: `Command` is a new node type, so an older host answers
+`unknown_type` to it and nothing else changes.
+
+The transcript in `conformance/command.txt` is the reference for its props and events.

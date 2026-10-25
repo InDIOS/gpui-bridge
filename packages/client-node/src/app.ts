@@ -546,6 +546,11 @@ export class App {
     return this.create("Canvas", props);
   }
 
+  /** A command palette over the sections in `items`; `confirm` with the chosen entry's `id`. */
+  command(props: NodeProps["Command"] = {}) {
+    return this.create("Command", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

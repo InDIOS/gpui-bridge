@@ -53,7 +53,8 @@ export type NodeType =
   | "Carousel"
   | "Sidebar"
   | "Chart"
-  | "Canvas";
+  | "Canvas"
+  | "Command";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -828,6 +829,34 @@ export interface CanvasProps {
   class?: string;
 }
 
+/** One entry of a `Command` palette. */
+export interface CommandEntry {
+  /** Unique across the whole palette: it is what `confirm` reports. */
+  id: string;
+  label: string;
+  /** A bundled icon name. */
+  icon?: string;
+  /** Extra terms the search matches, besides `label`. */
+  keywords?: string[];
+  /** Draws a check at the end of the row. */
+  checked?: boolean;
+  disabled?: boolean;
+}
+
+/** A group of entries with a heading (`label`); without one the entries have no heading. */
+export interface CommandSection {
+  label?: string;
+  items: CommandEntry[];
+}
+
+export interface CommandProps {
+  /** The sections: the palette takes no children and filters them by the query itself. */
+  items?: CommandSection[];
+  /** The search field's placeholder. */
+  placeholder?: string;
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -876,6 +905,7 @@ export interface NodeProps {
   Sidebar: SidebarProps & SharedProps;
   Chart: ChartProps & SharedProps;
   Canvas: CanvasProps & SharedProps;
+  Command: CommandProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -939,4 +969,6 @@ export interface NodeEvents {
   Chart: {};
   /** `value` is the point pressed, local to the canvas. */
   Canvas: { pointerDown: { value: CanvasPoint } };
+  /** `value` is the `id` of the entry confirmed (Enter or a click). */
+  Command: { confirm: { value: string } };
 }

@@ -398,3 +398,7 @@ export const Chart = "Chart" as unknown as HostComponent<ChartProps>;
 /** Paints the drawing commands in `commands`; `onPointerDown` gets the local point. */
 export type CanvasProps = NodeProps["Canvas"] & { onPointerDown?: (point: { x: number; y: number }) => void };
 export const Canvas = "Canvas" as unknown as HostComponent<CanvasProps>;
+
+/** A command palette over the sections in `items`; `onConfirm` gets the chosen entry's `id`. */
+export type CommandProps = NodeProps["Command"] & { onConfirm?: (id: string) => void };
+export const Command = "Command" as unknown as HostComponent<CommandProps>;

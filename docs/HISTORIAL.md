@@ -1541,3 +1541,35 @@ con `paint_quad` y `PathBuilder::stroke` de GPUI. El protocolo sigue en 1: un ho
 Verificado: `cargo fmt --check`, `clippy -D warnings`, 61 tests del host más la conformidad y
 `no_window`, 23 de Node, 19 de React, 23 de Python y `go test -race`. El ejemplo se probó en ventana real en
 Windows, también con 5000 comandos. No verificado: macOS y Linux en ventana real (como en M5).
+
+### Fase 39 — M10, paso 1: `Command` (2026-10-25)
+
+Plan de M10 aprobado por el usuario el mismo día: `Dock` sale a un hito propio (M11, con spike y
+ADR antes de programar), `Settings` se limita a cinco tipos de campo, y `change` con
+`{key, value}` va en `value` (que ya lleva objetos, como `sort`), sin campo `data` nuevo. Este
+paso es `Command`; `PROTOCOL.md` §21 es la referencia. El protocolo sigue en 1.
+
+- **Forma.** `items` usa las secciones de `Sidebar` (`{label?, items}`) con entradas `{id,
+  label, icon?, keywords?, checked?, disabled?}`, en vez del `group` por entrada que decía la
+  propuesta: es la forma que ya existe y cada sección pasa a ser un `CommandGroup`, así que el
+  `IndexPath` que devuelve gpui-component es (sección, entrada) y se traduce al `id` sin tabla.
+- **Recortes.** Solo el evento `confirm`. No hay `cancel` propio: dentro de un `Dialog`, Escape
+  con la consulta vacía llega al diálogo, que ya manda `cancel`. Tampoco se informa la consulta
+  (el componente filtra solo), ni paleta modal propia, `header`/`footer`/`empty` o `action`.
+- **Host.** `components/command.rs`: validación (ids únicos, iconos incluidos, `keywords` como
+  lista de textos), un `CommandState` por nodo (como `Select`) y `confirmed`, compartido con
+  `simulate`. Una entrada deshabilitada no manda nada; un id desconocido es
+  `invalid_operation`. `conformance/command.txt` cubre props, errores y evento.
+- **Clientes.** Node `command()` con `CommandEntry`, `CommandSection` y `CommandProps`; React
+  `<Command onConfirm>` (con test); Python `app.command(**props)`; Go `App.Command`.
+- **Ejemplo** `examples/command.ts`: la misma paleta en línea y dentro de un `Dialog`.
+- **Ventana real (Windows).** Captura del diálogo abierto: grupos con título, iconos, el check de
+  `checked` y la entrada deshabilitada atenuada. Sin pánicos en el stderr.
+- El test de React que fallaba antes de `app.close()` dejaba el host vivo y colgaba toda la
+  suite; parecía un fallo del entorno y no lo era.
+
+Verificado: `cargo fmt`, `clippy -D warnings`, 63 tests del host más la conformidad (24
+transcripciones) y `no_window`, 23 de Node, 20 de React, 23 de Python, `go test -race`, `go vet`
+y el type-check de los ejemplos. **Pendiente (usuario):** en ventana real, escribir para
+filtrar, flechas y Enter, clic en una entrada, y Escape dentro del diálogo.
+

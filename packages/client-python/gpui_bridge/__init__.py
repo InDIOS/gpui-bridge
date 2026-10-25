@@ -425,6 +425,12 @@ class App:
         width}). `pointerDown` passes the local point ({"x", "y"})."""
         return self._create("Canvas", props)
 
+    def command(self, **props) -> Node:
+        """A command palette: `items` (sections: {"label", "items": [{"id", "label", "icon",
+        "keywords", "checked", "disabled"}]}), `placeholder`. It filters by the query itself;
+        `confirm` passes the chosen entry's id."""
+        return self._create("Command", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)

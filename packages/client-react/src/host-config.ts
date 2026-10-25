@@ -183,6 +183,7 @@ const EVENT_PROPS: Record<string, string> = {
   onExpand: "expand",
   onCollapse: "collapse",
   onPointerDown: "pointerDown",
+  onConfirm: "confirm",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -335,6 +336,8 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.chart(wire);
     case "Canvas":
       return app.canvas(wire);
+    case "Command":
+      return app.command(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

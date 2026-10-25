@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, Command, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -403,6 +403,20 @@ test("Canvas sends its commands and onPointerDown gets the local point", async (
   emit(app, { id: canvas.id, event: "pointerDown", value: { x: 14, y: 23.5 } });
   await tick();
   assert.deepEqual(got, [{ x: 14, y: 23.5 }]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Command sends its sections and onConfirm gets the entry id", async () => {
+  const got: string[] = [];
+  const items = [{ label: "File", items: [{ id: "open", label: "Open", icon: "folder", keywords: ["load"] }] }, { items: [{ id: "quit", label: "Quit" }] }];
+  const { app, sent, errors } = await renderRecorded(<Command items={items} placeholder="Type a command..." onConfirm={(id) => got.push(id)} />);
+  const [command] = created(sent, "Command");
+  assert.deepEqual(command.props?.items, items);
+
+  emit(app, { id: command.id, event: "confirm", value: "quit" });
+  await tick();
+  assert.deepEqual(got, ["quit"]);
   await app.close();
   assert.deepEqual(errors, []);
 });

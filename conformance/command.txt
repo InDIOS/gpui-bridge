@@ -1,0 +1,32 @@
+# Section 21: Command, its sections and its confirm event.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Command","props":{"placeholder":"Type a command...","items":[{"label":"File","items":[{"id":"open","label":"Open","icon":"folder","keywords":["load"]},{"id":"save","label":"Save","checked":true},{"id":"soon","label":"Soon","disabled":true}]},{"items":[{"id":"quit","label":"Quit"}]}]},"events":["confirm"]}
+> {"op":"commit"}
+# Confirming an entry reports its id; a disabled one sends nothing; an unknown one is an error.
+> {"op":"simulate","id":1,"event":"confirm","value":"quit"}
+< {"type":"event","id":1,"event":"confirm","value":"quit"}
+> {"op":"simulate","id":1,"event":"confirm","value":"soon"}
+> {"op":"simulate","id":1,"event":"confirm","value":"nope"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"confirm"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":1,"event":"change","value":"quit"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed sections are rejected and the operation is not applied (props are checked on commit).
+> {"op":"setProps","id":1,"props":{"items":[{"label":"File"}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"items":[{"items":[{"id":"a","label":"A"},{"id":"a","label":"B"}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"items":[{"items":[{"id":"a","label":"A","keywords":"x"}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"items":[{"items":[{"id":"a","label":"A","icon":"nope"}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"commit"}
+# The rejected setProps left the old items: "quit" is still there.
+> {"op":"simulate","id":1,"event":"confirm","value":"quit"}
+< {"type":"event","id":1,"event":"confirm","value":"quit"}
+# Without the opt-in, confirming sends nothing.
+> {"op":"setEvents","id":1,"events":[]}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"confirm","value":"quit"}

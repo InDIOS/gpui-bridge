@@ -12,6 +12,7 @@ pub mod canvas;
 pub mod carousel;
 pub mod chart;
 pub mod checkbox;
+pub mod command;
 pub mod diff;
 pub mod input;
 pub mod layout;

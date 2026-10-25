@@ -168,6 +168,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `advanced.ts` | A `Tree` with expansion, a `Diff` of a patch and a `Carousel` |
 | `dashboard.ts` | A `Sidebar`, three `Chart`s (1,000 points, bars, a pie) and a 10-level tree |
 | `canvas.ts` | A `Canvas` drawn with `rect`, `line` and `path`; each press adds a square where it happened |
+| `command.ts` | A `Command` palette inline and inside a `Dialog`; confirming an entry shows its id |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).

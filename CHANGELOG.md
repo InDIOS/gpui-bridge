@@ -15,6 +15,10 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - New node `Canvas`: the client draws with `rect`, `line` and `path` commands in theme colors, and
   gets `pointerDown` with the point local to the canvas (PROTOCOL.md §20). `canvas()` in Node,
   `<Canvas onPointerDown>` in React, `app.canvas()` in Python and `App.Canvas` in Go.
+- New node `Command`: a command palette over sections of entries (Sidebar's shape plus
+  `keywords` and `checked`); it filters by the query itself and reports `confirm` with the
+  entry's `id` (PROTOCOL.md §21). Inside a `Dialog` it is a modal palette. `command()` in Node,
+  `<Command onConfirm>` in React, `app.command()` in Python and `App.Command` in Go.
 
 ## 0.2.0 — first public release
 

@@ -47,6 +47,8 @@ pub enum PropKind {
     Series,
     /// A Canvas's `commands`: a list of drawing command objects (PROTOCOL.md section 20).
     Commands,
+    /// A Command's `items`: sections of `{id, label, ...}` entries (PROTOCOL.md section 21).
+    CommandSections,
 }
 
 impl PropKind {
@@ -69,7 +71,8 @@ impl PropKind {
             | Self::Patch
             | Self::Sections
             | Self::Series
-            | Self::Commands => self.check(value).is_ok(),
+            | Self::Commands
+            | Self::CommandSections => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -109,6 +112,8 @@ impl PropKind {
                 .map_err(|err| format!("a list of data points ({err})")),
             Self::Commands => crate::components::canvas::check_commands(value)
                 .map_err(|err| format!("a list of canvas commands ({err})")),
+            Self::CommandSections => crate::components::command::check_items(value)
+                .map_err(|err| format!("a list of command sections ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -137,6 +142,7 @@ impl PropKind {
             Self::Sections => "a list of sidebar sections".into(),
             Self::Series => "a list of data points".into(),
             Self::Commands => "a list of canvas command objects".into(),
+            Self::CommandSections => "a list of command sections".into(),
         }
     }
 }
@@ -198,6 +204,8 @@ pub enum NodeType {
     Chart,
     // Canvas (PROTOCOL.md section 20).
     Canvas,
+    // Command palette (PROTOCOL.md section 21).
+    Command,
 }
 
 impl NodeType {
@@ -250,6 +258,7 @@ impl NodeType {
             "Sidebar" => Some(Self::Sidebar),
             "Chart" => Some(Self::Chart),
             "Canvas" => Some(Self::Canvas),
+            "Command" => Some(Self::Command),
             _ => None,
         }
     }
@@ -378,6 +387,8 @@ impl NodeType {
             (Self::Chart, "yMin" | "yMax" | "innerRadius" | "padAngle") => Some(Number),
             (Self::Chart, "xTicks" | "yTicks") => Some(Index),
             (Self::Canvas, "commands") => Some(Commands),
+            (Self::Command, "items") => Some(CommandSections),
+            (Self::Command, "placeholder") => Some(Str),
             (
                 Self::Input
                 | Self::Checkbox
@@ -484,6 +495,7 @@ impl NodeType {
             Self::Sidebar => "Sidebar",
             Self::Chart => "Chart",
             Self::Canvas => "Canvas",
+            Self::Command => "Command",
         }
     }
 }
@@ -538,6 +550,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::Sidebar,
     NodeType::Chart,
     NodeType::Canvas,
+    NodeType::Command,
 ];
 
 #[cfg(test)]

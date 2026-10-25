@@ -22,6 +22,7 @@ use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
 use crate::components::carousel::{self, CarouselSlot};
 use crate::components::chart::{self, ChartSlot};
+use crate::components::command::{self, CommandSlot};
 use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
@@ -59,6 +60,8 @@ pub struct RootView {
     carousels: HashMap<NodeId, CarouselSlot>,
     /// One per Chart: its data, parsed once per change (a series can be 1 000 points long).
     charts: HashMap<NodeId, ChartSlot>,
+    /// One per Command: the query and highlight the user typed and moved.
+    commands: HashMap<NodeId, CommandSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -132,6 +135,7 @@ impl RootView {
             diffs: HashMap::new(),
             carousels: HashMap::new(),
             charts: HashMap::new(),
+            commands: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -283,6 +287,7 @@ impl RootView {
         let diffs = diff::snapshot(tree, &members);
         let carousels = carousel::snapshot(tree, &members);
         let charts = chart::snapshot(tree, &members);
+        let commands = command::snapshot(tree, &members);
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -329,6 +334,7 @@ impl RootView {
         diff::sync(&mut self.diffs, diffs, &self.session, cx);
         carousel::sync(&mut self.carousels, carousels, &self.session, cx);
         chart::sync(&mut self.charts, charts, &self.session, cx);
+        command::sync(&mut self.commands, commands, window, cx);
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
@@ -438,6 +444,7 @@ impl RootView {
             diffs: &self.diffs,
             carousels: &self.carousels,
             charts: &self.charts,
+            commands: &self.commands,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
@@ -754,6 +761,7 @@ struct RenderCx<'a> {
     diffs: &'a HashMap<NodeId, DiffSlot>,
     carousels: &'a HashMap<NodeId, CarouselSlot>,
     charts: &'a HashMap<NodeId, ChartSlot>,
+    commands: &'a HashMap<NodeId, CommandSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -876,6 +884,7 @@ impl RenderCx<'_> {
             NodeType::Sidebar => self.sidebar_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Command => self.command_node(id, node, &classes),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
@@ -1423,6 +1432,16 @@ impl RenderCx<'_> {
     fn select_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.selects.get(&id) {
             Some(slot) => self.blocking(id, select::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn command_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.commands.get(&id) {
+            Some(slot) => {
+                let element = command::build(id, node, slot, self.session);
+                self.blocking(id, element, classes)
+            }
             None => div().into_any_element(),
         }
     }
