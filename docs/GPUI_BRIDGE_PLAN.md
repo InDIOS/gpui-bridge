@@ -324,8 +324,8 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
 > `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar`, qué costaría cada uno y su
 > impacto en host, protocolo y clientes: ver
 > [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). `Tree`,
-> `Diff` y `Carousel` (M2) y `Sidebar` y `Chart` (M3) ya están; quedan `Command` y
-> `Settings` (M10), `Dock` (M11) y `List`. `Editor` y `Speech` siguen fuera por dependencias.
+> `Diff` y `Carousel` (M2), `Sidebar` y `Chart` (M3) y `Command` y `Settings` (M10) ya están;
+> quedan `Dock` (M11) y `List`. `Editor` y `Speech` siguen fuera por dependencias.
 
 - Componentes: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"):
   Basic (`Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`,
@@ -334,7 +334,7 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
   `Resizable`) y Advanced (`Calendar`), con `Accordion` y el redimensionado dentro de lo que el
   árbol puede expresar. Lo que queda se detalla en
   [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` (**hecho**,
-  M2) y `Sidebar` y `Chart` (**hecho**, M3); `Command` y `Settings` en M10 y `Dock` en M11 (con
+  M2), `Sidebar` y `Chart` (**hecho**, M3) y `Command` y `Settings` (**hecho**, M10); `Dock` en M11 (con
   un ADR); `List` según necesidad. El editor de código (pide `tree-sitter`,
   que engorda el host), markdown (`TextView`) y el selector de color siguen pendientes.
 - Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana. **Hecho el 2026-10-21** (M1, HISTORIAL.md, «Fase 28»).

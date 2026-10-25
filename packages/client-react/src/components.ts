@@ -13,6 +13,7 @@ import type {
   NodeType,
   Option,
   RadioGroupProps as WireRadioGroupProps,
+  SettingsChange,
   TableCell,
   TableColumn,
   TableSort,
@@ -402,3 +403,9 @@ export const Canvas = "Canvas" as unknown as HostComponent<CanvasProps>;
 /** A command palette over the sections in `items`; `onConfirm` gets the chosen entry's `id`. */
 export type CommandProps = NodeProps["Command"] & { onConfirm?: (id: string) => void };
 export const Command = "Command" as unknown as HostComponent<CommandProps>;
+
+/** Settings pages of typed fields; `onChange` gets `{key, value}` of the field the user set. */
+export type SettingsProps = NodeProps["Settings"] & {
+  onChange?: (change: SettingsChange) => void;
+};
+export const Settings = "Settings" as unknown as HostComponent<SettingsProps>;

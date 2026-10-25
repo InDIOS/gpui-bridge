@@ -338,6 +338,8 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.canvas(wire);
     case "Command":
       return app.command(wire);
+    case "Settings":
+      return app.settings(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

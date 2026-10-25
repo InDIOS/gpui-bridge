@@ -30,8 +30,8 @@ use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, canvas, checkbox, layout, menu, radio, sidebar, switch, tabs,
-    tree,
+    self, accordion, basic, button, canvas, checkbox, layout, menu, radio, settings, sidebar,
+    switch, tabs, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -885,6 +885,10 @@ impl RenderCx<'_> {
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Command => self.command_node(id, node, &classes),
+            NodeType::Settings => {
+                let element = settings::build(id, node, self.session);
+                self.component_a11y(id, element, &classes, accessibility.as_ref())
+            }
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).

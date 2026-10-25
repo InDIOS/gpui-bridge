@@ -208,6 +208,7 @@ Rules:
 | `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
 | `Canvas`   | `commands`, `class` | `pointerDown` |
 | `Command`  | `items`, `placeholder`, `class` | `confirm` |
+| `Settings` | `pages`, `class` | `change` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -798,9 +799,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock`, `Settings` and `List` keep their own delegates and state machines
+binary. `Dock` and `List` keep their own delegates and state machines
 and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
-`Chart` in section 19, and `Command` in section 21.
+`Chart` in section 19, `Command` in section 21 and `Settings` in section 22.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
@@ -1110,3 +1111,65 @@ An unknown `id` is `invalid_operation`; a disabled one sends nothing.
 `unknown_type` to it and nothing else changes.
 
 The transcript in `conformance/command.txt` is the reference for its props and events.
+
+## 22. Settings
+
+A settings screen: a sidebar of pages, with a search field, and the groups of fields of the
+selected page. Its content is data in props and it takes no children. The sidebar and the page
+split the node's box, so give it a size (`size-full`, `flex-1`, `h-96`).
+
+```json
+{"op":"create","id":50,"type":"Settings","props":{"class":"size-full","pages":[
+  {"title":"General","icon":"settings","groups":[
+    {"title":"Look","items":[
+      {"key":"dark","label":"Dark mode","type":"switch","value":true},
+      {"key":"font","label":"Font","type":"dropdown","value":"mono",
+       "options":[{"value":"mono","label":"Mono"},{"value":"sans","label":"Sans"}]}
+    ]}
+  ]},
+  {"title":"Editor","groups":[{"items":[
+    {"key":"name","label":"Name","type":"input","value":"","description":"Shown in the title"},
+    {"key":"size","label":"Size","type":"number","value":14,"min":8,"max":32,"step":1},
+    {"key":"lines","label":"Line numbers","type":"checkbox","value":false,"disabled":true}
+  ]}]}
+]},"events":["change"]}
+```
+
+- `pages` is a list of `{"title", "icon"?, "groups"}`; `icon` is a bundled icon name. A group is
+  `{"title"?, "items"}`; a group without `title` has no heading.
+- An item is `{"key", "label", "type", "value"}` with optional `description` and `disabled`.
+  `type` is one of:
+
+  | `type`     | `value`  | Extra fields |
+  |------------|----------|--------------|
+  | `switch`   | boolean  | — |
+  | `checkbox` | boolean  | — |
+  | `input`    | string   | — |
+  | `dropdown` | string, one of the options' `value` | `options`: `[{"value", "label"}]` (required) |
+  | `number`   | number   | `min`, `max`, `step` (above 0, default 1) |
+
+- `key` is a string chosen by the client and must be unique across all pages. A repeated key, a
+  missing field, an unknown `type`, a `value` that does not fit its `type`, an icon that is not
+  bundled or a mistyped field is `invalid_props`, and the operation is not applied.
+- The search field filters the items by label and description; the selected page and the query
+  stay in the host and are not reported.
+- When the user changes a field, the host keeps the new `value` in `pages` (there is no
+  `controlled` mode) and `change` (opt-in) reports `{"key", "value"}`. A text field reports each
+  edit; a number field only reports values clamped to `min`..`max`. A `setProps` of `pages`
+  replaces the values the host kept.
+
+```json
+{"type":"event","id":50,"event":"change","value":{"key":"dark","value":false}}
+```
+
+`simulate` takes the same `value`:
+`{"op":"simulate","id":50,"event":"change","value":{"key":"dark","value":false}}`. An unknown
+`key` or a `value` that does not fit the field is `invalid_operation`; a disabled field, or the
+value the field already has, sends nothing.
+
+Left out: custom field elements, reset buttons, group footers and group variants.
+
+`PROTOCOL_VERSION` stays at 1: `Settings` is a new node type, so an older host answers
+`unknown_type` to it and nothing else changes.
+
+The transcript in `conformance/settings.txt` is the reference for its props and events.

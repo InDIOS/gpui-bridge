@@ -49,6 +49,8 @@ pub enum PropKind {
     Commands,
     /// A Command's `items`: sections of `{id, label, ...}` entries (PROTOCOL.md section 21).
     CommandSections,
+    /// A Settings' `pages`: pages of groups of typed fields (PROTOCOL.md section 22).
+    SettingsPages,
 }
 
 impl PropKind {
@@ -72,7 +74,8 @@ impl PropKind {
             | Self::Sections
             | Self::Series
             | Self::Commands
-            | Self::CommandSections => self.check(value).is_ok(),
+            | Self::CommandSections
+            | Self::SettingsPages => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -114,6 +117,8 @@ impl PropKind {
                 .map_err(|err| format!("a list of canvas commands ({err})")),
             Self::CommandSections => crate::components::command::check_items(value)
                 .map_err(|err| format!("a list of command sections ({err})")),
+            Self::SettingsPages => crate::components::settings::check_pages(value)
+                .map_err(|err| format!("a list of settings pages ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -143,6 +148,7 @@ impl PropKind {
             Self::Series => "a list of data points".into(),
             Self::Commands => "a list of canvas command objects".into(),
             Self::CommandSections => "a list of command sections".into(),
+            Self::SettingsPages => "a list of settings pages".into(),
         }
     }
 }
@@ -206,6 +212,8 @@ pub enum NodeType {
     Canvas,
     // Command palette (PROTOCOL.md section 21).
     Command,
+    // Settings pages (PROTOCOL.md section 22).
+    Settings,
 }
 
 impl NodeType {
@@ -259,6 +267,7 @@ impl NodeType {
             "Chart" => Some(Self::Chart),
             "Canvas" => Some(Self::Canvas),
             "Command" => Some(Self::Command),
+            "Settings" => Some(Self::Settings),
             _ => None,
         }
     }
@@ -389,6 +398,7 @@ impl NodeType {
             (Self::Canvas, "commands") => Some(Commands),
             (Self::Command, "items") => Some(CommandSections),
             (Self::Command, "placeholder") => Some(Str),
+            (Self::Settings, "pages") => Some(SettingsPages),
             (
                 Self::Input
                 | Self::Checkbox
@@ -496,6 +506,7 @@ impl NodeType {
             Self::Chart => "Chart",
             Self::Canvas => "Canvas",
             Self::Command => "Command",
+            Self::Settings => "Settings",
         }
     }
 }
@@ -551,6 +562,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::Chart,
     NodeType::Canvas,
     NodeType::Command,
+    NodeType::Settings,
 ];
 
 #[cfg(test)]

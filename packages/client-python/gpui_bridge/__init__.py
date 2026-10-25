@@ -431,6 +431,13 @@ class App:
         `confirm` passes the chosen entry's id."""
         return self._create("Command", props)
 
+    def settings(self, **props) -> Node:
+        """Settings pages: `pages` ([{"title", "icon", "groups": [{"title", "items": [{"key",
+        "label", "description", "type", "value", "options", "min", "max", "step", "disabled"}]}]}]),
+        with `type` one of switch, checkbox, input, dropdown, number. The host keeps each value the
+        user sets; `change` passes {"key", "value"}."""
+        return self._create("Settings", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)

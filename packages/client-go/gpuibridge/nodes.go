@@ -99,3 +99,4 @@ func (a *App) Sidebar(props Props) *Node         { return a.Create("Sidebar", pr
 func (a *App) Chart(props Props) *Node           { return a.Create("Chart", props) }
 func (a *App) Canvas(props Props) *Node          { return a.Create("Canvas", props) }
 func (a *App) Command(props Props) *Node         { return a.Create("Command", props) }
+func (a *App) Settings(props Props) *Node        { return a.Create("Settings", props) }

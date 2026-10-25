@@ -1573,3 +1573,38 @@ transcripciones) y `no_window`, 23 de Node, 20 de React, 23 de Python, `go test 
 y el type-check de los ejemplos. **Pendiente (usuario):** en ventana real, escribir para
 filtrar, flechas y Enter, clic en una entrada, y Escape dentro del diálogo.
 
+### Fase 40 — M10, paso 2: `Settings` (2026-10-25)
+
+`Settings` con la forma aprobada en el plan de M10; `PROTOCOL.md` §22 es la referencia. El
+protocolo sigue en 1.
+
+- **Forma.** `pages: [{title, icon?, groups: [{title?, items: [{key, label, description?, type,
+  value, options?, min?, max?, step?, disabled?}]}]}]`, con `type` en `switch`, `checkbox`,
+  `input`, `dropdown` y `number`; `change` con `value: {key, value}`.
+- **Recortes.** Sin modo `controlled`: el host guarda cada valor que el usuario cambia (como un
+  control sincronizado) y un `setProps` de `pages` lo reemplaza. Fuera también `render`/`element`,
+  el botón de reset, `title_suffix`, `footer` y las variantes de grupo.
+- **Host.** `components/settings.rs` sin slot: el `Settings` de gpui-kit guarda la página
+  elegida y la búsqueda en su propio estado con clave (el id del nodo). La validación rechaza
+  claves repetidas, tipos desconocidos y valores que no encajan con su tipo (un `dropdown` debe
+  tener `options` y su valor estar entre ellas): con un par tipo-valor mal formado gpui-kit
+  haría `expect` o `unimplemented!`. `changed` (compartido con `simulate`) escribe el valor
+  dentro de `pages` y no manda nada si ya era ese valor. Los campos de texto y número guardan el
+  primer *setter* mientras vive su estado, así que el *setter* busca el campo por su posición
+  (página, grupo, campo) al ejecutarse, la misma clave que usa gpui-kit para ese estado.
+- **Clientes.** Node `settings()` con `SettingsPage`, `SettingsGroup`, `SettingsItem`,
+  `SettingsChange` y `SettingsProps`; React `<Settings onChange>` (con test); Python
+  `app.settings(**props)`; Go `App.Settings`.
+- **Ejemplo** `examples/settings.ts`: dos páginas con los cinco tipos, una descripción y un
+  campo deshabilitado; cada cambio muestra su clave y valor.
+- **Ventana real (Windows).** En el ejemplo: iconos de página, desplegable abierto y elegido
+  (`font = "sans"`), cambio de página, descripción y campo deshabilitado atenuado. Con dos
+  `Settings` en la misma ventana cada uno muestra sus propios valores (el estado de los campos
+  no choca); clic en `+` del número (`size` 11), clic en un switch (`dark` true) y escribir
+  `abc` en un campo de texto mandan un `change` por tecla sin que el texto se revierta. Sin
+  pánicos en el stderr (solo el aviso conocido `0x887A002D`).
+
+Verificado: `cargo fmt`, `clippy -D warnings`, 65 tests del host más la conformidad (25
+transcripciones) y `no_window`, 23 de Node, 21 de React, 23 de Python, `go test`, `go vet`,
+`gofmt` y el type-check de los ejemplos.
+

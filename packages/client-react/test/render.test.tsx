@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, Command, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, Command, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -28,7 +28,7 @@ function created(sent: ClientMessage[], type: string) {
   return sent.filter((m): m is Extract<ClientMessage, { op: "create" }> => m.op === "create" && m.type === type);
 }
 
-function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number }; checked?: boolean }) {
+function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
 
@@ -417,6 +417,21 @@ test("Command sends its sections and onConfirm gets the entry id", async () => {
   emit(app, { id: command.id, event: "confirm", value: "quit" });
   await tick();
   assert.deepEqual(got, ["quit"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Settings sends its pages and onChange gets {key, value}", async () => {
+  const got: unknown[] = [];
+  const pages = [{ title: "General", icon: "settings", groups: [{ title: "Look", items: [{ key: "dark", label: "Dark mode", type: "switch" as const, value: true }] }] }];
+  const { app, sent, errors } = await renderRecorded(<Settings pages={pages} class="size-full" onChange={(change) => got.push(change)} />);
+  const [settings] = created(sent, "Settings");
+  assert.deepEqual(settings.props?.pages, pages);
+  assert.equal(settings.props?.controlled, undefined);
+
+  emit(app, { id: settings.id, event: "change", value: { key: "dark", value: false } });
+  await tick();
+  assert.deepEqual(got, [{ key: "dark", value: false }]);
   await app.close();
   assert.deepEqual(errors, []);
 });

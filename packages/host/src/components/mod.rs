@@ -20,6 +20,7 @@ pub mod menu;
 pub mod otp;
 pub mod radio;
 pub mod select;
+pub mod settings;
 pub mod sidebar;
 pub mod slider;
 pub mod switch;

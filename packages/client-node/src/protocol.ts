@@ -54,7 +54,8 @@ export type NodeType =
   | "Sidebar"
   | "Chart"
   | "Canvas"
-  | "Command";
+  | "Command"
+  | "Settings";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -147,7 +148,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -857,6 +858,47 @@ export interface CommandProps {
   class?: string;
 }
 
+/** One field of a `Settings` page; `value` fits `type` (a dropdown's is one of its `options`). */
+export type SettingsItem = {
+  /** Unique across all pages: it is what `change` reports. */
+  key: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+} & (
+  | { type: "switch" | "checkbox"; value: boolean }
+  | { type: "input"; value: string }
+  | { type: "dropdown"; value: string; options: { value: string; label: string }[] }
+  | { type: "number"; value: number; min?: number; max?: number; step?: number }
+);
+
+/** A group of fields, with an optional heading. */
+export interface SettingsGroup {
+  title?: string;
+  items: SettingsItem[];
+}
+
+/** A sidebar entry and the groups shown when it is selected. */
+export interface SettingsPage {
+  title: string;
+  /** A bundled icon name. */
+  icon?: string;
+  groups: SettingsGroup[];
+}
+
+/** What `change` reports: the field the user set and its new value. */
+export interface SettingsChange {
+  key: string;
+  value: boolean | string | number;
+}
+
+export interface SettingsProps {
+  /** The pages: the host keeps each value the user sets (no `controlled` mode). */
+  pages?: SettingsPage[];
+  /** Give it a size (`size-full`, `h-96`): the sidebar and the page split the box. */
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -906,6 +948,7 @@ export interface NodeProps {
   Chart: ChartProps & SharedProps;
   Canvas: CanvasProps & SharedProps;
   Command: CommandProps & SharedProps;
+  Settings: SettingsProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -971,4 +1014,6 @@ export interface NodeEvents {
   Canvas: { pointerDown: { value: CanvasPoint } };
   /** `value` is the `id` of the entry confirmed (Enter or a click). */
   Command: { confirm: { value: string } };
+  /** `value` is the field set by the user and its new value. */
+  Settings: { change: { value: SettingsChange } };
 }

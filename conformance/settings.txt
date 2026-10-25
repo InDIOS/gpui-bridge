@@ -1,0 +1,42 @@
+# Section 22: Settings, its pages of typed fields and its change event.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Settings","props":{"pages":[{"title":"General","icon":"settings","groups":[{"title":"Look","items":[{"key":"dark","label":"Dark mode","type":"switch","value":true},{"key":"lines","label":"Line numbers","type":"checkbox","value":false},{"key":"font","label":"Font","type":"dropdown","value":"mono","options":[{"value":"mono","label":"Mono"},{"value":"sans","label":"Sans"}]}]}]},{"title":"Editor","groups":[{"items":[{"key":"name","label":"Name","type":"input","value":"","description":"Shown in the title"},{"key":"size","label":"Size","type":"number","value":14,"min":8,"max":32},{"key":"soon","label":"Soon","type":"switch","value":false,"disabled":true}]}]}]},"events":["change"]}
+> {"op":"commit"}
+# Each change reports {key, value}; setting the value it already has sends nothing.
+> {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":false}}
+< {"type":"event","id":1,"event":"change","value":{"key":"dark","value":false}}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":false}}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"font","value":"sans"}}
+< {"type":"event","id":1,"event":"change","value":{"key":"font","value":"sans"}}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"name","value":"Ada"}}
+< {"type":"event","id":1,"event":"change","value":{"key":"name","value":"Ada"}}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"size","value":16}}
+< {"type":"event","id":1,"event":"change","value":{"key":"size","value":16}}
+# A disabled field sends nothing; an unknown key or a value that does not fit is an error.
+> {"op":"simulate","id":1,"event":"change","value":{"key":"soon","value":true}}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"nope","value":true}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":"on"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"font","value":"serif"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":1,"event":"change","value":"dark"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# Malformed pages are rejected and the operation is not applied (props are checked on commit).
+> {"op":"setProps","id":1,"props":{"pages":[{"title":"P"}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"pages":[{"title":"P","groups":[{"items":[{"key":"a","label":"A","type":"slider","value":1}]}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"pages":[{"title":"P","groups":[{"items":[{"key":"a","label":"A","type":"switch","value":"on"}]}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"pages":[{"title":"P","groups":[{"items":[{"key":"a","label":"A","type":"switch","value":true},{"key":"a","label":"B","type":"switch","value":true}]}]}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"commit"}
+# The rejected setProps left the old pages, with the values the user set: "dark" is false now.
+> {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":true}}
+< {"type":"event","id":1,"event":"change","value":{"key":"dark","value":true}}
+# Without the opt-in, a change sends nothing.
+> {"op":"setEvents","id":1,"events":[]}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"change","value":{"key":"dark","value":false}}

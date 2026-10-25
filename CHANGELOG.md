@@ -19,6 +19,10 @@ Versions are lockstep across the host and the three clients; the protocol has it
   `keywords` and `checked`); it filters by the query itself and reports `confirm` with the
   entry's `id` (PROTOCOL.md §21). Inside a `Dialog` it is a modal palette. `command()` in Node,
   `<Command onConfirm>` in React, `app.command()` in Python and `App.Command` in Go.
+- New node `Settings`: pages of grouped fields (`switch`, `checkbox`, `input`, `dropdown`,
+  `number`) with a searchable sidebar; the host keeps each value the user sets and reports
+  `change` with `{key, value}` (PROTOCOL.md §22). `settings()` in Node, `<Settings onChange>` in
+  React, `app.settings()` in Python and `App.Settings` in Go.
 
 ## 0.2.0 — first public release
 

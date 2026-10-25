@@ -178,6 +178,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Alert, "close")
             | (NodeType::Canvas, "pointerDown")
             | (NodeType::Command, "confirm")
+            | (NodeType::Settings, "change")
     );
     if !known {
         return Err(fail(
@@ -614,6 +615,33 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             };
             if !spec.disabled {
                 components::command::confirmed(tree, id, &entry);
+            }
+        }
+        // A field of Settings, as `{key, value}`: an unknown key or a value that does not fit the
+        // field is an error; a disabled field does nothing.
+        (NodeType::Settings, "change") => {
+            let given = sim.value.as_ref();
+            let key = given.and_then(|v| v.get("key")).and_then(Value::as_str);
+            let (Some(key), Some(value)) = (key, given.and_then(|v| v.get("value"))) else {
+                return Err(fail(
+                    ErrorCode::InvalidJson,
+                    "'change' needs a 'value' with 'key' and 'value'".into(),
+                ));
+            };
+            let Some((path, spec)) = components::settings::find(node, key) else {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no field '{key}'"),
+                ));
+            };
+            if !components::settings::fits(spec, value) {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("{value} does not fit the field '{key}'"),
+                ));
+            }
+            if spec.get("disabled") != Some(&Value::Bool(true)) {
+                components::settings::changed(tree, id, path, value.clone());
             }
         }
         (NodeType::Input | NodeType::NumberInput, "submit") => {
