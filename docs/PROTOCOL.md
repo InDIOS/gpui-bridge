@@ -1096,8 +1096,8 @@ content is data in props and it takes no children.
   query is not reported. Up and down move the highlight, Enter or a click confirms it.
 - `confirm` (opt-in) reports the confirmed entry's `id`. A palette holds no value: nothing is
   kept in the host, and a disabled entry cannot be confirmed.
-- A modal palette is a `Command` inside a `Dialog` (section 14): Escape with an empty query
-  reaches the dialog, which closes and sends its `cancel`.
+- A modal palette is a `Command` inside a `Dialog` (section 14): Escape first clears the query,
+  and with an empty query it reaches the dialog, which closes and sends its `cancel`.
 
 ```json
 {"type":"event","id":40,"event":"confirm","value":"quit"}

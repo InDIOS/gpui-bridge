@@ -153,7 +153,7 @@ el mismo cambio, prueba en ventana real y anotación en HISTORIAL.md.
 |---|---|---|---|
 | **1** | `Tree`, `Diff`, `Carousel` — **hecha (2026-10-21)** | Los tres son datos + un slot; no tocan el modelo. Mejor relación valor/riesgo | props validadas (incluidos árboles y el patch), selección/expansión reaplicadas tras reconstruir, transcripciones propias, ejemplo y ventana real |
 | **2** | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`) — **hecha (2026-10-21)** | Datos con más estructura; `Chart` se puede partir por tipo de gráfico | props validadas, transcripción `charts.txt`, ejemplo `dashboard.ts` con 1000 puntos y un árbol de 10 niveles, y ventana real |
-| **3** | `Command`, `Settings` | Necesitan un mini-lenguaje de datos (como `Table`) y una paleta modal | igual, más `query`/filtrado y `change` con `{key, value}` |
+| **3** | `Command` (**hecho**, M10 paso 1, `PROTOCOL.md` §21), `Settings` | Necesitan un mini-lenguaje de datos (como `Table`) y una paleta modal | igual, más `query`/filtrado y `change` con `{key, value}` |
 | **4** | `List` | Solo si hace falta lo que `VirtualList` no da (secciones, búsqueda integrada, carga incremental) | delegate genérico probado con 10 000 filas y árbol profundo |
 | **5** | `Dock` | Requiere un ADR antes de escribir código | ADR aprobado; después, lo mismo que las demás tandas + persistencia del layout |
 
@@ -194,6 +194,6 @@ normales, `change` desde el padre). El del piloto quedó en `PROTOCOL.md` §15.
 - `src/setting/page.rs`, `src/setting/settings.rs` — `Settings::pages([SettingPage…])`.
 - `src/dock/panel.rs` — `pub trait Panel: gpui_base::dock::Panel`.
 
-No implementado todavía: `Command`, `Settings`, `List` y `Dock`, que son las tandas 3–5 (la lista
+No implementado todavía: `Settings`, `List` y `Dock` (`Command` se hizo en M10), que son las tandas 3–5 (la lista
 de tipos de nodo es ya la de PROTOCOL.md §5, 42 tipos).
 
