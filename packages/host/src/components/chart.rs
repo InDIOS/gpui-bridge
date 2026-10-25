@@ -65,7 +65,7 @@ pub const COLORS: &[&str] = &[
     "info",
 ];
 
-fn color(theme: &Theme, name: &str) -> Hsla {
+pub fn color(theme: &Theme, name: &str) -> Hsla {
     match name {
         "chart-2" => theme.chart_2,
         "chart-3" => theme.chart_3,

@@ -8,6 +8,7 @@ pub mod accordion;
 pub mod basic;
 pub mod button;
 pub mod calendar;
+pub mod canvas;
 pub mod carousel;
 pub mod chart;
 pub mod checkbox;

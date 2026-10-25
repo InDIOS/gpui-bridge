@@ -419,6 +419,12 @@ class App:
         `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`). It has no events."""
         return self._create("Chart", props)
 
+    def canvas(self, **props) -> Node:
+        """A canvas: `commands`, painted in order ({"op": "rect", x, y, w, h, color,
+        corner_radius}, {"op": "line", x1, y1, x2, y2, color, width}, {"op": "path", d, color,
+        width}). `pointerDown` passes the local point ({"x", "y"})."""
+        return self._create("Canvas", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)

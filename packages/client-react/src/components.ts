@@ -394,3 +394,7 @@ export const Sidebar = "Sidebar" as unknown as HostComponent<SidebarProps>;
 /** A line, bar or pie chart of the points in `data`; it has no events of its own. */
 export type ChartProps = NodeProps["Chart"];
 export const Chart = "Chart" as unknown as HostComponent<ChartProps>;
+
+/** Paints the drawing commands in `commands`; `onPointerDown` gets the local point. */
+export type CanvasProps = NodeProps["Canvas"] & { onPointerDown?: (point: { x: number; y: number }) => void };
+export const Canvas = "Canvas" as unknown as HostComponent<CanvasProps>;

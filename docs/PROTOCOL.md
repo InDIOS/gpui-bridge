@@ -206,6 +206,7 @@ Rules:
 | `Carousel` | `value`, `axis` (`horizontal`, `vertical`), `looping`, `controls`, `pagination`, `controlled`, `class` | `change` |
 | `Sidebar`  | `items`, `value`, `collapsed`, `collapsible` (`icon`, `offcanvas`, `none`), `side` (`left`, `right`), `controlled`, `class` | `change` |
 | `Chart`    | `chart` (`line`, `bar`, `pie`), `data`, `color`, `name`, `curve` (`linear`, `natural`, `step`), `dot`, `horizontal`, `xAxis`, `xTicks`, `yAxis`, `yTicks`, `grid`, `yMin`, `yMax`, `innerRadius`, `padAngle`, `interactive`, `class` | — |
+| `Canvas`   | `commands`, `class` | `pointerDown` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -1008,3 +1009,58 @@ chart. Neither adds dependencies and both are props-only for the client.
   a bounded size in `class` (`h-56 w-full`, `h-64 flex-1`).
 
 The transcript in `conformance/charts.txt` is the reference for their props and events.
+
+
+## 20. Canvas
+
+A node the client draws into: it takes a list of drawing commands in `commands` and the
+host paints them with GPUI's paint API (`paint_quad`, `paint_path`). It has no children;
+its content is the list.
+
+```json
+{
+  "op": "create", "id": 10, "type": "Canvas",
+  "props": {
+    "class": "h-64 w-full",
+    "commands": [
+      { "op": "rect", "x": 10, "y": 10, "w": 100, "h": 60, "color": "primary", "corner_radius": 8 },
+      { "op": "line", "x1": 0, "y1": 0, "x2": 200, "y2": 200, "color": "danger", "width": 2 },
+      { "op": "path", "d": "M10 10 L90 10 L90 90 Z", "color": "chart-2", "width": 3 }
+    ]
+  },
+  "events": ["pointerDown"]
+}
+```
+
+| `op`   | Draws            | Required fields        | Optional fields                  |
+|--------|------------------|------------------------|----------------------------------|
+| `rect` | Filled rectangle | `x`, `y`, `w`, `h`     | `color`, `corner_radius` (0)     |
+| `line` | Straight line    | `x1`, `y1`, `x2`, `y2` | `color`, `width` (1)             |
+| `path` | Stroked path     | `d`                    | `color`, `width` (1)             |
+
+- Coordinates are logical pixels from the top-left corner of the `Canvas`. Commands paint in
+  order, so later ones cover earlier ones. Whatever falls outside the canvas is clipped.
+- `d` takes absolute `M x y`, `L x y` and `Z`, separated by spaces or commas (`M10,10L90 10Z`).
+  It starts with `M`. Other SVG commands are not supported.
+- `color` names a theme color, like a Chart's: `chart-1` (the default) to `chart-5`, `primary`,
+  `secondary`, `muted`, `accent`, `danger`, `success`, `warning`, `info`. The host resolves it
+  against the current theme, so light, dark and custom themes come for free.
+- `class` works like on any node; give the canvas a bounded size (`h-64 w-full`).
+- `setProps` replaces the whole list; `null` removes it.
+- A malformed command (unknown `op`, a missing or mistyped field, a negative `w`, `h`,
+  `corner_radius` or `width`, an unknown color, bad `d`) is `invalid_props` and the operation
+  is not applied.
+
+`pointerDown` (opt-in) is a left-button press on the canvas. Its `value` is the point,
+local to the canvas, in the same coordinates as the commands:
+
+```json
+{"type":"event","id":10,"event":"pointerDown","value":{"x":14.0,"y":23.5}}
+```
+
+`simulate` takes the same `value`: `{"op":"simulate","id":10,"event":"pointerDown","value":{"x":14,"y":23.5}}`.
+
+`PROTOCOL_VERSION` stays at 1: `Canvas` is a new node type, so an older host answers
+`unknown_type` to it and nothing else changes.
+
+The transcript in `conformance/canvas.txt` is the reference for its props and events.

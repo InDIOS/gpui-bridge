@@ -176,6 +176,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Sidebar, "change")
             | (NodeType::Div | NodeType::MenuBar, "menu")
             | (NodeType::Alert, "close")
+            | (NodeType::Canvas, "pointerDown")
     );
     if !known {
         return Err(fail(
@@ -223,6 +224,16 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
     match (node_type, sim.event.as_str()) {
         (NodeType::Div | NodeType::Button, "click") => components::clicked(tree, id),
         (NodeType::Alert, "close") => components::alert_closed(tree, id),
+        (NodeType::Canvas, "pointerDown") => {
+            let coord = |key| sim.value.as_ref()?.get(key)?.as_f64();
+            let (Some(x), Some(y)) = (coord("x"), coord("y")) else {
+                return Err(fail(
+                    ErrorCode::InvalidJson,
+                    "'pointerDown' needs {\"x\", \"y\"} numbers in 'value'".into(),
+                ));
+            };
+            components::canvas::pointer_down(tree, id, x, y);
+        }
         // The second click of a double click: it sends `click` too.
         (NodeType::Div, "doubleClick") => {
             components::clicked(tree, id);

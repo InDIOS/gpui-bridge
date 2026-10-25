@@ -52,7 +52,8 @@ export type NodeType =
   | "Diff"
   | "Carousel"
   | "Sidebar"
-  | "Chart";
+  | "Chart"
+  | "Canvas";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -145,7 +146,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -807,6 +808,26 @@ export interface ChartProps {
   class?: string;
 }
 
+/** One drawing command of a `Canvas` (PROTOCOL.md section 20), in logical pixels from its top-left corner. */
+export type CanvasCommand =
+  | { op: "rect"; x: number; y: number; w: number; h: number; color?: ChartColor; corner_radius?: number }
+  | { op: "line"; x1: number; y1: number; x2: number; y2: number; color?: ChartColor; width?: number }
+  /** `d` takes absolute `M x y`, `L x y` and `Z` only. */
+  | { op: "path"; d: string; color?: ChartColor; width?: number };
+
+/** A point local to a `Canvas`, in the same coordinates as its commands. */
+export interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+export interface CanvasProps {
+  /** Painted in order; `setProps` replaces the whole list. */
+  commands?: CanvasCommand[];
+  /** Give it a bounded box (`h-64 w-full`). */
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -854,6 +875,7 @@ export interface NodeProps {
   Carousel: CarouselProps & SharedProps;
   Sidebar: SidebarProps & SharedProps;
   Chart: ChartProps & SharedProps;
+  Canvas: CanvasProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -915,4 +937,6 @@ export interface NodeEvents {
   Sidebar: { change: { value: string } };
   /** A chart has no events: the hover tooltip is the component's own. */
   Chart: {};
+  /** `value` is the point pressed, local to the canvas. */
+  Canvas: { pointerDown: { value: CanvasPoint } };
 }

@@ -12,6 +12,9 @@ Versions are lockstep across the host and the three clients; the protocol has it
   modules are source only, so a Go program downloads its host from there.
 - PROTOCOL.md: a rejected `create` leaves no node (§4); what a client checks against the
   transcripts (§9).
+- New node `Canvas`: the client draws with `rect`, `line` and `path` commands in theme colors, and
+  gets `pointerDown` with the point local to the canvas (PROTOCOL.md §20). `canvas()` in Node,
+  `<Canvas onPointerDown>` in React, `app.canvas()` in Python and `App.Canvas` in Go.
 
 ## 0.2.0 — first public release
 

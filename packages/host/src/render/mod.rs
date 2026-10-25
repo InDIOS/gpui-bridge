@@ -29,7 +29,8 @@ use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, checkbox, layout, menu, radio, sidebar, switch, tabs, tree,
+    self, accordion, basic, button, canvas, checkbox, layout, menu, radio, sidebar, switch, tabs,
+    tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -874,6 +875,7 @@ impl RenderCx<'_> {
             NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Sidebar => self.sidebar_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
@@ -891,6 +893,7 @@ impl RenderCx<'_> {
                         | NodeType::Carousel
                         | NodeType::Sidebar
                         | NodeType::Chart
+                        | NodeType::Canvas
                 ) =>
             {
                 a11y::wrap(&spec, id, element)
@@ -1103,6 +1106,17 @@ impl RenderCx<'_> {
             }
             None => div().into_any_element(),
         }
+    }
+
+    fn canvas_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let element = canvas::build(id, node, self.theme, self.session);
+        self.component_a11y(id, element, classes, a11y)
     }
 
     fn div_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {

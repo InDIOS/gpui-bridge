@@ -45,6 +45,8 @@ pub enum PropKind {
     Sections,
     /// A Chart's `data`: `{label, value}` points.
     Series,
+    /// A Canvas's `commands`: a list of drawing command objects (PROTOCOL.md section 20).
+    Commands,
 }
 
 impl PropKind {
@@ -66,7 +68,8 @@ impl PropKind {
             | Self::TreeItems
             | Self::Patch
             | Self::Sections
-            | Self::Series => self.check(value).is_ok(),
+            | Self::Series
+            | Self::Commands => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -104,6 +107,8 @@ impl PropKind {
                 .map_err(|err| format!("a list of sidebar sections ({err})")),
             Self::Series => crate::components::chart::check_data(value)
                 .map_err(|err| format!("a list of data points ({err})")),
+            Self::Commands => crate::components::canvas::check_commands(value)
+                .map_err(|err| format!("a list of canvas commands ({err})")),
             _ if self.accepts(value) => Ok(()),
             _ => Err(self.describe()),
         }
@@ -131,6 +136,7 @@ impl PropKind {
             Self::Patch => "a unified diff string".into(),
             Self::Sections => "a list of sidebar sections".into(),
             Self::Series => "a list of data points".into(),
+            Self::Commands => "a list of canvas command objects".into(),
         }
     }
 }
@@ -190,6 +196,8 @@ pub enum NodeType {
     // Data components (PROTOCOL.md section 19).
     Sidebar,
     Chart,
+    // Canvas (PROTOCOL.md section 20).
+    Canvas,
 }
 
 impl NodeType {
@@ -241,6 +249,7 @@ impl NodeType {
             "Carousel" => Some(Self::Carousel),
             "Sidebar" => Some(Self::Sidebar),
             "Chart" => Some(Self::Chart),
+            "Canvas" => Some(Self::Canvas),
             _ => None,
         }
     }
@@ -368,6 +377,7 @@ impl NodeType {
             }
             (Self::Chart, "yMin" | "yMax" | "innerRadius" | "padAngle") => Some(Number),
             (Self::Chart, "xTicks" | "yTicks") => Some(Index),
+            (Self::Canvas, "commands") => Some(Commands),
             (
                 Self::Input
                 | Self::Checkbox
@@ -473,6 +483,7 @@ impl NodeType {
             Self::Carousel => "Carousel",
             Self::Sidebar => "Sidebar",
             Self::Chart => "Chart",
+            Self::Canvas => "Canvas",
         }
     }
 }
@@ -526,6 +537,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::Carousel,
     NodeType::Sidebar,
     NodeType::Chart,
+    NodeType::Canvas,
 ];
 
 #[cfg(test)]

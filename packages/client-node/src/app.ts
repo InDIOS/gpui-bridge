@@ -541,6 +541,11 @@ export class App {
     return this.create("Chart", props);
   }
 
+  /** Paints the drawing commands in `commands`; `pointerDown` with the local point. */
+  canvas(props: NodeProps["Canvas"] = {}) {
+    return this.create("Canvas", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

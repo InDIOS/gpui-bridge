@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -28,7 +28,7 @@ function created(sent: ClientMessage[], type: string) {
   return sent.filter((m): m is Extract<ClientMessage, { op: "create" }> => m.op === "create" && m.type === type);
 }
 
-function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" }; checked?: boolean }) {
+function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
 
@@ -385,6 +385,24 @@ test("Sidebar and Chart render with their props and report plain values", async 
   await tick();
   assert.deepEqual(got, [["sidebar", "theme"]]);
   assert.ok(sent.some((m) => m.op === "setProps" && m.id === sidebar.id && m.props.value === "theme"));
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("Canvas sends its commands and onPointerDown gets the local point", async () => {
+  const got: unknown[] = [];
+  const commands = [
+    { op: "rect", x: 10, y: 10, w: 100, h: 60, color: "primary", corner_radius: 8 },
+    { op: "line", x1: 0, y1: 0, x2: 200, y2: 200, width: 2 },
+    { op: "path", d: "M10 10 L90 10 L90 90 Z", color: "chart-2" },
+  ] as const;
+  const { app, sent, errors } = await renderRecorded(<Canvas class="h-64 w-full" commands={[...commands]} onPointerDown={(point) => got.push(point)} />);
+  const [canvas] = created(sent, "Canvas");
+  assert.deepEqual(canvas.props?.commands, commands);
+
+  emit(app, { id: canvas.id, event: "pointerDown", value: { x: 14, y: 23.5 } });
+  await tick();
+  assert.deepEqual(got, [{ x: 14, y: 23.5 }]);
   await app.close();
   assert.deepEqual(errors, []);
 });

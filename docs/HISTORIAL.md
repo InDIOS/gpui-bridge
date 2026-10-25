@@ -1505,3 +1505,39 @@ Verificado: `gofmt`, `go vet`, `go test -race` (con el host real sin ventana), e
 README compilado contra el módulo local, el script de renombrado de hosts con artefactos
 simulados y el contador en ventana real (el usuario). No verificado: el job `github` de
 `release.yml` (corre con el próximo tag) y la licencia en pkg.go.dev.
+
+### Fase 38 — M9: `Canvas` (2026-10-25)
+
+Nodo `Canvas`: el cliente manda una lista de comandos de dibujo en `commands` y el host los pinta
+con `paint_quad` y `PathBuilder::stroke` de GPUI. El protocolo sigue en 1: un host viejo responde
+`unknown_type` y nada más cambia. Spike y decisión en `docs/adr/0002-canvas.md`; la referencia es
+`PROTOCOL.md` §20.
+
+- **Spike.** El tiempo por commit no cambia de 10 a 5000 comandos, ni enviando la lista entera
+  ni enviando un parche (~21 ms en todos los casos, el mismo que un commit vacío), así que se
+  envía la lista entera. Un parche se puede añadir después sin romper el protocolo.
+- **Alcance recortado** (aprobado por el usuario, ADR §6.1). Comandos `rect`, `line` y `path`
+  (`d` solo con `M`, `L` y `Z` absolutos) y el evento `pointerDown`, cuyo `value` es `{x, y}`
+  local al lienzo; `simulate` toma el mismo `value`. Quedan fuera `text` (hay que dar forma al
+  texto), `image` (hay que cargarla), `pointerMove`, `pointerUp` y `click`.
+- **Host.** `components/canvas.rs` valida y pinta los comandos. Comparte los colores con `Chart`
+  (`chart-1`…`chart-5` y los del tema). Un comando malformado (`op` desconocido, campo que falta
+  o tiene otro tipo, tamaño o grosor negativo, número que no cabe en f32, color desconocido, `d`
+  inválido) es `invalid_props`. `class` y `a11y` pasan por `component_a11y`, como en `Chart`.
+  `conformance/canvas.txt` cubre las props, los errores y el evento.
+- **Clientes.** Node `canvas()` con los tipos `CanvasCommand`, `CanvasProps` y `CanvasPoint`;
+  React `<Canvas onPointerDown>`; Python `app.canvas(**props)`; Go `App.Canvas` (su test de
+  conformidad ya recorre `canvas.txt`).
+- **Ejemplo** `examples/canvas.ts`: dibuja con los tres comandos, y cada clic añade un cuadrado
+  y muestra `x, y`. Con `--stress N` añade N cuadrados (5000 por defecto).
+- **Ventana real (Windows).** Las coordenadas locales son correctas (un clic en la esquina da
+  `x 1, y 2`) y `class` da el tamaño. La prueba encontró un fallo: no se recortaba lo pintado
+  fuera del lienzo. Se arregló con `window.with_content_mask`. Con 5000 comandos, cada clic
+  reenvía unos 290 KB de JSON y no se nota retraso. Se probó a ojo, sin medir los cuadros del
+  host, porque el resultado no cambiaba ninguna decisión.
+- Las coordenadas de `pointerDown` salen de un f32 (`23.299999237`). No se redondean porque
+  ningún cliente compara coordenadas exactas.
+
+Verificado: `cargo fmt --check`, `clippy -D warnings`, 61 tests del host más la conformidad y
+`no_window`, 23 de Node, 19 de React, 23 de Python y `go test -race`. El ejemplo se probó en ventana real en
+Windows, también con 5000 comandos. No verificado: macOS y Linux en ventana real (como en M5).

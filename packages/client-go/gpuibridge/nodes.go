@@ -97,3 +97,4 @@ func (a *App) Diff(props Props) *Node            { return a.Create("Diff", props
 func (a *App) Carousel(props Props) *Node        { return a.Create("Carousel", props) }
 func (a *App) Sidebar(props Props) *Node         { return a.Create("Sidebar", props) }
 func (a *App) Chart(props Props) *Node           { return a.Create("Chart", props) }
+func (a *App) Canvas(props Props) *Node          { return a.Create("Canvas", props) }
