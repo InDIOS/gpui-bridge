@@ -1,7 +1,7 @@
 // Payload bench: sends one large value in a single protocol line, the way a base64 image (path
-// `d`) would travel today, and stays alive so bench/run.ps1 can sample the host's memory.
+// `d`) would travel today, and stays alive so benchmarks/run.ps1 can sample the host's memory.
 //
-//   node bench/payload.mjs <rawBytes> <baseline|retained|cleared|path|image> [imagePath]
+//   node benchmarks/payload.mjs <rawBytes> <baseline|retained|cleared|path|image> [imagePath]
 //
 //   baseline  a one-character value, to measure the host with no payload
 //   retained  a base64 value of `rawBytes`, kept in the tree (the worst case for path `d`)
@@ -12,13 +12,13 @@
 //
 // Known bias: `Input.value` is a string the node keeps *and lays out as text*, so `retained`
 // measures text shaping more than transport. Read those rows together with
-// `bench/payload-micro.mjs` (the encoding floor) and with `image` (the decode cost).
+// `benchmarks/payload-micro.mjs` (the encoding floor) and with `image` (the decode cost).
 
 import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createApp } from "../client-node/dist/index.js";
+import { createApp } from "../packages/client-node/dist/index.js";
 
 const raw = Number(process.argv[2] ?? 65536);
 const mode = process.argv[3] ?? "baseline";

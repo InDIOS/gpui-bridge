@@ -1609,3 +1609,36 @@ transcripciones) y `no_window`, 23 de Node, 21 de React, 23 de Python, `go test`
 `gofmt` y el type-check de los ejemplos. **Probado a mano por el usuario** (2026-10-25) en
 `node examples/settings.ts`: búsqueda, los cinco campos y el campo deshabilitado.
 
+### Fase 41 — M10, paso 3: rendimiento con el host release (2026-10-25)
+
+Mismo método que la medición del 2026-10-19 (Windows, Intel Iris Xe), ahora con el host
+**release** recién compilado. Los números van resumidos al README.
+
+- **Arreglos de los scripts.** Desde el paso a `packages/`, `tree.mjs` buscaba el host en
+  `host/target/debug` y `render.mjs`/`payload.mjs` importaban `../client-node/dist`: ninguno
+  corría. `sample.ps1 -Log` no mostraba los cuadros/s porque el cliente Node reenvía el stderr del
+  host solo con `debug`; ahora le pasa `--debug` a `render.mjs`. Los comentarios decían `bench/`.
+
+**Aplicar el árbol** (`benchmarks/tree.mjs`, `host --no-window`, tres corridas):
+
+| nodos | stringify ms | flush ms | apply ms (release) | apply ms (debug, 10-19) |
+|---|---|---|---|---|
+| 0 | 0,0 | 0,6 | 0,0–0,1 | 0,5 |
+| 1 000 | 0,3–0,4 | 2,1–2,5 | 3,1–3,2 | 24,5 |
+| 10 000 | 3,5–3,9 | 13,6–14,7 | 19,5–21,9 | 244,7 |
+| 50 000 | 16,0–19,9 | 62,8–73,0 | 101,0–107,2 | 1 269,3 |
+
+**Dibujo** (`benchmarks/sample.ps1 -Log`, 5 s de muestra tras `READY`):
+
+| caso | rss MB | cpu % | cuadros/s | pasada propia |
+|---|---|---|---|---|
+| 200 nodos + spinner (control) | 71 | 11,6–13,4 | 57–60 | 0,21–0,26 ms |
+| 20 000 nodos + spinner (2 corridas) | 275–278 | 99,1–100,6 | 11,9–12,7 | 9,5–10,2 ms |
+| 20 000 nodos en reposo | 327 | 0,9 | — | — |
+
+- El host aplica el árbol entre 8 y 12 veces más rápido que en debug: 50 000 nodos en ~0,1 s.
+- Con 20 000 nodos y algo animado, la pasada propia (~10 ms) es una octava parte del cuadro
+  (~80 ms a 12 cuadros/s): el resto es el layout y el pintado de GPUI. Sigue siendo el atajo de
+  la medición anterior (cada cuadro recorre la ventana entera); la salida para listas largas es
+  `VirtualList`/`Table`.
+

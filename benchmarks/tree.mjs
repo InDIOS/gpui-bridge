@@ -1,12 +1,12 @@
 // Transport and tree-apply bench. Talks to `host --no-window` directly, so it measures the
 // channel and the host with the client library's encoding out of the way.
 //
-//   node bench/tree.mjs [1000 10000 50000]      (default: 0 1000 10000 50000)
+//   node benchmarks/tree.mjs [1000 10000 50000]      (default: 0 1000 10000 50000)
 //
 // For each size it creates N divs under a clickable root, commits, and measures the round trip
 // of a `simulate` click. The same round trip is measured right after, with the host idle: the
 // difference is the cost of parsing and applying N nodes. Nothing is rendered (`--no-window`),
-// so this says nothing about drawing; `bench/render.mjs` covers that.
+// so this says nothing about drawing; `benchmarks/render.mjs` covers that.
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -15,9 +15,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
-const host = process.env.GPUI_BRIDGE_HOST ?? join(here, "..", "host", "target", "debug", exe);
+const host = process.env.GPUI_BRIDGE_HOST ?? join(here, "..", "target", "debug", exe);
 if (!existsSync(host)) {
-  console.error(`no host at ${host}; build it (cargo build in host/) or set GPUI_BRIDGE_HOST`);
+  console.error(`no host at ${host}; build it (cargo build) or set GPUI_BRIDGE_HOST`);
   process.exit(1);
 }
 
