@@ -573,7 +573,8 @@ with exactly those modifiers.
   (Escape, arrows, Enter); the Input still handles them.
 - `doubleClick` (opt-in) on a `div` is sent on the second click of a double click; both
   clicks also send `click`.
-- `focus` gives the keyboard focus to an `Input`, a `Textarea`, a `Table` or a `div` with `keyDown`,
+- `focus` gives the keyboard focus to an `Input`, a `Textarea`, a `NumberInput`, an `OtpInput`, a
+  `Calendar`, a `Tree`, a `Table`, a `Command` (its search field) or a `div` with `keyDown`,
   once the commit is applied and its window is showing. Another type is `invalid_operation`.
 - Not supported: system-wide shortcuts (when the app is not focused), key up events, and
   focus or blur events.
@@ -793,6 +794,13 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
   themselves as best they can (a `Checkbox`'s label, for example) and take `a11y` for the rest.
+- Do not repeat the role a component already reports: an `Input` is a text field named by its
+  `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
+  that has no label of its own (a `Slider`, a `Select`, a `RadioGroup`, a `Progress`), give
+  `a11y` the `group` role and a `label`.
+- Keyboard reach depends on gpui-component: `Slider`, `Rating`, `Accordion`, `Tabs`, `Select`,
+  `Pagination` and `Calendar` take no Tab stop and no keys, so a keyboard-only user cannot reach
+  them (a screen reader's own navigation still reads their `a11y`).
 
 ## 17. Basic, Form, Layout and Advanced components
 

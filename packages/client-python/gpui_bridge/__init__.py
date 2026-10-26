@@ -115,7 +115,7 @@ class Node:
         return self
 
     def focus(self) -> "Node":
-        """Gives the node the keyboard focus on the next commit (an Input, a Textarea or a div with keyDown)."""
+        """Gives the node the keyboard focus on the next commit (an Input, a Textarea, a Command, a div with keyDown…)."""
         self._app._pending.append({"op": "focus", "id": self.id})
         return self
 

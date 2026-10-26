@@ -406,6 +406,8 @@ impl RootView {
                 handle.focus(window, cx);
             } else if let Some(slot) = self.tables.get(&id) {
                 slot.focus(window, cx);
+            } else if let Some(slot) = self.commands.get(&id) {
+                slot.focus(window, cx);
             }
             self.session
                 .update(cx, |session, _| session.tree.clear_focus_request());

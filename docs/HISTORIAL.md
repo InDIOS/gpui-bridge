@@ -1686,27 +1686,65 @@ se abre con Ctrl+Win+Enter; NVDA se cierra con Insert+Q. Lanzar cada ejemplo con
 
 | # | ejemplo | acción | debería oírse (según el árbol) | se oyó |
 |---|---|---|---|---|
-| 1 | `components` | abrir la ventana | «Components», ventana; ¿anuncia la alerta? | |
-| 2 | `components` | Tab hasta `Rating`, flecha derecha | «Rating, control deslizante, 3»; ¿cambia el número? (hallazgo 9: no debería) | |
-| 3 | `components` | Tab por la paginación | «1», «2»…; ¿qué dice en anterior/siguiente? (hallazgo 4) | |
-| 4 | `components` | Tab hasta las pestañas, flechas | «Sections»; «Files, pestaña, seleccionada»; ¿«History» como no disponible? | |
-| 5 | `components` | Tab hasta el acordeón, Enter | ¿lee el título? ¿expandido/contraído? (hallazgo 6) | |
-| 6 | `components` | Tab hasta los radios, flechas | «Free»/«Pro», botón de opción, ¿marcado? | |
-| 7 | `components` | Tab hasta el campo | «Your name, edición»; ¿una vez o dos? (hallazgo 8) | |
-| 8 | `components` | buscar el calendario | ¿llega el foco? ¿dice «Start date»? (hallazgo 11) | |
-| 9 | `forms` | Espacio en Wi-Fi | «Wi-Fi», activado/desactivado al cambiar | |
-| 10 | `forms` | Tab por el combo y el slider | ¿sin nombre? ¿lee el valor al moverlo? (hallazgo 10) | |
-| 11 | `command` | foco en la búsqueda, flechas abajo | «Type a command or search…»; ¿lee cada entrada? (hallazgo 1) | |
-| 12 | `command` | escribir «sa», Enter | ¿lee «Save» al filtrar? ¿algo al confirmar? | |
-| 13 | `command` | botón «Open palette in a dialog» | ¿anuncia diálogo? ¿el foco entra en la búsqueda? (hallazgo 2) | |
-| 14 | `command` | Escape dos veces dentro del diálogo | la primera borra la búsqueda; la segunda cierra; ¿el foco vuelve al botón? | |
-| 15 | `settings` | abrir la ventana, Tab | «Search…», «General», «Editor» como elementos de árbol | |
-| 16 | `settings` | Espacio en «Dark mode» y en «Check automatically» | estado nuevo al cambiar | |
-| 17 | `settings` | Tab hasta «Beta channel» | ¿no disponible? ¿lee «Coming soon»? | |
-| 18 | `settings` | Enter en «Font: Monospace», flechas | ¿anuncia que abre una lista? (hallazgo 3) | |
-| 19 | `settings` | página «Editor»: «Font size» y «Project name» | número con su valor (8–32) y campo de texto con «demo» | |
+| 1 | `components` | abrir la ventana | «Components», ventana; ¿anuncia la alerta? | si |
+| 2 | `components` | Tab hasta `Rating`, flecha derecha | «Rating, control deslizante, 3»; ¿cambia el número? (hallazgo 9: no debería) | no, el tab no llega al rating y por ende no dice nada |
+| 3 | `components` | Tab por la paginación | «1», «2»…; ¿qué dice en anterior/siguiente? (hallazgo 4) | en todos los botones q no tienen un numero solo dice "botton" |
+| 4 | `components` | Tab hasta las pestañas, flechas | «Sections»; «Files, pestaña, seleccionada»; ¿«History» como no disponible? | el tab solo seleccion el boton dentro de la pestaña Files, lo demas no se selecciona |
+| 5 | `components` | Tab hasta el acordeón, Enter | ¿lee el título? ¿expandido/contraído? (hallazgo 6) | tab no lo selecciona |
+| 6 | `components` | Tab hasta los radios, flechas | «Free»/«Pro», botón de opción, ¿marcado? | si |
+| 7 | `components` | Tab hasta el campo | «Your name, edición»; ¿una vez o dos? (hallazgo 8) | solo dice "Component's region" |
+| 8 | `components` | buscar el calendario | ¿llega el foco? ¿dice «Start date»? (hallazgo 11) | no |
+| 9 | `forms` | Espacio en Wi-Fi | «Wi-Fi», activado/desactivado al cambiar | solo dice "Space" |
+| 10 | `forms` | Tab por el combo y el slider | ¿sin nombre? ¿lee el valor al moverlo? (hallazgo 10) | el tab no lo selecciona |
+| 11 | `command` | foco en la búsqueda, flechas abajo | «Type a command or search…»; ¿lee cada entrada? (hallazgo 1) | no |
+| 12 | `command` | escribir «sa», Enter | ¿lee «Save» al filtrar? ¿algo al confirmar? | no, solo dice "s a" |
+| 13 | `command` | botón «Open palette in a dialog» | ¿anuncia diálogo? ¿el foco entra en la búsqueda? (hallazgo 2) | no anuncia el dialog, el foco en la busqueda llega luego de un tab |
+| 14 | `command` | Escape dos veces dentro del diálogo | la primera borra la búsqueda; la segunda cierra; ¿el foco vuelve al botón? | si |
+| 15 | `settings` | abrir la ventana, Tab | «Search…», «General», «Editor» como elementos de árbol | luego de General entra en el contenido del tab, no pasa al siguiente |
+| 16 | `settings` | Espacio en «Dark mode» y en «Check automatically» | estado nuevo al cambiar | si, y los anuncia correctamente |
+| 17 | `settings` | Tab hasta «Beta channel» | ¿no disponible? ¿lee «Coming soon»? | no, nunca llega el tab |
+| 18 | `settings` | Enter en «Font: Monospace», flechas | ¿anuncia que abre una lista? (hallazgo 3) | lo anuncia como un boton y al dar enter lee los items como "menuItem" |
+| 19 | `settings` | página «Editor»: «Font size» y «Project name» | número con su valor (8–32) y campo de texto con «demo» | campo de texto no, campo de numero si, incluido maximo y minimo valor |
 
 Las respuestas se anotan en la última columna. Con ellas se cierra el informe de accesibilidad de
 M10 y se decide qué hallazgos se arreglan (en el host, en los ejemplos o con un aviso en
 `PROTOCOL.md` §16).
 
+**Lectura de las respuestas (2026-10-26).** Las filas se reparten en tres grupos.
+
+*Arreglado en el host, los ejemplos o la doc*, y comprobado de nuevo con el volcado UIA:
+
+- Fila 13: ahora `focus` acepta un `Command` y pone el foco en su campo de búsqueda.
+  `command.ts` lo pide al abrir el diálogo. Tras pulsar el botón, «sa» escrito con `SendKeys` cae
+  en la búsqueda del diálogo. De paso, `focus` ya acepta `NumberInput`, `OtpInput`, `Calendar` y
+  `Tree`: el render sabía enfocarlos, pero la validación los rechazaba (y §18 decía que `Tree`
+  funcionaba).
+- Fila 7 y hallazgo 8: `components.ts` ya no pone `role: "textbox"` en el `Input`, y ahora sale
+  un solo `Edit` «Your name». §16 avisa que no hay que repetir el rol que el componente ya informa.
+- Hallazgo 9: el `a11y.value` del `Rating` se actualiza en cada `change`.
+- Hallazgo 10: en `forms`, el combo, el slider y los radios van dentro de un `group` con
+  nombre («Country», «Volume», «Size»), igual que `tabs::named`. El `Progress` de `components`
+  va en el grupo «Upload».
+
+*La expectativa de la lista estaba mal*:
+
+- Fila 17: un switch deshabilitado no entra en el orden de Tab, y es lo correcto.
+- Filas 4 y 15: una lista de pestañas o un árbol es **una** parada de Tab, y dentro se avanza
+  con las flechas. Falta probar, en la fila 15, si la flecha abajo desde «General» llega a
+  «Editor».
+- Filas 9 y 12: «Space» y «s a» son el eco de teclas de Narrator. El mismo `Switch` se anunció
+  bien en `settings` (fila 16), así que hay que repetir la 9 llegando al switch con Tab.
+
+*Es de gpui-component 0.8 y no se arregla aquí*: `Slider`, `Rating`, `Accordion`, `Tabs`,
+`Select`, `Pagination` y `Calendar` no tienen parada de Tab ni manejo de teclas (no hay
+`tab_stop` ni `on_key_down` en su código). Eso explica las filas 2, 4, 5, 8 y 10. Otros
+componentes no ponen nombre a sus elementos: las entradas de `Command` (filas 11 y 12), anterior
+y siguiente de `Pagination` (fila 3), el título del `Dialog` (fila 13), el campo de texto de
+`Settings` (fila 19) y el desplegable de `Settings`, que se anuncia como botón (fila 18). §16
+documenta el límite de teclado. Hacer que el envoltorio de `a11y` sea una parada de Tab
+empeoraría las cosas: el lector diría «control deslizante, 3» y las flechas no harían nada.
+Quedan tres caminos para decidir: (a) dejarlo documentado, (b) parchear gpui-component con
+`[patch.crates-io]` sobre un fork local, o (c) emular el teclado en el host como un hito nuevo.
+
+**Para repetir con el lector:** las filas 7, 9 (llegando con Tab), 10 (solo los nombres, en el
+modo de exploración de Narrator), 13 y 15 (con flechas).

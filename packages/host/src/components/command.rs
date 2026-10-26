@@ -166,6 +166,14 @@ pub struct CommandSlot {
     state: Entity<CommandState>,
 }
 
+impl CommandSlot {
+    /// Focuses the search field, so a palette opened in a Dialog can be typed into at once.
+    pub fn focus(&self, window: &mut Window, cx: &mut App) {
+        let handle = self.state.read(cx).focus_handle(cx);
+        handle.focus(window, cx);
+    }
+}
+
 /// The Commands among `members`.
 pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> HashSet<NodeId> {
     members

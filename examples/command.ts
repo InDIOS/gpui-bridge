@@ -43,6 +43,7 @@ palette.on("confirm", ({ value }) => {
 });
 open.on("click", () => {
   dialog.set({ open: true });
+  palette.focus();
   app.commit();
 });
 

@@ -20,9 +20,15 @@ const onChange = <T>(apply: (value: T) => void) => ({ value }: { value: T }) => 
   app.commit();
 };
 
-const stars = app
-  .rating({ value: state.stars, max: 5, a11y: { role: "slider", label: "Rating", value: String(state.stars), min: 0, max: 5 } })
-  .on("change", onChange<number>((value) => (state.stars = value)));
+const starsA11y = () => ({ role: "slider" as const, label: "Rating", value: String(state.stars), min: 0, max: 5 });
+const stars = app.rating({ value: state.stars, max: 5, a11y: starsA11y() }).on(
+  "change",
+  onChange<number>((value) => {
+    state.stars = value;
+    // The reader reads `a11y.value`, not the stars: keep it in step.
+    stars.set({ a11y: starsA11y() });
+  }),
+);
 
 const pages = app
   .pagination({ page: state.page, total: 12, a11y: { label: "Pages" } })
@@ -62,7 +68,7 @@ const plan = app
   .on("change", onChange<string>((value) => (state.plan = value)));
 
 const name = app
-  .input({ placeholder: "Your name", a11y: { role: "textbox", label: "Your name" } })
+  .input({ placeholder: "Your name" })
   .on("change", onChange<string>((value) => (state.name = value)));
 
 const form = app
@@ -141,7 +147,7 @@ root.append(
     app.badge({ count: 3 }).append(app.icon({ name: "bell", class: "size-5" })),
     app.tag({ label: "beta", variant: "success", outline: true }),
     app.kbd({ keys: "ctrl-s" }),
-    app.progress({ value: 42, class: "w-40" }),
+    app.progress({ value: 42, class: "w-40", a11y: { role: "group", label: "Upload" } }),
     app.spinner({ class: "size-4" }),
     app.avatar({ name: "Ada Lovelace" }),
   ),

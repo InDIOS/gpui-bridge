@@ -30,6 +30,7 @@ const size = app
     ],
     value: state.size,
     direction: "horizontal",
+    a11y: { role: "group", label: "Size" },
   })
   .on("change", ({ value }) => {
     state.size = value;
@@ -43,6 +44,7 @@ const country = app
     placeholder: "Choose a country",
     searchable: true,
     class: "w-64",
+    a11y: { role: "group", label: "Country" },
   })
   .on("change", ({ value }) => {
     state.country = value;
@@ -51,7 +53,7 @@ const country = app
   });
 
 const volumeLabel = app.text({ content: `Volume: ${state.volume}`, class: "text-sm font-medium" });
-const volume = app.slider({ min: 0, max: 100, step: 1, value: state.volume, controlled: true, class: "w-64" });
+const volume = app.slider({ min: 0, max: 100, step: 1, value: state.volume, controlled: true, class: "w-64", a11y: { role: "group", label: "Volume" } });
 volume.on("change", ({ value }) => {
   // Controlled: the app snaps it to multiples of 10 and confirms that.
   state.volume = Math.round(value / 10) * 10;

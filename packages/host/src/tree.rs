@@ -417,7 +417,15 @@ impl Tree {
                 })?;
                 if !matches!(
                     node.node_type,
-                    NodeType::Input | NodeType::Textarea | NodeType::Div | NodeType::Table
+                    NodeType::Input
+                        | NodeType::Textarea
+                        | NodeType::NumberInput
+                        | NodeType::OtpInput
+                        | NodeType::Calendar
+                        | NodeType::Tree
+                        | NodeType::Div
+                        | NodeType::Table
+                        | NodeType::Command
                 ) {
                     return Err(fail(
                         ErrorCode::InvalidOperation,
@@ -770,6 +778,18 @@ mod tests {
             vec![ErrorCode::UnknownType]
         );
         assert_eq!(tree.node(1).unwrap().node_type, NodeType::Div);
+    }
+
+    #[test]
+    fn focus_takes_the_types_the_host_can_focus() {
+        let mut tree = Tree::default();
+        run(&mut tree, vec![create(1, "Command"), create(2, "text")]);
+        let focus = |id: NodeId| json!({"op": "focus", "id": id});
+        assert_eq!(run(&mut tree, vec![focus(1)]), vec![]);
+        assert_eq!(
+            run(&mut tree, vec![focus(2)]),
+            vec![ErrorCode::InvalidOperation]
+        );
     }
 
     #[test]
