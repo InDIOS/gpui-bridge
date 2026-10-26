@@ -1642,3 +1642,71 @@ Mismo método que la medición del 2026-10-19 (Windows, Intel Iris Xe), ahora co
   la medición anterior (cada cuadro recorre la ventana entera); la salida para listas largas es
   `VirtualList`/`Table`.
 
+### Fase 42 — M10, paso 4: accesibilidad, árbol UIA y lista para el lector de pantalla (2026-10-25)
+
+**UI Automation sí ve el contenido de GPUI.** La nota del plan decía que no. Lancé con
+`pnpm dev <ejemplo>` y leí los descendientes de la ventana con `UIAutomationClient`
+(`FindAll(Descendants)`). Así salen los nodos que AccessKit informa, con rol, nombre y patrones.
+Hay que hacer una consulta antes: la primera despierta AccessKit, y el árbol llega unos instantes
+después (antes de eso, la cuenta da 0). Narrator y NVDA leen de esa misma fuente, así que el
+volcado ya muestra **qué nombre y qué rol** recibe el lector. Falta comprobar **lo que se oye**:
+el orden del foco, los cambios de estado y los anuncios.
+
+| ejemplo | nodos en UIA | qué se ve |
+|---|---|---|
+| `components` | 38 | ventana, `Rating` (slider), paginación, pasos, pestañas, acordeón, radios, campo, regiones, barra de herramientas |
+| `forms` | 10 | switch, radios, combo, slider, área de texto |
+| `command` | 10 (21 con el diálogo) | búsqueda, lista de 6 entradas, botón; con el diálogo, una segunda ventana con búsqueda, lista y dos «Close» |
+| `settings` | 9 | búsqueda, páginas (`TreeItem`), switch, desplegable, checkbox, switch deshabilitado |
+
+**Hallazgos del volcado** (sin arreglar: quedan para que el usuario decida):
+
+| # | dónde | qué | de quién |
+|---|---|---|---|
+| 1 | `Command` | Las 6 entradas son `ListItem` **sin nombre**, tanto en línea como dentro del `Dialog`. Es probable que el lector no diga «Open file» al moverse con las flechas. | componente (gpui-component) |
+| 2 | `Dialog` | La ventana del diálogo no tiene nombre (el título «Command palette» no llega) y hay dos botones «Close» (la × y el de OK). | componente |
+| 3 | `Settings` | El desplegable es un `Button` «Font: Monospace» **sin** `ExpandCollapse`: puede que no se anuncie como algo que abre una lista. | componente |
+| 4 | `Pagination` | Anterior, siguiente y los puntos suspensivos son botones sin nombre. | componente |
+| 5 | `Stepper` | Los 3 pasos son `ListItem` sin nombre. | componente |
+| 6 | `Accordion` | Las secciones no tienen nombre (ni el grupo ni el botón de expandir llevan el título). | componente |
+| 7 | texto | El texto suelto (`text` sin `a11y`, el mensaje del `Alert`, el cuerpo del acordeón) no está en el árbol o sale como `Text` sin nombre: el lector no lo lee al pasar por encima. | GPUI |
+| 8 | `Input` + `a11y.role: "textbox"` | Sale **dos veces** «Your name» (`Edit` del envoltorio y `Edit` del campo). El `Input` ya se informa solo; el `role` del ejemplo sobra. `PROTOCOL.md` §16 no advierte de esto. | ejemplo + doc |
+| 9 | `Rating` en `components` | `a11y.value` queda en `"3"`: el ejemplo no lo actualiza en `change`, así que el lector va a leer siempre 3. | ejemplo |
+| 10 | `forms` | El combo, el slider y el grupo de radios no tienen nombre: las etiquetas son `text` aparte y el ejemplo no usa `a11y`. `Progress` en `components`, igual. | ejemplo |
+| 11 | `Calendar` | No aparece, aunque tiene `a11y.label: "Start date"`. Puede ser que no se pintara por quedar fuera de la pantalla (la ventana mide 860 px de alto). Sin confirmar. | sin confirmar |
+
+`Tabs` es así a propósito: la barra es un `tablist` de gpui-component sin nombre, y el
+`a11y.label` va en un `group` que la rodea (`tabs::named`). Que `Kbd`, `Tag`, `Badge`,
+`DescriptionList` y `StatusBar` no aparezcan es lo esperado: no tienen id ni rol. Que el switch
+salga como `Button` con `Toggle` es cómo AccessKit lo muestra en Windows.
+
+**Lista para el lector de pantalla** (la hace el usuario con la pantalla desbloqueada). Narrator
+se abre con Ctrl+Win+Enter; NVDA se cierra con Insert+Q. Lanzar cada ejemplo con
+`pnpm dev <nombre>`, recorrerlo con Tab/Mayús+Tab y las flechas, y anotar lo que se oye.
+
+| # | ejemplo | acción | debería oírse (según el árbol) | se oyó |
+|---|---|---|---|---|
+| 1 | `components` | abrir la ventana | «Components», ventana; ¿anuncia la alerta? | |
+| 2 | `components` | Tab hasta `Rating`, flecha derecha | «Rating, control deslizante, 3»; ¿cambia el número? (hallazgo 9: no debería) | |
+| 3 | `components` | Tab por la paginación | «1», «2»…; ¿qué dice en anterior/siguiente? (hallazgo 4) | |
+| 4 | `components` | Tab hasta las pestañas, flechas | «Sections»; «Files, pestaña, seleccionada»; ¿«History» como no disponible? | |
+| 5 | `components` | Tab hasta el acordeón, Enter | ¿lee el título? ¿expandido/contraído? (hallazgo 6) | |
+| 6 | `components` | Tab hasta los radios, flechas | «Free»/«Pro», botón de opción, ¿marcado? | |
+| 7 | `components` | Tab hasta el campo | «Your name, edición»; ¿una vez o dos? (hallazgo 8) | |
+| 8 | `components` | buscar el calendario | ¿llega el foco? ¿dice «Start date»? (hallazgo 11) | |
+| 9 | `forms` | Espacio en Wi-Fi | «Wi-Fi», activado/desactivado al cambiar | |
+| 10 | `forms` | Tab por el combo y el slider | ¿sin nombre? ¿lee el valor al moverlo? (hallazgo 10) | |
+| 11 | `command` | foco en la búsqueda, flechas abajo | «Type a command or search…»; ¿lee cada entrada? (hallazgo 1) | |
+| 12 | `command` | escribir «sa», Enter | ¿lee «Save» al filtrar? ¿algo al confirmar? | |
+| 13 | `command` | botón «Open palette in a dialog» | ¿anuncia diálogo? ¿el foco entra en la búsqueda? (hallazgo 2) | |
+| 14 | `command` | Escape dos veces dentro del diálogo | la primera borra la búsqueda; la segunda cierra; ¿el foco vuelve al botón? | |
+| 15 | `settings` | abrir la ventana, Tab | «Search…», «General», «Editor» como elementos de árbol | |
+| 16 | `settings` | Espacio en «Dark mode» y en «Check automatically» | estado nuevo al cambiar | |
+| 17 | `settings` | Tab hasta «Beta channel» | ¿no disponible? ¿lee «Coming soon»? | |
+| 18 | `settings` | Enter en «Font: Monospace», flechas | ¿anuncia que abre una lista? (hallazgo 3) | |
+| 19 | `settings` | página «Editor»: «Font size» y «Project name» | número con su valor (8–32) y campo de texto con «demo» | |
+
+Las respuestas se anotan en la última columna. Con ellas se cierra el informe de accesibilidad de
+M10 y se decide qué hallazgos se arreglan (en el host, en los ejemplos o con un aviso en
+`PROTOCOL.md` §16).
+
