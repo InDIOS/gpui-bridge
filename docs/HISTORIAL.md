@@ -1809,3 +1809,12 @@ RePág/AvPág.
 se queda con Tab y Mayús+Tab (no sale con el teclado); es de gpui-component y no se tocó.
 
 **Pendiente:** la pasada del usuario con Narrator. UIA da los nombres y valores, no lo que se oye.
+
+**Segunda vuelta, el mismo día:**
+
+- El `Slider` de `forms` pasa a `step: 10`. Con `step: 1`, cada flecha proponía un valor que la app
+  redondeaba de vuelta a 40. §16 lo avisa para cualquier `Slider` controlado que redondee.
+- Anillo de foco: una sombra exterior rellenaba de gris el envoltorio transparente, porque GPUI no
+  la recorta por fuera. Ahora es una sombra `inset` de 2px con `ring`. No mueve el layout.
+- Capturas de `forms`, `components` y `data`, con y sin foco: `w-64` sigue dando el ancho del
+  `Slider`, la barra de `Tabs` sigue ocupando todo el ancho y el anillo se ve entero.

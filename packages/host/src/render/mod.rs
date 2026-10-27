@@ -970,12 +970,13 @@ impl RenderCx<'_> {
         } else {
             div()
         };
+        // Inset: an outer shadow fills the transparent wrapper instead of drawing a ring.
         let ring = BoxShadow {
-            color: self.theme.ring.alpha(0.5),
+            color: self.theme.ring,
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
-            spread_radius: px(3.),
-            inset: false,
+            spread_radius: px(2.),
+            inset: true,
         };
         let session = self.session.clone();
         let stop = a11y::apply(

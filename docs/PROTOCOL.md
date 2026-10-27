@@ -802,7 +802,8 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 - The host gives `Slider`, `Rating`, `Tabs` and `Pagination` a Tab stop (none when `disabled`)
   and keys: ←/↓ and →/↑ move one `step` (one star, one page, the previous or next enabled tab),
   Home and End go to the first and last. A key sends the same `change` a click would, in both
-  synced and controlled modes. The stop reports its own role and value — `slider` (Slider,
+  synced and controlled modes (a controlled `Slider` that rounds the value should have the
+  `step` it rounds to, or an arrow proposes a value the app takes back). The stop reports its own role and value — `slider` (Slider,
   Rating), `spinbutton` (Pagination) or the chosen `tab` (Tabs) — so their `a11y` only gives the
   `id`, `label`, `description` and `keyshortcuts`; its `role` and value are ignored. A `Tabs`
   reads as its chosen tab, and its `a11y.label` becomes the description.
