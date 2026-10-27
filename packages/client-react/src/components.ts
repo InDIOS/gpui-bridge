@@ -409,3 +409,35 @@ export type SettingsProps = NodeProps["Settings"] & {
   onChange?: (change: SettingsChange) => void;
 };
 export const Settings = "Settings" as unknown as HostComponent<SettingsProps>;
+
+/** A button that stays pressed; `onChange` gets the new `checked`. */
+export type ToggleProps = NodeProps["Toggle"] & { onChange?: (checked: boolean) => void };
+export const Toggle = "Toggle" as unknown as HostComponent<ToggleProps>;
+
+/** An action with a menu: `onClick` is the left half, `onMenu` gets the chosen item's id. */
+export type DropdownButtonProps = NodeProps["DropdownButton"] & {
+  onClick?: () => void;
+  onMenu?: (item: string) => void;
+};
+export const DropdownButton = "DropdownButton" as unknown as HostComponent<DropdownButtonProps>;
+
+export type LabelProps = NodeProps["Label"];
+export const Label = "Label" as unknown as HostComponent<LabelProps>;
+
+/** A centered empty state; its children are the action under the header. */
+export type EmptyProps = NodeProps["Empty"] & { children?: ReactNode };
+export const Empty = "Empty" as unknown as HostComponent<EmptyProps>;
+
+export type ShimmerProps = NodeProps["Shimmer"];
+export const Shimmer = "Shimmer" as unknown as HostComponent<ShimmerProps>;
+
+/** A framed text field; `onChange` and `onSubmit` work as in an `Input`. */
+export type InputGroupProps = NodeProps["InputGroup"] & {
+  onChange?: (value: string) => void;
+  onSubmit?: (value: string) => void;
+};
+export const InputGroup = "InputGroup" as unknown as HostComponent<InputGroupProps>;
+
+/** Copies `value` on click; `onCopied` gets the text that was copied. */
+export type ClipboardProps = NodeProps["Clipboard"] & { onCopied?: (value: string) => void };
+export const Clipboard = "Clipboard" as unknown as HostComponent<ClipboardProps>;

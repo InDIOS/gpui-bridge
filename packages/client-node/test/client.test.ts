@@ -241,6 +241,60 @@ test("the basic, form and layout components are accepted and report their events
   ]);
 });
 
+test("the simple components are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  const seen: unknown[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  const toggle = app
+    .toggle({ label: "Bold", icon: "asterisk", variant: "outline", tooltip: "Bold" })
+    .on("change", ({ checked }) => seen.push(["toggle", checked]));
+  const dropdown = app
+    .dropdownButton({ label: "Save", variant: "primary", items: [{ id: "save-as", label: "Save as" }], menuLabel: "Save options" })
+    .on("click", () => seen.push(["save"]))
+    .on("menu", ({ item }) => seen.push(["menu", item]));
+  const group = app
+    .inputGroup({ value: "example.com", placeholder: "host", prefix: "https://", suffixIcon: "check" })
+    .on("change", ({ value }) => seen.push(["group", value]))
+    .on("submit", ({ value }) => seen.push(["submit", value]));
+  const clipboard = app
+    .clipboard({ value: "https://example.com", a11y: { label: "Copy the address" } })
+    .on("copied", ({ value }) => seen.push(["copied", value]));
+
+  app.window({
+    root: app.div({ class: "flex flex-col gap-2 p-4" }).append(
+      toggle,
+      dropdown,
+      app.label({ content: "Total", secondary: "(12)", highlight: "12" }),
+      app
+        .empty({ icon: "folder-open", title: "No files", description: "Drop a file here" })
+        .append(app.button({ label: "Choose a file" })),
+      app.shimmer({ content: "Loading...", duration: 3, spread: 0.4, reverse: true, once: true }),
+      group,
+      clipboard,
+    ),
+  });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: toggle.id, event: "change", checked: true });
+  app.handleMessage({ type: "event", id: dropdown.id, event: "click" });
+  app.handleMessage({ type: "event", id: dropdown.id, event: "menu", value: "save-as" });
+  app.handleMessage({ type: "event", id: group.id, event: "change", value: "example.org" });
+  app.handleMessage({ type: "event", id: group.id, event: "submit", value: "example.org" });
+  app.handleMessage({ type: "event", id: clipboard.id, event: "copied", value: "https://example.com" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["toggle", true],
+    ["save"],
+    ["menu", "save-as"],
+    ["group", "example.org"],
+    ["submit", "example.org"],
+    ["copied", "https://example.com"],
+  ]);
+});
+
 test("an a11y prop is validated by the host", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

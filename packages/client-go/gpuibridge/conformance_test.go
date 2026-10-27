@@ -46,6 +46,8 @@ func TestMessagesMatchConformance(t *testing.T) {
 		{closeWindowMsg(2), `{"op":"closeWindow","id":2}`},
 		{createMsg(6, "Spinner", nil, nil), `{"op":"create","id":6,"type":"Spinner"}`},
 		{createMsg(3, "Button", Props{"label": "Go"}, []string{"click"}), `{"op":"create","id":3,"type":"Button","props":{"label":"Go"},"events":["click"]}`},
+		{createMsg(3, "Label", Props{"content": "Total", "secondary": "(12)", "highlight": "12"}, nil), `{"op":"create","id":3,"type":"Label","props":{"content":"Total","secondary":"(12)","highlight":"12"}}`},
+		{createMsg(8, "Clipboard", Props{"value": "example.com", "tooltip": "Copy the address", "a11y": map[string]any{"label": "Copy address"}}, []string{"copied"}), `{"op":"create","id":8,"type":"Clipboard","props":{"value":"example.com","tooltip":"Copy the address","a11y":{"label":"Copy address"}},"events":["copied"]}`},
 		{appendMsg(1, 2), `{"op":"append","parent":1,"child":2}`},
 		{insertBeforeMsg(1, 3, 4), `{"op":"insertBefore","parent":1,"child":3,"before":4}`},
 		{setPropsMsg(6, Props{"checked": true}), `{"op":"setProps","id":6,"props":{"checked":true}}`},

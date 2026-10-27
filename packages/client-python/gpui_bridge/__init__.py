@@ -438,6 +438,39 @@ class App:
         user sets; `change` passes {"key", "value"}."""
         return self._create("Settings", props)
 
+    def toggle(self, **props) -> Node:
+        """A button that stays pressed: `checked`, `label`, `icon`, `variant` (ghost, outline),
+        `tooltip`, `disabled`, `controlled`. `change` passes the new `checked`."""
+        return self._create("Toggle", props)
+
+    def dropdown_button(self, **props) -> Node:
+        """An action with a menu: `label`, `icon`, `variant`, `outline`, `disabled`, `items` (a
+        menu list) and `menuLabel`. `click` is the left half; `menu` passes the chosen item's id."""
+        return self._create("DropdownButton", props)
+
+    def label(self, **props) -> Node:
+        """Text: `content`, `secondary` (a muted text after it), `masked`, `highlight` (marks
+        every occurrence of the substring, ignoring case)."""
+        return self._create("Label", props)
+
+    def empty(self, **props) -> Node:
+        """A centered empty state: `icon`, `title`, `description`; append the action (a button)."""
+        return self._create("Empty", props)
+
+    def shimmer(self, **props) -> Node:
+        """Loading text: `content`, `duration` in seconds, `spread`, `reverse`, `once`."""
+        return self._create("Shimmer", props)
+
+    def input_group(self, **props) -> Node:
+        """A framed text field: `value`, `placeholder`, `prefix`, `suffix`, `prefixIcon`,
+        `suffixIcon`, `disabled`, `readonly`, `invalid`, `controlled`. `change` and `submit` pass
+        the text, like an `Input`."""
+        return self._create("InputGroup", props)
+
+    def clipboard(self, **props) -> Node:
+        """Copies `value` on click: `tooltip`. `copied` passes the text that was copied."""
+        return self._create("Clipboard", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)
@@ -623,7 +656,7 @@ class App:
                 if not handler:
                     return
                 # A menu choice passes the item id; a Slider, a number.
-                if record.type in ("Checkbox", "Switch"):
+                if record.type in ("Checkbox", "Switch", "Toggle"):
                     handler(message.get("checked", False))
                 elif "paths" in message:
                     handler(message["paths"])

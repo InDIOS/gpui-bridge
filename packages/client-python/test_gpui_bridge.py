@@ -223,6 +223,65 @@ class ClientTest(unittest.TestCase):
             ],
         )
 
+    def test_simple_components_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        toggle = app.toggle(label="Bold", icon="asterisk", variant="outline", tooltip="Bold").on(
+            "change", lambda checked: seen.append(("toggle", checked))
+        )
+        save = (
+            app.dropdown_button(
+                label="Save",
+                variant="primary",
+                items=[{"id": "save-as", "label": "Save as"}],
+                menuLabel="Save options",
+            )
+            .on("click", lambda: seen.append(("save",)))
+            .on("menu", lambda item: seen.append(("menu", item)))
+        )
+        group = (
+            app.input_group(value="example.com", placeholder="host", prefix="https://", suffixIcon="check")
+            .on("change", lambda value: seen.append(("group", value)))
+            .on("submit", lambda value: seen.append(("submit", value)))
+        )
+        clipboard = app.clipboard(value="https://example.com", a11y={"label": "Copy the address"}).on(
+            "copied", lambda value: seen.append(("copied", value))
+        )
+        root = app.div(class_="flex flex-col gap-2 p-4").append(
+            toggle,
+            save,
+            app.label(content="Total", secondary="(12)", highlight="12"),
+            app.empty(icon="folder-open", title="No files", description="Drop a file here").append(
+                app.button(label="Choose a file")
+            ),
+            app.shimmer(content="Loading...", duration=3, spread=0.4, reverse=True, once=True),
+            group,
+            clipboard,
+        )
+        app.window(root=root)
+        app.commit()
+
+        app._dispatch({"type": "event", "id": toggle.id, "event": "change", "checked": True})
+        app._dispatch({"type": "event", "id": save.id, "event": "click"})
+        app._dispatch({"type": "event", "id": save.id, "event": "menu", "value": "save-as"})
+        app._dispatch({"type": "event", "id": group.id, "event": "change", "value": "example.org"})
+        app._dispatch({"type": "event", "id": group.id, "event": "submit", "value": "example.org"})
+        app._dispatch({"type": "event", "id": clipboard.id, "event": "copied", "value": "https://example.com"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("toggle", True),
+                ("save",),
+                ("menu", "save-as"),
+                ("group", "example.org"),
+                ("submit", "example.org"),
+                ("copied", "https://example.com"),
+            ],
+        )
+
     def test_an_a11y_prop_is_validated_by_the_host(self):
         app = App(headless=True)
         errors = []

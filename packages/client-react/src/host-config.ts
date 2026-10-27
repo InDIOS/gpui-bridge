@@ -184,6 +184,7 @@ const EVENT_PROPS: Record<string, string> = {
   onCollapse: "collapse",
   onPointerDown: "pointerDown",
   onConfirm: "confirm",
+  onCopied: "copied",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -218,7 +219,8 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
   if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
-  if (type === "Checkbox" || type === "Switch") wire.controlled = props.checked !== undefined;
+  if (type === "Checkbox" || type === "Switch" || type === "Toggle") wire.controlled = props.checked !== undefined;
+  if (type === "InputGroup") wire.controlled = props.value !== undefined;
   return { wire, handlers };
 }
 
@@ -235,7 +237,7 @@ function subscribe(instance: Instance, event: string): void {
     else if (event === "menu") handler(payload.item);
     else if (event === "keyDown") handler(payload.key);
     else if (event === "drop") handler(payload.paths);
-    else if (instance.type === "Checkbox" || instance.type === "Switch") handler(payload.checked);
+    else if (instance.type === "Checkbox" || instance.type === "Switch" || instance.type === "Toggle") handler(payload.checked);
     else handler(payload.value);
   });
 }
@@ -340,6 +342,20 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.command(wire);
     case "Settings":
       return app.settings(wire);
+    case "Toggle":
+      return app.toggle(wire);
+    case "DropdownButton":
+      return app.dropdownButton(wire);
+    case "Label":
+      return app.label(wire);
+    case "Empty":
+      return app.empty(wire);
+    case "Shimmer":
+      return app.shimmer(wire);
+    case "InputGroup":
+      return app.inputGroup(wire);
+    case "Clipboard":
+      return app.clipboard(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

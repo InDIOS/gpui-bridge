@@ -100,3 +100,10 @@ func (a *App) Chart(props Props) *Node           { return a.Create("Chart", prop
 func (a *App) Canvas(props Props) *Node          { return a.Create("Canvas", props) }
 func (a *App) Command(props Props) *Node         { return a.Create("Command", props) }
 func (a *App) Settings(props Props) *Node        { return a.Create("Settings", props) }
+func (a *App) Toggle(props Props) *Node          { return a.Create("Toggle", props) }
+func (a *App) DropdownButton(props Props) *Node  { return a.Create("DropdownButton", props) }
+func (a *App) Label(props Props) *Node           { return a.Create("Label", props) }
+func (a *App) Empty(props Props) *Node           { return a.Create("Empty", props) }
+func (a *App) Shimmer(props Props) *Node         { return a.Create("Shimmer", props) }
+func (a *App) InputGroup(props Props) *Node      { return a.Create("InputGroup", props) }
+func (a *App) Clipboard(props Props) *Node       { return a.Create("Clipboard", props) }

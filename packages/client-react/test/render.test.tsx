@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, Command, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, Command, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -684,6 +684,73 @@ test("the new components render with their props and report their events", async
   emit(app, { id: calendar.id, event: "change", value: "2024-09-01" });
   await app.close();
   assert.deepEqual(seen, ["close", ["rating", 4], ["page", 2], ["accordion", "a"], ["step", "two"], ["number", "13"], ["day", "2024-09-01"]]);
+  assert.deepEqual(errors, []);
+});
+
+test("the simple components render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Toggle label="Bold" icon="asterisk" variant="outline" tooltip="Bold" onChange={(checked) => seen.push(["toggle", checked])} />
+      <DropdownButton
+        label="Save"
+        variant="primary"
+        items={[{ id: "save-as", label: "Save as" }]}
+        menuLabel="Save options"
+        onClick={() => seen.push(["save"])}
+        onMenu={(item) => seen.push(["menu", item])}
+      />
+      <Label content="Total" secondary="(12)" highlight="12" />
+      <Empty icon="folder-open" title="No files" description="Drop a file here">
+        <Button label="Choose a file" />
+      </Empty>
+      <Shimmer content="Loading..." duration={3} spread={0.4} reverse once />
+      <InputGroup value="example.com" placeholder="host" prefix="https://" suffixIcon="check" onChange={(value) => seen.push(["group", value])} onSubmit={(value) => seen.push(["submit", value])} />
+      <Clipboard value="https://example.com" a11y={{ label: "Copy the address" }} onCopied={(value) => seen.push(["copied", value])} />
+    </Div>,
+  );
+  const [toggle] = created(sent, "Toggle");
+  const [dropdown] = created(sent, "DropdownButton");
+  const [label] = created(sent, "Label");
+  const [empty] = created(sent, "Empty");
+  const [shimmer] = created(sent, "Shimmer");
+  const [group] = created(sent, "InputGroup");
+  const [clipboard] = created(sent, "Clipboard");
+  assert.deepEqual(toggle.props, { label: "Bold", icon: "asterisk", variant: "outline", tooltip: "Bold", controlled: false });
+  assert.deepEqual(dropdown.props, {
+    label: "Save",
+    variant: "primary",
+    items: [{ id: "save-as", label: "Save as" }],
+    menuLabel: "Save options",
+  });
+  assert.deepEqual(label.props, { content: "Total", secondary: "(12)", highlight: "12" });
+  assert.deepEqual(empty.props, { icon: "folder-open", title: "No files", description: "Drop a file here" });
+  assert.deepEqual(shimmer.props, { content: "Loading...", duration: 3, spread: 0.4, reverse: true, once: true });
+  // A `value` makes a field controlled in React, as it does in the DOM.
+  assert.deepEqual(group.props, {
+    value: "example.com",
+    placeholder: "host",
+    prefix: "https://",
+    suffixIcon: "check",
+    controlled: true,
+  });
+  assert.deepEqual(clipboard.props?.a11y, { label: "Copy the address" });
+
+  emit(app, { id: toggle.id, event: "change", checked: true });
+  emit(app, { id: dropdown.id, event: "click" });
+  emit(app, { id: dropdown.id, event: "menu", value: "save-as" });
+  emit(app, { id: group.id, event: "change", value: "example.org" });
+  emit(app, { id: group.id, event: "submit", value: "example.org" });
+  emit(app, { id: clipboard.id, event: "copied", value: "https://example.com" });
+  await app.close();
+  assert.deepEqual(seen, [
+    ["toggle", true],
+    ["save"],
+    ["menu", "save-as"],
+    ["group", "example.org"],
+    ["submit", "example.org"],
+    ["copied", "https://example.com"],
+  ]);
   assert.deepEqual(errors, []);
 });
 

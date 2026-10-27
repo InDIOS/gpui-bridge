@@ -556,6 +556,41 @@ export class App {
     return this.create("Settings", props);
   }
 
+  /** A button that stays pressed: `change` with `checked`. */
+  toggle(props: NodeProps["Toggle"] = {}) {
+    return this.create("Toggle", props);
+  }
+
+  /** An action with a menu: `click` for the left half, `menu` with the chosen item's id. */
+  dropdownButton(props: NodeProps["DropdownButton"] = {}) {
+    return this.create("DropdownButton", props);
+  }
+
+  /** Text with an optional secondary text and a highlighted substring. */
+  label(props: NodeProps["Label"] = {}) {
+    return this.create("Label", props);
+  }
+
+  /** A centered empty state; append the action (usually a `Button`). */
+  empty(props: NodeProps["Empty"] = {}) {
+    return this.create("Empty", props);
+  }
+
+  /** Loading text with a moving highlight. */
+  shimmer(props: NodeProps["Shimmer"] = {}) {
+    return this.create("Shimmer", props);
+  }
+
+  /** A text field with text and an icon on either side: `change` and `submit` like an `Input`. */
+  inputGroup(props: NodeProps["InputGroup"] = {}) {
+    return this.create("InputGroup", props);
+  }
+
+  /** Copies `value` on click: `copied` with that text. */
+  clipboard(props: NodeProps["Clipboard"] = {}) {
+    return this.create("Clipboard", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);
@@ -701,7 +736,7 @@ export class App {
                 ? { paths: message.paths ?? [] }
               : message.event === "sort"
                 ? (message.value as TableSort)
-            : type === "Checkbox" || type === "Switch"
+            : type === "Checkbox" || type === "Switch" || type === "Toggle"
               ? { checked: message.checked ?? false }
               : message.value !== undefined
                 ? { value: message.value }

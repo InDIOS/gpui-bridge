@@ -55,7 +55,14 @@ export type NodeType =
   | "Chart"
   | "Canvas"
   | "Command"
-  | "Settings";
+  | "Settings"
+  | "Toggle"
+  | "DropdownButton"
+  | "Label"
+  | "Empty"
+  | "Shimmer"
+  | "InputGroup"
+  | "Clipboard";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -899,6 +906,98 @@ export interface SettingsProps {
   class?: string;
 }
 
+// Simple components (PROTOCOL.md section 23).
+
+export interface ToggleProps {
+  checked?: boolean;
+  label?: string;
+  /** A bundled icon name, drawn before the label. */
+  icon?: string;
+  /** Default "ghost". */
+  variant?: "ghost" | "outline";
+  /** A hint; it is also the name a screen reader reads. */
+  tooltip?: string;
+  disabled?: boolean;
+  /** The host only reports clicks; the client confirms them with `checked`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface DropdownButtonProps {
+  label?: string;
+  /** A bundled icon name, drawn before the label. */
+  icon?: string;
+  /** Default: gpui-component's own look. */
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  outline?: boolean;
+  disabled?: boolean;
+  /** The menu, in the format of `contextMenu` (`PROTOCOL.md` section 10). */
+  items?: MenuItem[];
+  /** The name a screen reader reads for the caret; default: a translated "More options". */
+  menuLabel?: string;
+  class?: string;
+}
+
+export interface LabelProps {
+  content?: string;
+  /** A muted text after the content. */
+  secondary?: string;
+  /** Dots instead of the characters. */
+  masked?: boolean;
+  /** Marks every occurrence of this substring, ignoring case. */
+  highlight?: string;
+  class?: string;
+}
+
+export interface EmptyProps {
+  /** A bundled icon name, in a muted box above the title. */
+  icon?: string;
+  title?: string;
+  description?: string;
+  /** It fills its box (`flex-1`), so size the parent. */
+  class?: string;
+}
+
+export interface ShimmerProps {
+  content?: string;
+  /** One sweep, in seconds; default 2. */
+  duration?: number;
+  /** The highlight half-width; default 0.3, kept within 0.05–1. */
+  spread?: number;
+  reverse?: boolean;
+  /** One sweep instead of a loop. */
+  once?: boolean;
+  class?: string;
+}
+
+export interface InputGroupProps {
+  value?: string;
+  placeholder?: string;
+  /** Text on the left of the field. */
+  prefix?: string;
+  /** Text on the right. */
+  suffix?: string;
+  /** A bundled icon name on the left. */
+  prefixIcon?: string;
+  /** A bundled icon name on the right. */
+  suffixIcon?: string;
+  disabled?: boolean;
+  readonly?: boolean;
+  /** The caller's validation result; it does not reject edits. */
+  invalid?: boolean;
+  /** The host only reports edits; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ClipboardProps {
+  /** The text copied on click. */
+  value?: string;
+  /** A hint; `a11y.label` is the button's name. */
+  tooltip?: string;
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -949,6 +1048,13 @@ export interface NodeProps {
   Canvas: CanvasProps & SharedProps;
   Command: CommandProps & SharedProps;
   Settings: SettingsProps & SharedProps;
+  Toggle: ToggleProps & SharedProps;
+  DropdownButton: DropdownButtonProps & SharedProps;
+  Label: LabelProps & SharedProps;
+  Empty: EmptyProps & SharedProps;
+  Shimmer: ShimmerProps & SharedProps;
+  InputGroup: InputGroupProps & SharedProps;
+  Clipboard: ClipboardProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1016,4 +1122,13 @@ export interface NodeEvents {
   Command: { confirm: { value: string } };
   /** `value` is the field set by the user and its new value. */
   Settings: { change: { value: SettingsChange } };
+  Toggle: { change: { checked: boolean } };
+  /** `value` is the chosen item's `id`. */
+  DropdownButton: { click: {}; menu: { item: string } };
+  Label: {};
+  Empty: {};
+  Shimmer: {};
+  InputGroup: { change: { value: string }; submit: { value: string } };
+  /** `value` is the text that was copied. */
+  Clipboard: { copied: { value: string } };
 }
