@@ -107,3 +107,7 @@ func (a *App) Empty(props Props) *Node           { return a.Create("Empty", prop
 func (a *App) Shimmer(props Props) *Node         { return a.Create("Shimmer", props) }
 func (a *App) InputGroup(props Props) *Node      { return a.Create("InputGroup", props) }
 func (a *App) Clipboard(props Props) *Node       { return a.Create("Clipboard", props) }
+func (a *App) AlertDialog(props Props) *Node     { return a.Create("AlertDialog", props) }
+func (a *App) Sheet(props Props) *Node           { return a.Create("Sheet", props) }
+func (a *App) Popover(props Props) *Node         { return a.Create("Popover", props) }
+func (a *App) HoverCard(props Props) *Node       { return a.Create("HoverCard", props) }

@@ -441,3 +441,26 @@ export const InputGroup = "InputGroup" as unknown as HostComponent<InputGroupPro
 /** Copies `value` on click; `onCopied` gets the text that was copied. */
 export type ClipboardProps = NodeProps["Clipboard"] & { onCopied?: (value: string) => void };
 export const Clipboard = "Clipboard" as unknown as HostComponent<ClipboardProps>;
+
+/** A confirmation; `onOk` and `onCancel` close it, as in a `Dialog`. */
+export type AlertDialogProps = NodeProps["AlertDialog"] & {
+  onOk?: () => void;
+  onCancel?: () => void;
+  children?: ReactNode;
+};
+export const AlertDialog = "AlertDialog" as unknown as HostComponent<AlertDialogProps>;
+
+/** A panel that slides in from `side`; `onClose` is its X, Escape or a click on the overlay. */
+export type SheetProps = NodeProps["Sheet"] & { onClose?: () => void; children?: ReactNode };
+export const Sheet = "Sheet" as unknown as HostComponent<SheetProps>;
+
+/**
+ * A panel anchored to its first child (the trigger); the rest are the panel. `onChange` gets the
+ * new `open`: the host keeps it, as it keeps a `Checkbox`'s `checked`.
+ */
+export type PopoverProps = NodeProps["Popover"] & { onChange?: (checked: boolean) => void; children?: ReactNode };
+export const Popover = "Popover" as unknown as HostComponent<PopoverProps>;
+
+/** A card on hover, opened by the mouse alone; `onChange` gets the new `open`. */
+export type HoverCardProps = NodeProps["HoverCard"] & { onChange?: (checked: boolean) => void; children?: ReactNode };
+export const HoverCard = "HoverCard" as unknown as HostComponent<HoverCardProps>;

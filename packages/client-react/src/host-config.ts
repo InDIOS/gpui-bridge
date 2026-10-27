@@ -237,6 +237,7 @@ function subscribe(instance: Instance, event: string): void {
     else if (event === "keyDown") handler(payload.key);
     else if (event === "drop") handler(payload.paths);
     else if (instance.type === "Checkbox" || instance.type === "Switch" || instance.type === "Toggle") handler(payload.checked);
+    else if (instance.type === "Popover" || instance.type === "HoverCard") handler(payload.checked);
     else handler(payload.value);
   });
 }
@@ -355,6 +356,14 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.inputGroup(wire);
     case "Clipboard":
       return app.clipboard(wire);
+    case "AlertDialog":
+      return app.alertDialog(wire);
+    case "Sheet":
+      return app.sheet(wire);
+    case "Popover":
+      return app.popover(wire);
+    case "HoverCard":
+      return app.hoverCard(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

@@ -471,6 +471,27 @@ class App:
         """Copies `value` on click: `tooltip`. `copied` passes the text that was copied."""
         return self._create("Clipboard", props)
 
+    def alert_dialog(self, **props) -> Node:
+        """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
+        children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""
+        return self._create("AlertDialog", props)
+
+    def sheet(self, **props) -> Node:
+        """A panel from `side` (left, right, top, bottom): `open`, `title`, `size` in pixels. The
+        children are the scrollable body. `close` is its X, Escape or a click on the overlay."""
+        return self._create("Sheet", props)
+
+    def popover(self, **props) -> Node:
+        """A panel anchored to the first child (the trigger): `open`, `anchor` (top-left,
+        top-center, top-right, left-center, right-center, bottom-left, bottom-center,
+        bottom-right), `arrow`. `change` passes the new `open`, and the host keeps it."""
+        return self._create("Popover", props)
+
+    def hover_card(self, **props) -> Node:
+        """A card on hover: `openDelay` and `closeDelay` in milliseconds, `anchor`. The mouse is
+        the only way in (there is no `open`); `change` passes the new state."""
+        return self._create("HoverCard", props)
+
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
         self._queue_window(None, root, options)
@@ -656,7 +677,7 @@ class App:
                 if not handler:
                     return
                 # A menu choice passes the item id; a Slider, a number.
-                if record.type in ("Checkbox", "Switch", "Toggle"):
+                if record.type in ("Checkbox", "Switch", "Toggle", "Popover", "HoverCard"):
                     handler(message.get("checked", False))
                 elif "paths" in message:
                     handler(message["paths"])

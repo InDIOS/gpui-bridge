@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, Command, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, AlertDialog, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, Command, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Popover, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -751,6 +751,63 @@ test("the simple components render with their props and report their events", as
     ["submit", "example.org"],
     ["copied", "https://example.com"],
   ]);
+  assert.deepEqual(errors, []);
+});
+
+test("the overlays render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <AlertDialog
+        open
+        title="Delete 3 files?"
+        description="This cannot be undone."
+        icon="circle-alert"
+        okText="Delete"
+        cancelText="Cancel"
+        onOk={() => seen.push(["ok"])}
+        onCancel={() => seen.push(["cancel"])}
+      >
+        <Text>3 files</Text>
+      </AlertDialog>
+      <Sheet open side="left" title="Filters" size={320} onClose={() => seen.push(["close"])}>
+        <Input value="*.png" />
+      </Sheet>
+      <Popover open={false} anchor="bottom-right" arrow onChange={(checked) => seen.push(["popover", checked])}>
+        <Button label="Sort" />
+        <Text>By name</Text>
+      </Popover>
+      <HoverCard openDelay={300} closeDelay={200} anchor="top-center" onChange={(checked) => seen.push(["card", checked])}>
+        <Button label="Info" />
+        <Text>Hovered</Text>
+      </HoverCard>
+    </Div>,
+  );
+  const [alert] = created(sent, "AlertDialog");
+  const [sheet] = created(sent, "Sheet");
+  const [popover] = created(sent, "Popover");
+  const [card] = created(sent, "HoverCard");
+  assert.deepEqual(alert.props, {
+    open: true,
+    title: "Delete 3 files?",
+    description: "This cannot be undone.",
+    icon: "circle-alert",
+    okText: "Delete",
+    cancelText: "Cancel",
+  });
+  assert.deepEqual(sheet.props, { open: true, side: "left", title: "Filters", size: 320 });
+  assert.deepEqual(popover.props, { open: false, anchor: "bottom-right", arrow: true });
+  assert.deepEqual(card.props, { openDelay: 300, closeDelay: 200, anchor: "top-center" });
+  // The children of a `Popover`/`HoverCard` are its trigger and its panel.
+  const [button] = created(sent, "Button");
+  assert.ok(sent.some((m) => m.op === "append" && m.parent === popover.id && m.child === button.id));
+
+  emit(app, { id: alert.id, event: "ok" });
+  emit(app, { id: sheet.id, event: "close" });
+  emit(app, { id: popover.id, event: "change", checked: true });
+  emit(app, { id: card.id, event: "change", checked: false });
+  await app.close();
+  assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
   assert.deepEqual(errors, []);
 });
 

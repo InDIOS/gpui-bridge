@@ -62,7 +62,11 @@ export type NodeType =
   | "Empty"
   | "Shimmer"
   | "InputGroup"
-  | "Clipboard";
+  | "Clipboard"
+  | "AlertDialog"
+  | "Sheet"
+  | "Popover"
+  | "HoverCard";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -1000,6 +1004,71 @@ export interface ClipboardProps {
   class?: string;
 }
 
+// Overlays (PROTOCOL.md section 24).
+
+/** The eight corners a `Popover` or a `HoverCard` can open from. */
+export type OverlayAnchor =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "left-center"
+  | "right-center"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
+
+export interface AlertDialogProps {
+  /** Shown while true; the host sets it to false when the user answers. */
+  open?: boolean;
+  title?: string;
+  description?: string;
+  /** A bundled icon name, before the title. */
+  icon?: string;
+  /** Default "OK". */
+  okText?: string;
+  /** Adds the Cancel button. */
+  cancelText?: string;
+  /** Classes of the body that holds the children. */
+  class?: string;
+}
+
+export interface SheetProps {
+  /** Shown while true; the host sets it to false when the panel closes. */
+  open?: boolean;
+  /** The edge it slides in from. Default "right". */
+  side?: "left" | "right" | "top" | "bottom";
+  title?: string;
+  /** Pixels: the width on the sides, the height above and below. Default 350. */
+  size?: number;
+  /** Classes of the body that holds the children. */
+  class?: string;
+}
+
+export interface PopoverProps {
+  /**
+   * The panel's state, kept in the host as a synced `Checkbox`'s `checked`: the user opening or
+   * closing it reports `change` and updates it, and a `setProps` with another `open` wins.
+   */
+  open?: boolean;
+  /** Where the panel goes. Default "top-left" (below the trigger, left-aligned). */
+  anchor?: OverlayAnchor;
+  /** A triangle pointing at the trigger. */
+  arrow?: boolean;
+  /** Classes of the trigger's slot (the first child), not of the panel. */
+  class?: string;
+}
+
+export interface HoverCardProps {
+  /** Milliseconds before it opens. Default 600. */
+  openDelay?: number;
+  /** Milliseconds before it closes. Default 300. */
+  closeDelay?: number;
+  /** Where the card goes. Default "top-center". */
+  anchor?: OverlayAnchor;
+  /** Classes of the trigger's slot (the first child), not of the card. */
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1057,6 +1126,10 @@ export interface NodeProps {
   Shimmer: ShimmerProps & SharedProps;
   InputGroup: InputGroupProps & SharedProps;
   Clipboard: ClipboardProps & SharedProps;
+  AlertDialog: AlertDialogProps & SharedProps;
+  Sheet: SheetProps & SharedProps;
+  Popover: PopoverProps & SharedProps;
+  HoverCard: HoverCardProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1133,4 +1206,12 @@ export interface NodeEvents {
   InputGroup: { change: { value: string }; submit: { value: string } };
   /** `value` is the text that was copied. */
   Clipboard: { copied: { value: string } };
+  /** OK and Cancel close it, as in a `Dialog`; it shows over an open one. */
+  AlertDialog: { ok: {}; cancel: {} };
+  /** The user closed the panel with its X, Escape or a click on the overlay. */
+  Sheet: { close: {} };
+  /** `checked` is true when it opened, false when it closed. */
+  Popover: { change: { checked: boolean } };
+  /** The mouse is the only way in: no `open` and no `simulate`. */
+  HoverCard: { change: { checked: boolean } };
 }

@@ -591,6 +591,26 @@ export class App {
     return this.create("Clipboard", props);
   }
 
+  /** A confirmation with a title, a description and an icon: `ok` and `cancel`, as in a `Dialog`. */
+  alertDialog(props: NodeProps["AlertDialog"] = {}) {
+    return this.create("AlertDialog", props);
+  }
+
+  /** A panel that slides in from `side`: `close` with its X, Escape or a click on the overlay. */
+  sheet(props: NodeProps["Sheet"] = {}) {
+    return this.create("Sheet", props);
+  }
+
+  /** A panel anchored to its first child (the trigger): `change` with `checked` both ways. */
+  popover(props: NodeProps["Popover"] = {}) {
+    return this.create("Popover", props);
+  }
+
+  /** A card on hover, opened by the mouse alone: `change` with `checked`. */
+  hoverCard(props: NodeProps["HoverCard"] = {}) {
+    return this.create("HoverCard", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);
@@ -736,7 +756,11 @@ export class App {
                 ? { paths: message.paths ?? [] }
               : message.event === "sort"
                 ? (message.value as TableSort)
-            : type === "Checkbox" || type === "Switch" || type === "Toggle"
+            : type === "Checkbox" ||
+                type === "Switch" ||
+                type === "Toggle" ||
+                type === "Popover" ||
+                type === "HoverCard"
               ? { checked: message.checked ?? false }
               : message.value !== undefined
                 ? { value: message.value }

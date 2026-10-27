@@ -282,6 +282,48 @@ class ClientTest(unittest.TestCase):
             ],
         )
 
+    def test_overlays_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        alert = (
+            app.alert_dialog(
+                open=True,
+                title="Delete 3 files?",
+                description="This cannot be undone.",
+                icon="circle-alert",
+                okText="Delete",
+                cancelText="Cancel",
+            )
+            .on("ok", lambda: seen.append(("ok",)))
+            .append(app.text(content="3 files"))
+        )
+        sheet = (
+            app.sheet(open=True, side="left", title="Filters", size=320)
+            .on("close", lambda: seen.append(("close",)))
+            .append(app.input(value="*.png"))
+        )
+        popover = (
+            app.popover(open=False, anchor="bottom-right", arrow=True)
+            .on("change", lambda checked: seen.append(("popover", checked)))
+            .append(app.button(label="Sort"), app.text(content="By name"))
+        )
+        card = (
+            app.hover_card(openDelay=300, closeDelay=200, anchor="top-center")
+            .on("change", lambda checked: seen.append(("card", checked)))
+            .append(app.button(label="Info"), app.text(content="Hovered"))
+        )
+        app.window(root=app.div(class_="flex flex-col gap-2 p-4").append(alert, sheet, popover, card))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": alert.id, "event": "ok"})
+        app._dispatch({"type": "event", "id": sheet.id, "event": "close"})
+        app._dispatch({"type": "event", "id": popover.id, "event": "change", "checked": True})
+        app._dispatch({"type": "event", "id": card.id, "event": "change", "checked": False})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("ok",), ("close",), ("popover", True), ("card", False)])
+
     def test_an_a11y_prop_is_validated_by_the_host(self):
         app = App(headless=True)
         errors = []

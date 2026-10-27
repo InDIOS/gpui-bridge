@@ -295,6 +295,52 @@ test("the simple components are accepted and report their events", async () => {
   ]);
 });
 
+test("the overlays are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  const seen: unknown[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  const alert = app
+    .alertDialog({
+      open: true,
+      title: "Delete 3 files?",
+      description: "This cannot be undone.",
+      icon: "circle-alert",
+      okText: "Delete",
+      cancelText: "Cancel",
+    })
+    .on("ok", () => seen.push(["ok"]))
+    .on("cancel", () => seen.push(["cancel"]));
+  const sheet = app
+    .sheet({ open: true, side: "left", title: "Filters", size: 320 })
+    .on("close", () => seen.push(["close"]));
+  const popover = app
+    .popover({ open: false, anchor: "bottom-right", arrow: true })
+    .on("change", ({ checked }) => seen.push(["popover", checked]));
+  const card = app
+    .hoverCard({ openDelay: 300, closeDelay: 200, anchor: "top-center" })
+    .on("change", ({ checked }) => seen.push(["card", checked]));
+
+  app.window({
+    root: app.div({ class: "flex flex-col gap-2 p-4" }).append(
+      alert.append(app.text({ content: "3 files" })),
+      sheet.append(app.input({ value: "*.png" })),
+      popover.append(app.button({ label: "Sort" }), app.text({ content: "By name" })),
+      card.append(app.button({ label: "Info" }), app.text({ content: "Hovered" })),
+    ),
+  });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: alert.id, event: "ok" });
+  app.handleMessage({ type: "event", id: sheet.id, event: "close" });
+  app.handleMessage({ type: "event", id: popover.id, event: "change", checked: true });
+  app.handleMessage({ type: "event", id: card.id, event: "change", checked: false });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
+});
+
 test("an a11y prop is validated by the host", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];
