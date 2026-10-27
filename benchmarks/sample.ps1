@@ -25,6 +25,7 @@ $psi.RedirectStandardOutput = $true
 if ($Log) {
   $psi.RedirectStandardError = $true
   $psi.Environment["RUST_LOG"] = "debug"
+  $psi.Arguments += " --debug"   # the client forwards the host's stderr only with debug on
 }
 if ($HostPath) { $psi.Environment["GPUI_BRIDGE_HOST"] = (Resolve-Path $HostPath).Path }
 $process = [Diagnostics.Process]::Start($psi)

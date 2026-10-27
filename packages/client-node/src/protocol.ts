@@ -24,6 +24,7 @@ export type NodeType =
   | "VirtualList"
   | "Table"
   | "Tabs"
+  | "Tab"
   | "Alert"
   | "Badge"
   | "Tag"
@@ -46,8 +47,19 @@ export type NodeType =
   | "StatusBar"
   | "Toolbar"
   | "Resizable"
-  | "Calendar";
+  | "Calendar"
+  | "Tree"
+  | "Diff"
+  | "Carousel"
+  | "Sidebar"
+  | "Chart"
+  | "Canvas"
+  | "Command"
+  | "Settings";
 export type WindowTheme = "light" | "dark";
+
+/** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
+export type WindowEventName = "focus" | "blur" | "resize" | "move" | "visibility";
 
 /**
  * A gpui-component theme file (PROTOCOL.md section 3). Field names are the file's own
@@ -74,7 +86,27 @@ export type Props = Record<string, unknown>;
 /** Messages from the client (host stdin). */
 export type ClientMessage =
   | { op: "hello"; protocol: number }
-  | { op: "window"; id?: WindowId; title?: string; width?: number; height?: number; root?: NodeId; theme?: WindowTheme; themeSet?: ThemeSet; frameless?: boolean }
+  | {
+      op: "window";
+      id?: WindowId;
+      title?: string;
+      width?: number;
+      height?: number;
+      /** Initial position; read when the window opens. */
+      x?: number;
+      y?: number;
+      /** Minimum size the user can resize to; read when the window opens. */
+      minWidth?: number;
+      minHeight?: number;
+      root?: NodeId;
+      theme?: WindowTheme;
+      themeSet?: ThemeSet;
+      frameless?: boolean;
+      /** Minimizes (`true`) or restores (`false`) on commit; an action, not a remembered state. */
+      minimized?: boolean;
+      /** Window events the client wants; replaces the previous list. */
+      events?: WindowEventName[];
+    }
   | { op: "create"; id: NodeId; type: NodeType; props?: Props; events?: string[] }
   | { op: "append"; parent: NodeId; child: NodeId }
   | { op: "insertBefore"; parent: NodeId; child: NodeId; before: NodeId }
@@ -116,8 +148,10 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
+  /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
+  | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
   | { type: "tray"; event: "click" | "menu"; value?: string }
   | { type: "shortcut"; keys: string; window: WindowId }
   | { type: "notification"; id: string; window: WindowId }
@@ -385,6 +419,22 @@ export interface TabsProps {
   class?: string;
 }
 
+/**
+ * One tab of a `Tabs`: append children to build its chip (an `Icon`, a `text`, a `Tag`…; a
+ * last `Button`, `Checkbox` or `Switch` is drawn after them, at its own size).
+ * A `Tabs` with `Tab` children uses them and ignores its `tabs`, and the `Tab` reports nothing:
+ * its `Tabs` sends the `change`.
+ */
+export interface TabProps {
+  /** What `change` reports for this tab. Required: the host rejects a `Tab` without it. */
+  value?: string;
+  /** The tab's text, drawn before its children. A chip of nodes names itself with `a11y.label`. */
+  label?: string;
+  disabled?: boolean;
+  /** Styles the chip itself: `flex-1` makes the tabs share the bar's width. */
+  class?: string;
+}
+
 export interface MenuBarProps {
   menus?: Menu[];
   class?: string;
@@ -603,6 +653,252 @@ export interface CalendarProps {
   class?: string;
 }
 
+/** One item of a `Tree`; `children` nests them. */
+export interface TreeNode {
+  /** Unique within the whole `items` list. */
+  id: string;
+  label: string;
+  children?: TreeNode[];
+  /** Open when the tree first shows it; the user can expand or collapse it. */
+  expanded?: boolean;
+  disabled?: boolean;
+}
+
+export interface TreeProps {
+  items?: TreeNode[];
+  /** The selected item's `id`; one that is not in `items` selects nothing. */
+  value?: string;
+  /** The host only reports clicks; the client confirms them with `value`. */
+  controlled?: boolean;
+  /** Give the tree a bounded height (`h-64`, `flex-1`): it scrolls itself. */
+  class?: string;
+}
+
+/** The selected source lines of a `Diff`, reported with `change`. */
+export interface DiffSelection {
+  path: string;
+  side: "original" | "modified";
+  start: number;
+  end: number;
+  endSide: "original" | "modified";
+}
+
+export interface DiffProps {
+  /** A unified or Git diff; a malformed patch is `invalid_props`. */
+  patch?: string;
+  /** Default "unified". */
+  mode?: "unified" | "split";
+  /** Default true. */
+  lineNumbers?: boolean;
+  /** Default false: long lines scroll horizontally. */
+  softWrap?: boolean;
+  /** Shows a header above each file; default true. */
+  header?: boolean;
+  /** Give it a bounded height (`h-96`, `flex-1`): it scrolls itself. */
+  class?: string;
+}
+
+/** A carousel; each child is one slide. */
+export interface CarouselProps {
+  /** The selected slide index; one past the last slide selects the last one. */
+  value?: number;
+  /** Default "horizontal". */
+  axis?: "horizontal" | "vertical";
+  /** Wrap from the last slide to the first; default false. */
+  looping?: boolean;
+  /** Previous and next buttons; default true. */
+  controls?: boolean;
+  /** One dot per slide; default false. */
+  pagination?: boolean;
+  /** The host only reports slides; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+/** One entry of a `Sidebar`; `children` is its submenu. */
+export interface SidebarEntry {
+  /** Unique across the whole sidebar: it is the `value` and what `change` reports. */
+  id: string;
+  label: string;
+  /** A bundled icon name; collapsed, it is all the entry shows. */
+  icon?: string;
+  disabled?: boolean;
+  /** The submenu starts open; default false. */
+  open?: boolean;
+  children?: SidebarEntry[];
+}
+
+/** A group of entries with a heading (`label`); without one the entries have no heading. */
+export interface SidebarSection {
+  label?: string;
+  items: SidebarEntry[];
+}
+
+export interface SidebarProps {
+  /** The sections: the sidebar takes no children. */
+  items?: SidebarSection[];
+  /** The active entry's `id`; one that is not in `items` leaves none active. */
+  value?: string;
+  /** Icon width (48px) instead of the full width. */
+  collapsed?: boolean;
+  /** What collapsing does: `icon` (default), `offcanvas` or `none`. */
+  collapsible?: "icon" | "offcanvas" | "none";
+  /** Default `left`. */
+  side?: "left" | "right";
+  /** The host only reports clicks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+/** A theme color of a chart series (PROTOCOL.md section 19). */
+export type ChartColor =
+  | "chart-1"
+  | "chart-2"
+  | "chart-3"
+  | "chart-4"
+  | "chart-5"
+  | "primary"
+  | "secondary"
+  | "muted"
+  | "accent"
+  | "danger"
+  | "success"
+  | "warning"
+  | "info";
+
+/** One point of a `Chart`: the category of a line or a bar, or the name of a slice. */
+export interface ChartDatum {
+  label: string;
+  value: number;
+}
+
+export interface ChartProps {
+  /** The plot: `line` (default), `bar` or `pie`. */
+  chart?: "line" | "bar" | "pie";
+  /** The points, in order. */
+  data?: ChartDatum[];
+  /** A line's or the bars' color; default `chart-1`. A pie cycles `chart-1` to `chart-5`. */
+  color?: ChartColor;
+  /** The series name the hover tooltip shows. */
+  name?: string;
+  /** A line's curve between points; default `linear`. */
+  curve?: "linear" | "natural" | "step";
+  /** A line: a dot on each point; default false. */
+  dot?: boolean;
+  /** Bars grow from the left instead of the bottom; default false. */
+  horizontal?: boolean;
+  /** The category axis (of a line or the bars); default true. */
+  xAxis?: boolean;
+  /** How many category labels, spread evenly; default 12, 0 none. */
+  xTicks?: number;
+  /** The value axis; default false. */
+  yAxis?: boolean;
+  /** Ticks on the value axis, both ends included; default 5, below 2 counts as 2. */
+  yTicks?: number;
+  /** The grid lines; default true. */
+  grid?: boolean;
+  /** A line: pin the value axis; both are needed, in order. */
+  yMin?: number;
+  yMax?: number;
+  /** A pie: the hole in the middle, in pixels; default 0. */
+  innerRadius?: number;
+  /** A pie: the gap between slices, in radians (0.03 is a thin gap); default 0. */
+  padAngle?: number;
+  /** The hover crosshair, the dots and the tooltip; default true. */
+  interactive?: boolean;
+  /** Give it a bounded box (`h-64`, `flex-1 w-full`): the plot fills it. */
+  class?: string;
+}
+
+/** One drawing command of a `Canvas` (PROTOCOL.md section 20), in logical pixels from its top-left corner. */
+export type CanvasCommand =
+  | { op: "rect"; x: number; y: number; w: number; h: number; color?: ChartColor; corner_radius?: number }
+  | { op: "line"; x1: number; y1: number; x2: number; y2: number; color?: ChartColor; width?: number }
+  /** `d` takes absolute `M x y`, `L x y` and `Z` only. */
+  | { op: "path"; d: string; color?: ChartColor; width?: number };
+
+/** A point local to a `Canvas`, in the same coordinates as its commands. */
+export interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+export interface CanvasProps {
+  /** Painted in order; `setProps` replaces the whole list. */
+  commands?: CanvasCommand[];
+  /** Give it a bounded box (`h-64 w-full`). */
+  class?: string;
+}
+
+/** One entry of a `Command` palette. */
+export interface CommandEntry {
+  /** Unique across the whole palette: it is what `confirm` reports. */
+  id: string;
+  label: string;
+  /** A bundled icon name. */
+  icon?: string;
+  /** Extra terms the search matches, besides `label`. */
+  keywords?: string[];
+  /** Draws a check at the end of the row. */
+  checked?: boolean;
+  disabled?: boolean;
+}
+
+/** A group of entries with a heading (`label`); without one the entries have no heading. */
+export interface CommandSection {
+  label?: string;
+  items: CommandEntry[];
+}
+
+export interface CommandProps {
+  /** The sections: the palette takes no children and filters them by the query itself. */
+  items?: CommandSection[];
+  /** The search field's placeholder. */
+  placeholder?: string;
+  class?: string;
+}
+
+/** One field of a `Settings` page; `value` fits `type` (a dropdown's is one of its `options`). */
+export type SettingsItem = {
+  /** Unique across all pages: it is what `change` reports. */
+  key: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+} & (
+  | { type: "switch" | "checkbox"; value: boolean }
+  | { type: "input"; value: string }
+  | { type: "dropdown"; value: string; options: { value: string; label: string }[] }
+  | { type: "number"; value: number; min?: number; max?: number; step?: number }
+);
+
+/** A group of fields, with an optional heading. */
+export interface SettingsGroup {
+  title?: string;
+  items: SettingsItem[];
+}
+
+/** A sidebar entry and the groups shown when it is selected. */
+export interface SettingsPage {
+  title: string;
+  /** A bundled icon name. */
+  icon?: string;
+  groups: SettingsGroup[];
+}
+
+/** What `change` reports: the field the user set and its new value. */
+export interface SettingsChange {
+  key: string;
+  value: boolean | string | number;
+}
+
+export interface SettingsProps {
+  /** The pages: the host keeps each value the user sets (no `controlled` mode). */
+  pages?: SettingsPage[];
+  /** Give it a size (`size-full`, `h-96`): the sidebar and the page split the box. */
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -621,6 +917,7 @@ export interface NodeProps {
   VirtualList: VirtualListProps & SharedProps;
   Table: TableProps & SharedProps;
   Tabs: TabsProps & SharedProps;
+  Tab: TabProps & SharedProps;
   Alert: AlertProps & SharedProps;
   Badge: BadgeProps & SharedProps;
   Tag: TagProps & SharedProps;
@@ -644,6 +941,14 @@ export interface NodeProps {
   Toolbar: ToolbarProps & SharedProps;
   Resizable: ResizableProps & SharedProps;
   Calendar: CalendarProps & SharedProps;
+  Tree: TreeProps & SharedProps;
+  Diff: DiffProps & SharedProps;
+  Carousel: CarouselProps & SharedProps;
+  Sidebar: SidebarProps & SharedProps;
+  Chart: ChartProps & SharedProps;
+  Canvas: CanvasProps & SharedProps;
+  Command: CommandProps & SharedProps;
+  Settings: SettingsProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -667,6 +972,8 @@ export interface NodeEvents {
   /** `value` is a row index; `null` when Escape clears the selection. */
   Table: { change: { value: number | null }; doubleClick: { value: number }; sort: TableSort };
   Tabs: { change: { value: string } };
+  /** A `Tab` reports nothing: its `Tabs` sends the `change`. */
+  Tab: {};
   Alert: { close: {} };
   Badge: {};
   Tag: {};
@@ -693,4 +1000,20 @@ export interface NodeEvents {
   Resizable: {};
   /** `value` is the chosen day, `YYYY-MM-DD`. */
   Calendar: { change: { value: string } };
+  /** `value` is the selected item's `id`; `expand`/`collapse` report a folder's `id`. */
+  Tree: { change: { value: string }; expand: { value: string }; collapse: { value: string } };
+  /** `value` is the selected range, `null` when the selection is cleared. */
+  Diff: { change: { value: DiffSelection | null } };
+  /** `value` is the selected slide index. */
+  Carousel: { change: { value: number } };
+  /** `value` is the `id` of the entry clicked. */
+  Sidebar: { change: { value: string } };
+  /** A chart has no events: the hover tooltip is the component's own. */
+  Chart: {};
+  /** `value` is the point pressed, local to the canvas. */
+  Canvas: { pointerDown: { value: CanvasPoint } };
+  /** `value` is the `id` of the entry confirmed (Enter or a click). */
+  Command: { confirm: { value: string } };
+  /** `value` is the field set by the user and its new value. */
+  Settings: { change: { value: SettingsChange } };
 }

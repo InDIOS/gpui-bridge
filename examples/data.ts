@@ -59,20 +59,23 @@ const panel = app.div({ class: "flex flex-col flex-1 min-h-0" }).append(list);
 const parked = app.div().append(table);
 const panels = { list, table };
 const tabs = app
-  .tabs({
-    tabs: [
-      { value: "list", label: "VirtualList" },
-      { value: "table", label: "Table" },
-    ],
-    value: "list",
-    variant: "underline",
-  })
+  .tabs({ value: "list", variant: "underline" })
   .on("change", ({ value }) => {
     const shown = value as keyof typeof panels;
     parked.append(panels[shown === "list" ? "table" : "list"]);
     panel.append(panels[shown]);
     say(`Showing the ${shown}`);
   });
+// Each tab is a node: an icon, its text and the row count in a `Tag` beside it.
+for (const [value, label, icon] of [["list", "VirtualList", "hard-drive"], ["table", "Table", "layout-dashboard"]] as const) {
+  const tab = app.tab({ value, a11y: { label } });
+  tab.append(
+    app.icon({ name: icon, class: "size-4" }),
+    app.text({ content: label }),
+    app.tag({ label: COUNT.toLocaleString("en-US") }),
+  );
+  tabs.append(tab);
+}
 
 const root = app.div({ class: "flex flex-col size-full gap-3 p-4 bg-background text-foreground" }).append(tabs, panel, status);
 app.window({ title: "Data", width: 720, height: 560, root });

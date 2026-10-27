@@ -1,8 +1,12 @@
 # Runs against the real host binary in headless mode (build it first: `cargo build` in host/).
 # Run: python -m unittest   (from client-python/)
 
+import os
+import sys
 import unittest
+from pathlib import Path
 
+import gpui_bridge
 from gpui_bridge import App, HostError, HostExitedError
 
 
@@ -320,6 +324,123 @@ class ClientTest(unittest.TestCase):
             [("row", 1), ("row", None), ("open", 0), ("sort", {"column": "name", "direction": "desc"}), ("tab", "table")],
         )
 
+    def test_a_tabs_of_tab_nodes(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        tabs = app.tabs(value="files", variant="underline")
+        tabs.on("change", lambda value: seen.append(("tab", value)))
+        files = app.tab(value="files", a11y={"label": "Files"})
+        files.append(app.icon(name="folder", class_="size-4"), app.text(content="Files"), app.badge(count=3))
+        tabs.append(files, app.tab(value="history", label="History", disabled=True))
+        app.window(root=app.div().append(tabs))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": tabs.id, "event": "change", "value": "files"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("tab", "files")])
+
+    def test_tree_diff_and_carousel_are_accepted_and_dispatch_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+
+        tree = app.tree(
+            items=[
+                {"id": "src", "label": "src", "expanded": True, "children": [{"id": "src/lib.rs", "label": "lib.rs"}]},
+                {"id": "README.md", "label": "README.md"},
+            ],
+            value="src",
+        )
+        tree.on("change", lambda value: seen.append(("change", value)))
+        tree.on("expand", lambda value: seen.append(("expand", value)))
+        tree.on("collapse", lambda value: seen.append(("collapse", value)))
+        patch = (
+            "diff --git a/notes.txt b/notes.txt\n"
+            "--- a/notes.txt\n"
+            "+++ b/notes.txt\n"
+            "@@ -1,3 +1,4 @@\n"
+            " one\n"
+            "-two\n"
+            "+2\n"
+            " three\n"
+            "+four\n"
+        )
+        diff = app.diff(patch=patch, mode="split")
+        diff.on("change", lambda selection: seen.append(("diff", selection)))
+        carousel = app.carousel(value=0, pagination=True, class_="h-40")
+        carousel.append(app.text(content="One"), app.text(content="Two"))
+        carousel.on("change", lambda index: seen.append(("slide", index)))
+        app.window(root=app.div().append(tree, diff, carousel))
+        app.commit()
+
+        selection = {"path": "notes.txt", "side": "modified", "start": 1, "end": 2, "endSide": "modified"}
+        app._dispatch({"type": "event", "id": tree.id, "event": "change", "value": "README.md"})
+        app._dispatch({"type": "event", "id": tree.id, "event": "expand", "value": "src"})
+        app._dispatch({"type": "event", "id": tree.id, "event": "collapse", "value": "src"})
+        app._dispatch({"type": "event", "id": diff.id, "event": "change", "value": selection})
+        app._dispatch({"type": "event", "id": diff.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": carousel.id, "event": "change", "value": 1})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("change", "README.md"),
+                ("expand", "src"),
+                ("collapse", "src"),
+                ("diff", selection),
+                ("diff", None),
+                ("slide", 1),
+            ],
+        )
+
+    def test_sidebar_and_chart_are_accepted_and_the_sidebar_dispatches_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+
+        sidebar = app.sidebar(
+            items=[
+                {
+                    "label": "General",
+                    "items": [
+                        {"id": "home", "label": "Home", "icon": "layout-dashboard"},
+                        {"id": "inbox", "label": "Inbox", "icon": "inbox"},
+                    ],
+                },
+                {"items": [{"id": "settings", "label": "Settings", "children": [{"id": "theme", "label": "Theme"}]}]},
+            ],
+            value="home",
+        )
+        sidebar.on("change", lambda entry: seen.append(("sidebar", entry)))
+        line = app.chart(
+            chart="line",
+            data=[{"label": "Mon", "value": 12}, {"label": "Tue", "value": 18}],
+            yAxis=True,
+        )
+        pie = app.chart(chart="pie", data=[{"label": "Rust", "value": 60}], innerRadius=20)
+        app.window(root=app.div().append(sidebar, line, pie))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": sidebar.id, "event": "change", "value": "theme"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("sidebar", "theme")])
+
+    def test_malformed_sidebar_and_chart_props_are_invalid_props(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+
+        app.sidebar(items=[{"items": [{"id": "home"}]}])
+        app.chart(data=[{"label": "Mon"}])
+        app.window(root=app.div())
+        app.commit()
+        app.close()
+        self.assertEqual([error.code for error in errors], ["invalid_props", "invalid_props"])
+
     def test_create_window_has_its_own_id_root_and_closed_callback(self):
         app = App(headless=True)
         errors, closed = [], []
@@ -342,6 +463,33 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(closed, [2, 20])
         self.assertEqual([(e.code, e.op) for e in errors], [("invalid_operation", "window")])
 
+    def test_window_events_are_opt_in_and_dispatched(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+
+        window = app.create_window(root=app.div())
+        resized, seen = [], []
+        window.on("resize", resized.append)
+        app.on_window_event = seen.append
+        # The subscription travels as `window.events`, and replaces the previous list.
+        self.assertEqual(app._pending[-1]["events"], ["resize"])
+        with self.assertRaises(ValueError):
+            window.on("hover", print)
+        app.commit()
+
+        app._dispatch({"type": "windowEvent", "id": window.id, "event": "resize", "width": 500, "height": 400})
+        self.assertEqual([message["width"] for message in resized], [500])
+        self.assertEqual([message["event"] for message in seen], ["resize"])
+
+        # The last unsubscribe sends an empty list, so the host stops sending them.
+        window.off("resize")
+        self.assertEqual(app._pending[-1]["events"], [])
+        app.commit()
+
+        app.close()
+        self.assertEqual(errors, [])
+
     def test_host_crash_is_reported_clearly(self):
         app = App(headless=True)
         app._proc.kill()
@@ -352,6 +500,24 @@ class ClientTest(unittest.TestCase):
     def test_missing_host_binary_fails_with_helpful_message(self):
         with self.assertRaisesRegex(HostExitedError, r"host not found at does-not-exist\.exe"):
             App("does-not-exist.exe")
+
+    def test_default_host_path_prefers_the_packaged_asset(self):
+        # The wheel is platform-tagged and carries its binary; a checkout has none staged,
+        # so this checks the order: the explicit variable, the asset, the repository build.
+        name = "gpui-bridge-host.exe" if sys.platform == "win32" else "gpui-bridge-host"
+        packaged = Path(gpui_bridge.__file__).resolve().parent / "bin" / name
+        saved = os.environ.pop("GPUI_BRIDGE_HOST", None)
+        try:
+            if packaged.exists():
+                self.assertEqual(gpui_bridge.default_host_path(), str(packaged))
+            else:
+                self.assertRegex(gpui_bridge.default_host_path(), r"target[\\/](debug|release)[\\/]gpui-bridge-host")
+            os.environ["GPUI_BRIDGE_HOST"] = "an-explicit-host"
+            self.assertEqual(gpui_bridge.default_host_path(), "an-explicit-host")
+        finally:
+            os.environ.pop("GPUI_BRIDGE_HOST", None)
+            if saved is not None:
+                os.environ["GPUI_BRIDGE_HOST"] = saved
 
 
 if __name__ == "__main__":

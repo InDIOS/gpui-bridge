@@ -900,3 +900,938 @@ fuera y se dejó el análisis en [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONE
 No se tocó código en este paso: la lista de tipos de nodo sigue en 40 (PROTOCOL.md §5). El
 documento quedó enlazado desde la §8 del plan y desde el README.
 
+### Extra — Estabilización del repositorio (2026-10-21)
+
+El repositorio pasó a tener `origin` (<https://github.com/InDIOS/gpui-bridge>). Antes de elegir el
+siguiente hito se cerró lo que faltaba para que un checkout y CI sean reproducibles y para que los
+paquetes puedan publicarse sin arreglos manuales. No cambia el protocolo ni el host.
+
+**Verificación de partida** (todo en verde en esta máquina, Windows x64, Node 24.22, pnpm 12.4.2,
+Python 3.12, Rust 1.99.1):
+
+- `cargo test --workspace`: 48 unitarios, la transcripción de conformidad y `no_window`.
+- `cargo clippy --workspace --all-targets -- -D warnings` y `cargo fmt --all -- --check`, limpios.
+- `pnpm test:node` 17/17, `pnpm test:react` 14/14, `pnpm test:python` 17/17.
+- `pnpm --filter gpui-bridge-examples typecheck`, limpio.
+- `gpui-bridge-host --version` → `0.1.0 (windows-x86_64, protocol 1)`, en debug y en release.
+
+**Cambios**
+
+- **Metadatos de publicación:** `license`, `author`, `keywords`, `homepage`, `repository` (con
+  `directory`) y `bugs` en los dos `package.json`; `authors`, `keywords`, `[project.urls]` y más
+  classifiers en `pyproject.toml`. `gpui-bridge-react` declara `os: ["win32"]` y `cpu: ["x64"]`
+  como el cliente de Node, para fallar al instalar en vez de al abrir una ventana.
+- **Enlaces:** `OWNER` reemplazado por `InDIOS` en los README de los paquetes; `RELEASING.md` ya
+  no pide ese reemplazo y explica dónde vive el nombre del repositorio.
+- **`.gitattributes` nuevo:** `* text=auto eol=lf` (el índice ya estaba en LF, pero 51 archivos
+  llegaban al working tree en CRLF en Windows) y binarios declarados (`*.png`, `*.exe`, `*.whl`,
+  `*.tgz`), para que un checkout en macOS/Linux produzca los mismos bytes y las transcripciones de
+  `conformance/` se comparen igual.
+- **Rust fijado:** `rust-toolchain.toml` pasa de `stable` a `1.99.1`, la versión con la que se
+  verificó; CI usa la misma (`RUST_VERSION` en `ci.yml`). Se suben juntas.
+- **CI:** `cargo fmt --all -- --check` (el `rust-toolchain.toml` decía que CI lo corría y no era
+  cierto), `clippy ... -- -D warnings`, `--locked` en clippy/test/build, `timeout-minutes` por job
+  y `concurrency` para cancelar runs viejos de la misma rama.
+- **`CONTRIBUTING.md`:** los checks previos a un commit son los que corre CI, más el type-check de
+  los ejemplos.
+- **Plantillas de GitHub:** `.github/PULL_REQUEST_TEMPLATE.md` repite las reglas de
+  `CONTRIBUTING.md` como checklist (protocolo, fmt, clippy, tests, empaquetado, historial) y
+  `.github/ISSUE_TEMPLATE/bug_report.md` pide `bin/host.json`, la versión del cliente y los logs
+  de stderr.
+- **Plan §8:** se agregó la hoja de ruta propuesta (M0–M6) con criterios de aceptación e impacto en
+  el protocolo; los puntos del backlog anterior quedan como catálogo en §8.2.
+
+**Verificación del empaquetado** (fuera del repositorio, sin `GPUI_BRIDGE_HOST`):
+
+- `pnpm pack:node` → `gpui-bridge-0.1.0.tgz` (7.8 MB) con `bin/gpui-bridge-host.exe` y
+  `bin/host.json` (`0.1.0`, protocolo 1, `win32-x64`). Instalado con npm en una carpeta temporal:
+  `createApp({ headless: true })`, dos `commit` y `close()` → handshake y salida 0.
+- `pnpm wheel` → `gpui_bridge-0.1.0-py3-none-win_amd64.whl` (7.8 MB), instalado en un venv
+  temporal: `App(headless=True)`, dos `commit` y `close()` → salida 0.
+- La primera pasada del wheel falló y eso evitó un bug publicado: el classifier
+  `License :: OSI Approved :: MIT License` choca con `license = "MIT"` + `license-files` de
+  PEP 639 (setuptools ≥ 77 lo rechaza). Se quitó el classifier; la expresión de licencia queda
+  como única fuente.
+
+**Pendiente fuera del repositorio** (no se puede hacer desde un commit): confirmar el primer run
+verde de CI en `dev` y `main`, proteger `main` exigiendo CI y revisión, y crear los secretos
+`NPM_TOKEN` y `TWINE_*` solo cuando se decida publicar (M5).
+
+- **CI en verde (2026-10-21).** El primer run falló solo en `pack`: PowerShell no expande globs
+  para comandos nativos, así que `tar.exe` recibía `packages/client-node/gpui-bridge-*.tgz` literal.
+  El step ahora lista el tarball con `Get-ChildItem`, falla si falta `bin/gpui-bridge-host.exe` o
+  `bin/host.json` y comprueba lo mismo en el wheel. Tras el arreglo, `dev` pasó en `host`, `clients`
+  y `pack`. Proteger `main` sigue pendiente, para cuando el repositorio sea público.
+
+### Fase 28 — Ventanas: posición, tamaño mínimo, minimizar/restaurar y eventos (2026-10-21)
+
+Primer hito de la hoja de ruta M0–M6 ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1). No sube
+`PROTOCOL_VERSION`: son campos **opcionales** de `window` y un mensaje nuevo del host, así que un
+host viejo ignora los campos y un cliente viejo nunca los pide.
+
+**Criterios de aceptación:** posición inicial y tamaño mínimo aplicados al abrir; minimizar y
+restaurar sin cerrar; eventos de foco, redimensionado, movimiento y visibilidad, opt-in;
+`PROTOCOL.md` §3 y §6, transcripción propia, ejemplo y prueba en ventana real.
+
+**Estado:** completada la parte automática; **falta la prueba en ventana real** (ver abajo).
+
+- **API de GPUI verificada en la fuente instalada** (`gpui-pre-0.3.9`, regla 2):
+  `WindowOptions::window_bounds` con `WindowBounds::Windowed(Bounds)`, `WindowOptions::window_min_size`,
+  `Window::minimize_window()`, `Window::activate_window()` (restaura si está minimizada),
+  `Context::observe_window_bounds/activation/visibility`. **No hay `hide()` por ventana**: `App::hide`
+  oculta la aplicación y `hide_window` no existe, así que "ocultar sin cerrar" se resuelve con
+  `minimized`, y restaurar con `activate_window`. Queda dicho en PROTOCOL.md §3.
+- **Protocolo (§3):** `window` acepta `x`, `y` (posición inicial, píxeles lógicos; se leen al abrir,
+  como `frameless`), `minWidth`/`minHeight` (tamaño mínimo; también al abrir), `minimized` (acción:
+  `true` minimiza, `false` restaura y trae al frente; no se recuerda entre commits) y `events`
+  (lista que **reemplaza** la anterior; `[]` desuscribe). Nombres: `focus`, `blur`, `resize`, `move`,
+  `visibility`; uno desconocido es `invalid_json`.
+- **Protocolo (§6):** mensaje `{"type":"windowEvent","id":…,"event":…}`. `move` y `resize` llevan
+  `x`,`y`,`width`,`height`; `visibility` lleva `visible`. Solo se envían los suscritos, y solo
+  cambios: la ventana que abre reporta `focus` si arranca activa, pero no reporta su tamaño ni su
+  posición iniciales (son los que pidió el cliente). `resize` cuando cambió el tamaño; `move`
+  cuando solo cambió la posición.
+- **Host:** `WindowSpec` gana `x`, `y`, `min_width`, `min_height` y `events`; las peticiones de
+  `minimized` van en una cola aparte (`take_window_requests`) que `sync_windows` aplica **después**
+  de abrir o actualizar, así que `{"minimized":true}` funciona en el mismo commit que abre la
+  ventana. `RootView` registra tres observadores (`activation`, `bounds`, `visibility`), los primea
+  con la primera llamada para no mandar ruido y filtra con `tree.wants_window_event`. Los
+  observadores se `detach()`: viven lo que vive la vista, que vive lo que vive la ventana.
+- **Clientes:** Node `WindowOptions` con los campos nuevos, `AppWindow.on/off` para los cinco
+  eventos (manda la lista de `events` solo cuando cambia el conjunto de suscripciones) y
+  `App.on("windowEvent")` para la ventana principal o para todas; Python `Window.on/off` (con
+  `ValueError` para un nombre desconocido) y `App.on_window_event`; React `<Window onFocus onBlur
+  onResize onMove onVisibility>` (suscripción por prop, se da de baja al quitarla) y los campos
+  nuevos en `WindowOptions`, que la ventana principal recibe por `render(element, { window })`.
+- **Ejemplo:** `examples/windows.ts` abre en 80,80 con mínimo 320x220, muestra el tamaño en un
+  texto que actualiza `resize` y tiene un botón "Minimize for 1 s" que minimiza y restaura.
+- **Verificación automática:** 49 unitarios del host (nuevo: eventos y peticiones de `minimized`;
+  el test de `window` cubre la lectura de los campos nuevos), la transcripción nueva
+  `conformance/window-events.txt` (campos válidos, nombre de evento desconocido, tipos erróneos,
+  lista vacía), las 19 transcripciones restantes, `no_window`, 18 tests de Node, 15 de React y 18
+  de Python; `clippy -D warnings`, `fmt` y el type-check de los ejemplos, limpios.
+- **Prueba en ventana real (2026-10-21).** Se condujo el host con un script (una ventana "probe"
+  a 80,80, mínimo 300x200, minimizar y restaurar) y destapó tres cosas que los tests no podían ver:
+  - **`pnpm dev` ejecutaba un host viejo.** `scripts/dev.mjs` prefería `target/release`, que era
+    anterior a M1 (empaquetado de M0); el debug era el actual. Por eso "no funcionaba nada" en
+    `pnpm dev windows`. Ahora prefiere `debug` (el orden que ya usan los clientes) y `--debug`
+    imprime la ruta del host en uso, porque un binario viejo y una función rota se ven igual.
+  - **La geometría se leía del área cliente.** `Window::bounds()` devuelve el origen del área de
+    cliente (80,124 con `x`/`y` = 80,80: +44 px de barra de título), así que un `move` tras
+    minimizar y restaurar "desplazaba" la ventana y un cliente que guardara ese valor y lo
+    devolviera a `x`/`y` se iría bajando en cada arranque. Se usa
+    `window.window_bounds().get_bounds()`: origen del marco (lo mismo que fija `x`/`y`) y tamaño
+    cliente (lo mismo que `width`/`height`).
+  - **`visibility: false` no llegaba al minimizar.** El observador de visibilidad no llama al
+    registrar (a diferencia de activación y bounds), así que el primer `Hidden` se consumía como
+    "prime" y se perdía. Ahora el estado se primea con `window.visibility()` al registrar.
+  - Al minimizar, Windows mueve la ventana a `-32000`; con `window_bounds` ese cambio no aparece
+    como `move`, así que no hace falta filtrarlo.
+  - Secuencia verificada tras el arreglo: `focus` al abrir; `visibility false` + `blur` al
+    minimizar; `focus` + `visibility true` al restaurar; sin `move` espurios.
+- **Pendiente (regla 7):** la comprobación visual sigue en manos del usuario: que la ventana se
+  vea en 80,80, que no baje de 320x220, que el texto de geometría siga al redimensionado y que el
+  botón minimice y restaure. Lo automático cubre el protocolo y los eventos; el dibujo, el mouse y
+  el tamaño mínimo en pantalla no.
+- **Prueba visual del usuario (2026-10-21).** `pnpm dev windows` pasó los tres puntos: la ventana
+  abre en 80,80, no baja de 320x220, el texto de geometría sigue al redimensionado y el botón
+  minimiza y restaura a 1 s. Con eso M0 y M1 quedan cerrados en la hoja de ruta.
+- **Fuera de este paso:** mover o redimensionar la ventana desde el cliente después de abrirla
+  (`x`/`y`/`minWidth`/`minHeight` se leen solo al abrir, y avisan por stderr si cambian), ocultar
+  de verdad (GPUI no lo expone), estado maximizado/pantalla completa en el protocolo, y eventos de
+  DPI o de pantalla.
+
+### Fase 29 — M2: Tree, Diff y Carousel (2026-10-21)
+
+Segundo hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), tanda 1 de
+[GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube `PROTOCOL_VERSION`: son props
+nuevas y objetos dentro de `value`, que un host viejo ignora (PROTOCOL.md §6) y un cliente viejo
+no envía.
+
+**Criterios de aceptación:** props validadas (árbol y patch incluidos), selección y expansión
+reaplicadas al reconstruir, transcripción propia, ejemplo y ventana real; clientes Node, React y
+Python en el mismo cambio.
+
+**Estado:** completada la parte automática; **falta la prueba en ventana real** (ver abajo).
+
+- **API de gpui-component 0.7.3 verificada en la fuente instalada** (regla 2): `tree::Tree` con
+  `TreeState::new/items/set_items/set_selected_item/selected_item/scroll_handle` y
+  `TreeEvent::{Expanded, Collapsed}`; `diff::{Diff, DiffState, DiffFile::parse, DiffEvent,
+  DiffMode, DiffLineRange}`; `carousel::{Carousel, CarouselContent, CarouselItem,
+  CarouselPrevious, CarouselNext, CarouselPagination, CarouselPaginationItem, CarouselState,
+  CarouselEvent}`. Dos detalles que fijaron el diseño: `TreeState::set_items` **resetea** la
+  selección, y al revelar un item seleccionado dentro de una carpeta cerrada
+  `set_selected_item` **emite** `TreeEvent::Expanded` por cada ancestro; `CarouselState` emite
+  `Change` solo desde los caminos de usuario (`select_*`) y sus setters son silenciosos.
+- **Protocolo (§5, §6 y §18):** `Tree` (`items` recursivo, `value`, `controlled`; eventos
+  `change`, `expand`, `collapse`), `Diff` (`patch`, `mode`, `lineNumbers`, `softWrap`, `header`;
+  `change` con `{path, side, start, end, endSide}` o `null`) y `Carousel` (`value`, `axis`,
+  `looping`, `controls`, `pagination`, `controlled`; un hijo por diapositiva; `change` con el
+  índice). `value` admite ya un objeto para `Diff`, como `Table` con `sort`.
+- **Host — Tree:** un `TreeState` por nodo y `TreeSlot` con la lista normalizada
+  (`ItemSpec`, comparable) y un mapa de expansión elegida por el usuario. El estado se reconstruye
+  **solo** cuando `items` cambia (comparar el prop, como `Select` con `options`); tras
+  `set_items` se reaplica `value`. La expansión del usuario sobrevive al rebuild para los ids que
+  siguen existiendo y cuyo `expanded` no cambió el cliente. Un `Cell` de silencio evita que la
+  expansión automática de ancestros (al revelar la selección) se confunda con un clic. La
+  selección se reporta desde el `on_click` de la fila (`change` con el id); los `ListItem` llevan
+  sangría por profundidad y chevron con los iconos incluidos, y las filas se virtualizan solas.
+- **Host — Diff:** `check_patch` parsea el patch al validar la prop, así que uno mal formado es
+  `invalid_props` y nunca llega a `DiffState`; el estado se reconstruye solo si cambian `patch` o
+  `mode` (`set_mode` conserva la selección cuando solo cambia la presentación). `change` se emite
+  desde `DiffEvent::SelectionChanged`, con `null` al limpiar.
+- **Host — Carousel:** un `CarouselState` por nodo; el número de diapositivas es
+  `node.children.len()`, y `sync` aplica recuento, eje, bucle y el índice de `value`
+  (`set_selected_index` lo acota). Los hijos se envuelven en `CarouselItem` en orden; los
+  controles y los puntos son opcionales.
+- **Simulación (`--no-window`):** `change`/`expand`/`collapse` en `Tree` (id desconocido →
+  `invalid_operation`, hoja o item deshabilitado → nada), `change` en `Diff` (`null` o rango con
+  ruta del patch; ruta ausente → `invalid_operation`, objeto mal formado → `invalid_json`) y
+  `change` en `Carousel` (índice fuera de rango → `invalid_json`). Transcripción nueva
+  `conformance/advanced.txt` (props válidas, selección, expansión, controlado, los errores de
+  `simulate` y diez `invalid_props`).
+- **Clientes:** Node añade `app.tree/diff/carousel`, los tipos `TreeNode`, `DiffSelection`,
+  `TreeProps`, `DiffProps`, `CarouselProps` y los eventos tipados. Para liberar el nombre `tree`
+  el árbol de operaciones interno de `App` pasó a llamarse `wire` (solo uso interno). React añade
+  `<Tree>`, `<Diff>` y `<Carousel>`, `onExpand`/`onCollapse` y deduce `controlled` de `value` como
+  el resto de controles. Python añade `tree`, `diff` y `carousel`.
+- **Ejemplo:** `examples/advanced.ts` (árbol de un repositorio con selección y expansión, patch
+  unificado con selección de líneas y carrusel con puntos), ejecutable con
+  `pnpm dev advanced`.
+- **Verificación automática:** 52 unitarios del host (nuevos: validación recursiva del árbol,
+  reaplicación de la expansión y parseo del patch), las 21 transcripciones de `conformance/`,
+  `no_window`, 19 tests de Node, 16 de React y 19 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Corrección tras la primera prueba en ventana real (2026-10-21).** `pnpm dev advanced` mostró
+  los tres contenedores vacíos (el carrusel solo con los puntos) y destapó dos fallos de layout
+  que ningún test sin ventana podía ver:
+  - **`a11y::wrap` encogía los componentes a su ancho de contenido.** Es un `div().flex()` extra;
+    dentro de una columna, un hijo `size_full()` no tiene un ancho definido contra el que
+    resolverse, así que `Tree` y `Diff` quedaban con un ancho mínimo. Los tres componentes de datos
+    aplican ahora el `a11y` en **su propia** caja con tamaño (`component_a11y`), sin envoltorio
+    extra; el resto de componentes conserva el envoltorio de siempre.
+  - **El carrusel no tenía altura definida.** El estado contaba las diapositivas (los puntos
+    salían), pero `CarouselContent` se dimensionaba por contenido y una diapositiva `size-full`
+    resolvía a 0. Ahora la raíz del carrusel es `h_full()` y el contenido `flex_1().min_h_0()`, de
+    modo que la diapositiva llena el espacio que dejan los controles.
+- **Prueba en ventana real (2026-10-21).** Con el host en debug, `pnpm dev advanced` y clics
+  guionizados sobre la ventana (más capturas de la propia ventana con `PrintWindow`), se
+  comprobó lo que ningún test sin ventana cubre:
+  - **Tree:** muestra la jerarquía (`src` abierto con `main.rs` y `ui`, y `README.md` y `target`
+    deshabilitado atenuado); un clic en `README.md` mueve la selección y muestra
+    `Tree: selected README.md`; un clic en `ui` lo expande y aparece `tree.rs`.
+  - **Diff:** pinta el patch con cabecera, hunk y líneas tintadas; un clic en el número de la
+    línea 2 la selecciona (azul) y muestra `Diff: notes.txt original 2-2`.
+  - **Carousel:** la diapositiva se ve y llena la caja; las flechas `‹ ›` y los tres puntos están
+    visibles; un clic en `›` pasa a la diapositiva 2, mueve el punto activo y muestra
+    `Carousel: slide 2`.
+- **Dos fallos más que destapó esa prueba.**
+  - **`ListItem` apila sus hijos directos en un bloque**, así que el chevron y el texto del árbol
+    salían en dos líneas; ahora van dentro de un `h_flex` (una fila).
+  - **`CarouselPrevious`/`CarouselNext` se posicionan en absoluto sobre el contenido y en este
+    host quedaban fuera de la caja visible.** Se sustituyen por dos botones propios (iconos
+    `chevron-left`/`chevron-right`) en una fila bajo la diapositiva, que llaman a
+    `select_previous`/`select_next` (el mismo camino que emite `change`).
+- **Pendiente (regla 7):** nada visual de esta tanda; el teclado del carrusel y del árbol se
+  ejercitó por los botones y el foco, y lo automático cubre el resto.
+- **Fuera de este paso:** `value` como selección de líneas de `Diff` (la selección es del
+  componente), búsqueda o filtrado en `Tree`, carga incremental, y `Dock`/`Command`/`Settings`/
+  `List`/`Chart`/`Sidebar`, que siguen en las tandas siguientes.
+
+### Fase 30 — M3: Sidebar y Chart (2026-10-21)
+
+Tercer hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), tanda 2 de
+[GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube `PROTOCOL_VERSION`: son dos
+tipos de nodo y props nuevas que un cliente viejo no envía.
+
+**Criterios de aceptación:** los de M2 (props validadas, transcripción, ejemplo, ventana real y
+los tres clientes en el mismo cambio) más una prueba con series de 1000 puntos y un árbol
+profundo.
+
+**Estado:** hecha, con la prueba en ventana real.
+
+- **Protocolo (§5 y §19):** `Sidebar` (`items` en secciones `{label?, items}` de entradas
+  `{id, label, icon?, disabled?, open?, children?}` a cualquier profundidad, `value`,
+  `collapsed`, `collapsible` `icon`/`offcanvas`/`none`, `side`, `controlled`; `change` con el id)
+  y `Chart` (`chart` `line`/`bar`/`pie`, `data` `[{label, value}]`, `color` con los nombres del
+  tema, `name`, y las opciones de cada gráfico; sin eventos). Ninguno toma hijos.
+- **Host — Sidebar:** `check_items` valida secciones, entradas, ids únicos en todo el sidebar e
+  iconos incluidos; `build` arma `Sidebar`/`SidebarGroup`/`SidebarMenu` de gpui-component con el
+  activo marcado por `value`. Un clic en una entrada deshabilitada o en la activa no envía nada;
+  una entrada padre reporta su id y abre o cierra su submenú.
+- **Host — Chart:** `ChartSlot` guarda los puntos parseados y solo se relee cuando cambia `data`
+  (una serie de 1000 puntos no se parsea en cada cuadro). Línea (`curve`, `dot`, `yMin`/`yMax`),
+  barras (`horizontal`) y tarta (`innerRadius`, `padAngle`, colores `chart-1`…`chart-5` por
+  porción).
+- **Simulación y conformidad:** `change` en `Sidebar` (id desconocido → `invalid_operation`,
+  deshabilitada o activa → nada; `Chart` no tiene eventos). Transcripción nueva
+  `conformance/charts.txt` (props válidas, selección, submenú, controlado y diez
+  `invalid_props`).
+- **Clientes:** Node `app.sidebar/chart` con `SidebarSection`, `ChartDatum` y los tipos de props;
+  React `<Sidebar onChange>` y `<Chart>`; Python `sidebar` y `chart`.
+- **Ejemplo:** `examples/dashboard.ts` (`pnpm dev dashboard`): sidebar con submenú y entrada
+  deshabilitada, línea de 1000 puntos con botón para reenviarlos, barras, tarta y un árbol de 10
+  niveles (2047 items).
+- **Tres fallos que destapó la prueba en ventana real** y que ningún test sin ventana ve:
+  - **Las 1000 etiquetas del eje x** se dibujaban todas (gpui-component etiqueta cada punto por
+    defecto) y formaban una barra negra. El host pasa ahora `x_tick_count`/`band_tick_count`:
+    12 etiquetas por defecto, repartidas del primer punto al último, y el prop `xTicks` (entero
+    desde 0) deja al cliente elegir el número (0 ninguna; uno mayor que los puntos, todas).
+    `yTicks` hace lo mismo con las marcas del eje de valores (por defecto 5, extremos incluidos;
+    gpui-component sube a 2 lo que quede por debajo).
+  - **`padAngle` está en radianes** (`Pie` de gpui-base trabaja sobre `TAU`). El ejemplo y la
+    transcripción usaban `2` (≈115°), que se tragaba toda porción menor: solo se veía la de
+    Rust, aunque el hover sí encontraba las otras. Se documenta la unidad y el ejemplo pasa a
+    `0.03`.
+  - **El tooltip de la tarta no decía qué porción era** («21 (21.0%)»); ahora usa
+    `tooltip_name` con la etiqueta («TypeScript 21 (21.0%)»).
+- **Prueba en ventana real (2026-10-21).** Host en debug, `pnpm dev dashboard`, clics guionizados
+  y capturas de la ventana: clic en Inbox, Settings (abre el submenú con Palette atenuada) y
+  Theme mueven el activo y muestran `Sidebar: <id>`; Palette deshabilitada no cambia nada;
+  «Toggle sidebar» lo pliega a iconos; «Refresh the series» reenvía los 1000 puntos (0,6 ms en
+  el cliente) y la línea se redibuja; el árbol de 10 niveles se ve con tres niveles abiertos y un
+  clic expande `b`. Sin pánicos en el stderr del host.
+- **Verificación automática:** 58 unitarios del host, las 22 transcripciones de `conformance/`,
+  `no_window`, 21 tests de Node, 17 de React y 21 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Fuera de este paso:** varias series por gráfico, leyenda, gráficos de área/radar/velas y
+  eventos de clic en puntos o porciones.
+
+### Fase 31 — M4: `Tab` dentro de `Tabs` (2026-10-21)
+
+Cuarto hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1), el piloto de
+subcomponentes de [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9. No sube
+`PROTOCOL_VERSION`: un tipo de nodo nuevo que un cliente viejo no envía, y `tabs` sigue igual.
+
+**Criterios de aceptación:** pestañas hechas de nodos (icono + texto + `Badge`) que informan la
+elegida como hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia;
+transcripción, ejemplo, los tres clientes y ventana real.
+
+**Estado:** hecha, con la prueba en ventana real (2026-10-21).
+
+- **Protocolo (§5 y §15):** nodo `Tab` (`value` obligatoria y no vacía, `label`, `disabled`,
+  `class`; sin eventos) y el párrafo que explica que un `Tabs` con hijos `Tab` los usa e **ignora
+  `tabs`**, que los hijos del `Tab` se dibujan dentro del chip **después del `label`** (o sea, que
+  una pestaña se arma con nodos), que el `class` del `Tab` vista el chip, que una pestaña sin
+  `label` se anuncia con su `a11y.label` y que un `Tab` fuera de un `Tabs` o un hijo que no es
+  `Tab` no se dibujan ni son pestañas (y `value` repetido: gana el primero). `change` sigue
+  saliendo del `Tabs`. `simulate` (§9) elige sobre los hijos `Tab` cuando los hay.
+- **Host — `tabs.rs`:** `choices` (los `(value, disabled)` de los hijos `Tab`, o los de `tabs`) y
+  `chip` (el `Tab` de gpui-component con su `label` o su `aria_label`, y sus hijos dentro en una
+  fila con `gap_2`). `build` arma la barra con los chips que le pasa el render, o con los de
+  `tabs` si no hay hijos; el clic sigue siendo el mismo `on_click` por índice, así que una pestaña
+  deshabilitada o ya elegida no envía nada.
+- **Host — `schema.rs` y `tree.rs`:** `NodeType::check_required`, la primera prop obligatoria del
+  protocolo: un `Tab` sin `value` (o con uno vacío, o un `setProps` que lo quita) es
+  `invalid_props`.
+- **Host — render:** `tabs_node` recoge los hijos `Tab`, les pasa sus nodos ya construidos y les
+  aplica su `class` al chip; un `Tab` suelto no dibuja nada. `tab_content` construye el contenido
+  con `in_chip` puesto: la marca nueva que hace que **solo los controles** (`Button`, `Checkbox`,
+  `Input`, `Select`, `Switch`, `RadioGroup`, `Slider`, `NumberInput`, un `Tab` doblado, un `Table`,
+  un `MenuBar` y un `div` con `click`) ocluyan el clic, de modo que la pestaña no se elija. Se
+  separa de `in_control` (área de título) a propósito: el occlude de `component_a11y`, que vale
+  para un área de título, haría que un `Icon`, un `text` o un `Badge` dentro del chip se comieran
+  el clic y la pestaña no se eligiera al pulsar sobre ellos. Los dos casos se juntan en
+  `blocks_area`.
+- **Simulación y conformidad:** `conformance/data.txt` (§15) gana una barra de hijos `Tab`:
+  elección, repetida, deshabilitada, `tabs` ignorado y un hijo que no es `Tab` (`invalid_operation`
+  para los dos), controlado y `Tab` sin `value` / con `value` vacío o no textual / quitado
+  (`invalid_props`).
+- **Clientes:** Node `app.tab` (con `TabProps`), React `<Tab>` (con hijos; `TabsProps.tabs` pasa a
+  opcional) y Python `tab`.
+- **Ejemplos:** `examples/components.ts` gana una barra hecha de nodos (icono + texto + `Badge`),
+  una pestaña deshabilitada y un `Button` «×» dentro de la primera pestaña; `examples/data.ts`
+  cambia sus pestañas por nodos con el icono y, encima, un `Badge` con las 10 000 filas.
+- **Dos fallos de aspecto que destapó mirar la ventana real.** El chip no separaba sus nodos
+  (gpui-component solo separa lo que construye él: su `label`, su prefijo y su sufijo), así que
+  icono, texto y `Badge` salían pegados; ahora van en una fila con `gap_2` (8 px, lo mismo que
+  una fila de `Tree`). Y el `Badge` del ejemplo estaba suelto: el `Badge` de gpui-component es un
+  envoltorio que pinta la cuenta en absoluto **sobre su hijo**, así que sin hijos ocupaba 0×0 y el
+  número se montaba encima del texto; ahora envuelve al icono (y `PROTOCOL.md` §17 lo aclara).
+- **Prueba en ventana real (2026-10-21):** el host abre la ventana del ejemplo sin rechazar
+  ninguna operación (el log no trae `invalid_props` ni `unknown_type`) y sin pánicos en el
+  `stderr`; los iconos del ejemplo se corrigieron a nombres del juego por defecto (`replace`,
+  `undo`). **Verificado con clics por el usuario:** elegir pestañas, la pestaña deshabilitada que no
+  hace nada y —el punto del hito— la «×» dentro de un chip, que **no** cambia de pestaña.
+- **Verificación automática:** 58 unitarios del host, las 22 transcripciones de `conformance/`,
+  `no_window`, 22 tests de Node, 18 de React y 22 de Python; `clippy -D warnings`, `fmt` y el
+  type-check de los ejemplos, limpios.
+- **Fuera de este paso:** el resto del piloto (`Radio` en `RadioGroup`, `Step` en `Stepper`,
+  `Entry` en `DescriptionList`, `Section` en `Accordion`, que sí tendrían que decidir cómo se
+  dibuja un `Radio`/`Step` suelto, y `Select`/`Tree`/`Table`/`Sidebar`, que arman sus elementos a
+  partir de datos y tienen estado propio).
+
+### Fase 32 — M5: multiplataforma (2026-10-21)
+
+Quinto hito de la hoja de ruta ([GPUI_BRIDGE_PLAN.md](GPUI_BRIDGE_PLAN.md) §8.1). No sube
+`PROTOCOL_VERSION`: el protocolo es el mismo, cambia **dónde vive el binario** y en qué sistemas se
+compila.
+
+**Criterios de aceptación:** CI con matriz de los tres sistemas; instalar el paquete y abrir un
+ejemplo en cada uno; `os`/`cpu` de los `package.json` relajados junto con los assets.
+
+**Estado:** hecha la parte automática; **la matriz de CI aún no se ejecutó** (se verifica al
+empujar) y la comprobación visual en ventana real de macOS y Linux queda pendiente porque no hay
+máquinas de esas plataformas en el entorno (decisión del usuario: M5 cierra con la verificación de
+CI).
+
+- **El host compila en Linux.** `tray-icon` 0.26 emite `compile_error!` si no tiene uno de sus dos
+  backends de Linux, así que `packages/host/Cargo.toml` declara la dependencia con `ksni` en
+  `cfg(any(target_os = "linux", freebsd, netbsd, openbsd, dragonfly))`: `ksni` habla D-Bus por su
+  cuenta, sin GTK ni `libappindicator`. Windows y macOS usan la API del sistema y no llevan feature
+  (por eso `default-features = false` en la dependencia principal). No hay ni un `#[cfg]` en las
+  fuentes del host: lo específico de plataforma vivía en dependencias, no en el código.
+- **Un paquete npm por plataforma.** `packages/host-<plataforma>-<arch>/` (tres: `win32-x64`,
+  `darwin-arm64`, `linux-x64`) con nombre `gpui-bridge-<plataforma>-<arch>`, `os`/`cpu` propios,
+  `files: ["bin"]` y un `prepack` que copia el host ya compilado (y un `postpack` que lo borra, para
+  que un checkout no se quede con un binario viejo). `gpui-bridge` declara los tres como
+  `optionalDependencies` (`workspace:*`, que pnpm reescribe a la versión al publicar): npm instala
+  el que corresponde a la máquina y descarta los otros dos. El paquete del cliente ya **no** lleva
+  binario ni `os`/`cpu`, y `gpui-bridge-react` tampoco (es JavaScript puro).
+- **`scripts/stage-host.mjs` estrena plataforma explícita.** El destino del asset sale de un *tag*
+  (`win32-x64`, `darwin-arm64`, `linux-x64`) que se deduce del `--triple` de Rust o de la máquina, y
+  `--tag` lo fija a mano; con eso elige el nombre del ejecutable (`.exe` o no), el paquete npm de
+  destino y la carpeta del wheel. `--from` busca primero `target/<triple>/release` y después
+  `target/release`, así que sirve tanto para una compilación nativa como para un cross target. Si el
+  tag no tiene paquete npm, falla con un mensaje claro en vez de inventar una carpeta.
+- **Cómo encuentra el host cada cliente.** Node: `$GPUI_BRIDGE_HOST`, el binario del paquete de
+  plataforma instalado (`gpui-bridge-<plataforma>-<arch>`, resuelto por su `package.json` con
+  `createRequire`), y si no una build de Cargo en `target/{debug,release}` hacia arriba —el orden
+  acordado: entorno → paquete de plataforma → repositorio—. `defaultHostPath()` es ahora un export
+  público: sirve para diagnosticar qué host corre una app. Python no cambia su orden (el wheel es
+  uno solo por plataforma y sigue llevando el host en `gpui_bridge/bin/`); lo que cambia son sus
+  classifiers (Windows, macOS y Linux) y el texto que documenta el tag del wheel.
+- **Prueba de empaquetado reproducible: `scripts/check-package.mjs`** (también `pnpm
+  check:package`). Instala los tarballs y el wheel en una carpeta **fuera** del repositorio, sin
+  `GPUI_BRIDGE_HOST` y sin Rust, y abre una app headless con el cliente de Node y el de Python
+  imprimiendo la ruta del host que cada uno resolvió. En Windows resuelve además el detalle de
+  lanzar npm sin shell (un `.cmd` no se puede `spawn`ear directo; se ejecuta su `npm-cli.js` con el
+  mismo intérprete).
+- **CI con matriz** (`.github/workflows/ci.yml`): `host` en los tres sistemas (fmt, clippy,
+  unitarios + transcripciones + `no_window`, release y artefacto `gpui-bridge-host-<tag>`);
+  `clients` en Windows y Linux (Node, React y Python contra el host descargado, con el asset
+  **estageado** antes de correr los tests, para que la prueba del resolvedor ejercite la rama del
+  paquete de plataforma; y el type-check de los ejemplos); y `pack` en los tres (tarball del
+  paquete de plataforma, tarball del cliente y wheel, comprobación de que el host viaja dentro de
+  los dos últimos y `check-package.mjs`). Linux instala las bibliotecas que GPUI necesita: lista de
+  desarrollo en el job del host y lista de runtime en el de clientes, porque incluso un host que
+  corre sin ventana tiene que poder cargar sus `.so`.
+- **`release.yml`** publica primero el paquete de plataforma de Windows y después el cliente, y sube
+  también el tarball de plataforma como artefacto. Publicar los tres paquetes y los tres wheels de
+  una release es trabajo de M6 (el job corre en un solo runner).
+- **Verificación automática (local, 2026-10-21):** 58 unitarios del host, las 22 transcripciones de
+  `conformance/` y `no_window`; 23 tests de Node, 18 de React y 23 de Python (uno nuevo por
+  cliente, el del orden de búsqueda del host, que comprueba las dos ramas: paquete de plataforma
+  estageado y build del repositorio); `clippy -D warnings`, `fmt` y el type-check de los ejemplos,
+  limpios. El camino de empaquetado completo se corrió entero en Windows:
+  `pnpm --dir packages/host-win32-x64 pack`, `pnpm pack:node`, `pnpm wheel` y `pnpm check:package`,
+  que informó `node_modules/gpui-bridge-win32-x64/bin/gpui-bridge-host.exe` y
+  `site-packages/gpui_bridge/bin/gpui-bridge-host.exe`, y las dos apps headless cerraron con código
+  0. La matriz de CI, en cambio, todavía no se ejecutó.
+- **Fuera de este paso:** los paquetes de `darwin-x64`, `linux-arm64` y demás combinaciones (el
+  script los soporta en cuanto exista el paquete: `--tag`), la publicación multiplataforma (M6), la
+  firma de código de Windows (M6) y la comprobación visual en ventana real de macOS y Linux.
+
+### Fase 33 — Revisión de `Tabs`/`Tab` (2026-10-23)
+
+Una revisión del pilot de M4 contra el `TabBar` de gpui-component 0.7.3, mirando la ventana real
+del ejemplo `components`, encontró tres fallos del host y un ejemplo que se veía mal.
+
+- **La barra no llenaba el ancho si el `Tabs` traía `a11y`.** El render envolvía todo componente
+  con `a11y` en `a11y::wrap`, que es una fila, y el `TabBar` se encogía a sus pestañas (la línea
+  inferior terminaba en la última). `Tabs` pasa a la lista de los que ponen su `a11y` en un wrapper
+  con tamaño (`component_a11y`). Además el `TabBar` ya es un `tablist` (gpui-base), así que el
+  wrapper es un `group` con la `label` (`tabs::named`) y no un segundo `tablist` anidado.
+- **Un control dentro del chip salía recortado.** gpui-component mete los hijos de un `Tab` en una
+  caja de alto fijo (26 px en `underline`) con `overflow_hidden`, y un `Button` mide 32 px. Ahora el
+  último hijo del `Tab`, si es `Button`, `Checkbox` o `Switch`, va al `suffix` del `Tab`, fuera de
+  esa caja y a su tamaño (`tabs::is_control`).
+- **`label` e hijos salían pegados.** gpui-component no pone separación entre su `label` y los
+  hijos; con hijos, el chip dibuja el `label` primero en su propia fila con `gap_2` (y lo pasa como
+  `aria_label`). El `a11y.label` del `Tab` gana siempre sobre el `label`, como en gpui.
+- **Sobraba una comprobación**: el `!disabled` del `on_click` de la barra; gpui-component ya no
+  reporta una pestaña deshabilitada.
+- **Ejemplos.** El `Badge` de gpui-component dibuja el número fuera de su caja, encima del icono
+  (16 px) y sobre el texto. `components.ts` y `data.ts` llevan ahora icono, texto y un `Tag` con la
+  cuenta; `components.ts` además muestra un panel que cambia con la pestaña y ya no pide
+  `role: "tablist"`. PROTOCOL.md §15 documenta el `suffix`, la altura de la fila y el `a11y` de la
+  barra.
+- **Verificación (local, 2026-10-23):** 60 tests del host (unitarios, transcripciones y
+  `no_window`), `clippy` y `fmt` limpios; en ventana real (Windows): barra a todo el ancho, «×» sin
+  recorte al pasar el ratón, la «×» no cambia de pestaña, «Changes» cambia el panel, y un `Tab` con
+  `label` + icono los separa.
+
+### Fase 34 — M6: gpui-kit 0.8, parte A y B (2026-10-23)
+
+**M6-A — Bump de dependencias.** `gpui-kit` (y `gpui-base`, `gpui-component`,
+`gpui-component-macros`, `gpui-kit-assets`) de 0.7.3 a 0.8.0 en
+`packages/host/Cargo.toml`, con `cargo update` y `Cargo.lock` regerado.
+`cargo check`, `cargo fmt --check` y `cargo clippy -- -D warnings` pasan, y
+`cargo update --locked` reporta 0 paquetes bloqueados (consistente con CI).
+El host compila sin cambios de código: `TabVariant`, `TableEvent`,
+`TableState::set_selected_row`, `DataTable`, `ScrollableElement` y
+`h_resizable`/`v_resizable`/`resizable_panel` siguen disponibles en 0.8.
+
+**M6-B — `Tabs`/`TabVariant::Folder`.** `components/tabs.rs` acepta ahora
+`variant: "folder"` y lo mapea a `TabVariant::Folder` (nueva en 0.8). El `match`
+se sigue haciendo por string con `_ => TabVariant::Tab` de fallback, así que
+clientes existentes y strings desconocidos siguen funcionando y no se sube
+`PROTOCOL_VERSION`.
+
+**Verificación (local):** `cargo check`, `fmt --check` y `clippy -D warnings`
+limpios. La revisión del source de gpui-component 0.8.0 confirmó que
+`TabVariant` agregó `Folder` y conservó `Tab`/`Outline`/`Pill`/`Segmented`/
+`Underline`.
+
+Pendiente de M6: revisar `Table` (Home/End, `set_selected_row` sin corte de
+propagación, `ClearSelection`), scroll (`scroll_bounce`, rueda vertical en
+eje horizontal), `Resizable` (confirma sin `on_drag`), easing/transition,
+tests de los tres clientes, `pnpm check:package`, prueba en ventana real de
+`components`, `data`, `advanced` y `dashboard`, y entrada de cambios de
+comportamiento en este mismo historial.
+
+### Fase 35 — M6: revisión Table, Scroll, Resizable y Easing (sin cambios de código)
+
+**M6-C — `Table`/`DataTable`.** En gpui-component 0.8 persisten `DataTable`,
+`TableDelegate`, `TableState`, `TableEvent::SelectRow`/`DoubleClickedRow`/
+`ClearSelection` y `TableState::set_selected_row`. Teclado: `SelectFirst`
+(Home) → fila 0 y `SelectLast` (End) → última fila, como describe el ROADMAP.
+El handler del host (`components/table.rs`) protege la selección controlada:
+sólo llama `row_selected` cuando `current != Some(ix)`, y el re-sync sólo llama
+`set_selected_row` cuando `state.selected_row() != selected`, así que aunque
+`set_selected_row` ya no corte la propagación en 0.8 no hay bucle entre la
+selección del usuario y la selección controlada. No se requirió cambio de código.
+
+**M6-D — Scroll.** `Scrollable` en 0.8 trae `scroll_bounce: Option<bool>` y
+envuelve siempre `gpui_base::ScrollBounce`; con `scroll_bounce: None` (lo que
+deja el host) aplica el default por plataforma (rebote activo en macOS). En eje
+horizontal, gpui-component agrega `ScrollableMask::vertical_wheel`, así que la
+rueda vertical se queda con el wrapper salvo `.scroll_wheel(false)`. El host usa
+`overflow_x_scrollbar`/`overflow_y_scrollbar`/`overflow_scrollbar`, que siguen
+existiendo. No se requirió cambio de código; la verificación de comportamiento
+(VirtualList, Table, Tree, Diff y div con overflow anidado) se deja para la
+prueba en ventana real.
+
+**M6-E — `Resizable`.** `h_resizable`/`v_resizable`/`resizable_panel` son iguales
+en 0.8 y el host no usa `ResizeHandle::on_drag`. Sin cambios de código; solo
+se confirmó al compilar.
+
+**M6-F — Easing / `transition`.** `animation.rs` y `styles.rs` usan `Ease`,
+`Timing`, `Transition` y `Visual` de gpui-base; `cargo check` pasó. Se revisó
+que ningún valor del host asuma un rango cerrado `[0, 1]` (el easing es
+cubic-bezier con sobrepaso permitido y la interpolación del host trabaja sobre
+`Visual`). Sin cambios de código.
+
+Pendiente de M6: `cargo test` del host, tests de los tres clientes,
+`pnpm check:package`, y prueba en ventana real de `components`, `data`,
+`advanced` y `dashboard`.
+
+### Fase 36 — M7: preparar la primera publicación (2026-10-23)
+
+Versión **0.2.0** (decidida por el usuario en `ef0ac23`; el protocolo sigue en 1). Este paso deja
+todo listo para publicar; publicar lo hace el usuario.
+
+- `Cargo.lock` no había entrado en el commit del bump y CI corre con `--locked`: commit aparte.
+- `release.yml` corría en un solo runner de Windows: publicaba solo `gpui-bridge-win32-x64`
+  (en macOS y Linux `gpui-bridge` habría quedado sin host), usaba `pypa/gh-action-pypi-publish`
+  en Windows (es una acción de contenedor, solo Linux) y no seguía a CI (`@stable`, sin
+  `--locked`). Ahora llama a `ci.yml` entero como workflow reutilizable (`workflow_call`) y
+  publica lo que construyó su job `pack`: un job `npm` en Linux (comprueba que el tag es la
+  versión de los paquetes, publica los tres paquetes de plataforma y después `gpui-bridge` y
+  `gpui-bridge-react`, y salta las versiones que ya están en npm) y un job `pypi` en Linux con el
+  entorno `pypi` y los tres wheels. Los dos con OIDC, sin tokens. Lanzarlo a mano es el ensayo:
+  construye y sube los artefactos y no publica. El job `pack` ahora empaqueta también
+  `gpui-bridge-react`.
+- El host de Linux se compila en `ubuntu-22.04` y el wheel lleva la glibc con la que se compiló
+  (`manylinux_2_35_x86_64`): `manylinux2014` prometía glibc 2.17 y el binario de
+  `ubuntu-latest` pide la 2.39.
+- Docs coherentes sobre plataformas: README, §1 del plan, `RELEASING.md` y el README de PyPI dicen
+  lo mismo (binarios para Windows x64, macOS arm64 y Linux x64, probados en CI; en ventana real,
+  solo Windows). El README abre con `pip install` y el contador en Python, «GPUI from Python, or
+  from any language that can start a process», y presenta `PROTOCOL.md` y `conformance/` como el
+  contrato para un cliente nuevo; Node y React después. El README de PyPI enlaza el protocolo, las
+  transcripciones y los ejemplos con URLs absolutas.
+- `CHANGELOG.md` 0.2.0 con lo que reciben los usuarios (M1–M6) y `RELEASING.md` con la primera
+  publicación paso a paso: npm solo admite publicador de confianza en paquetes que ya existen, así
+  que la 0.2.0 de los cinco paquetes npm sale a mano desde los artefactos del ensayo; PyPI admite
+  publicador pendiente.
+
+Verificado: YAML de los dos workflows válido, la etiqueta del wheel con un self-check (Windows
+`win_amd64`; Linux simulado con glibc 2.35 y 2.39.1), la extracción `name@version` del tarball,
+23 tests de Python. No verificado: el workflow en GitHub (no se empujó), `ubuntu-22.04` con las
+bibliotecas de GPUI, y el wheel construido en Linux.
+
+Pendiente de M7, del usuario: firma de código del host de Windows (pide un certificado o un
+servicio de firma propio), repositorio público, publicadores de confianza, tag `v0.2.0` y la
+instalación desde los registros.
+
+**Nombres con scope (mismo día).** Al publicar a mano, npm rechazó `gpui-bridge-win32-x64` con
+«Package name triggered spam detection» (403). Sin nada publicado todavía, los tres paquetes de
+plataforma pasan a `@indios/gpui-bridge-<plataforma>-<arch>` (el patrón de `@esbuild/win32-x64`;
+el scope es la cuenta npm del usuario) y `gpui-bridge` y `gpui-bridge-react` conservan el nombre.
+Cambian los `package.json`, las `optionalDependencies` y la búsqueda del host en `client-node`,
+el lockfile y los docs vigentes (el historial no se reescribe). Verificado: 23 tests de Node y
+`pnpm check:package` fuera del repositorio, con el cliente resolviendo
+`node_modules/@indios/gpui-bridge-win32-x64/bin/gpui-bridge-host.exe` y las dos apps headless en
+verde.
+
+### Fase 37 — M8: cliente Go (2026-10-24)
+
+`packages/client-go/` (módulo `github.com/InDIOS/gpui-bridge/packages/client-go`, paquete
+`gpuibridge`), solo biblioteca estándar. El protocolo sigue en 1.
+
+- **Conformidad del lado del cliente.** Las transcripciones prueban el host y su runner ya las
+  reproduce; el test del cliente comprueba lo contrario: que lo que escribe por cada operación es
+  una línea `>` de `conformance/`. Destapó que toda `window` llevaba `"themeSet":null` (un
+  `*ThemeSet` nil pasado como `any`). Se borró la copia de `conformance/` dentro del paquete.
+- **Huecos de `PROTOCOL.md`**, corregidos: un `create` rechazado no deja nodo (§4) y qué comprueba
+  un cliente frente a las transcripciones (§9). El cliente se escribió mirando los otros, así que
+  no prueba del todo que alcance con la especificación.
+- **Goroutines.** Los handlers corren en la goroutine que lee del host; los métodos de `Node` toman
+  el lock de `App`. Un test hace fallar a `-race` sin el lock, y CI corre `go test -race`.
+- **Fallos de `App`:** `Run` tras `Close` se colgaba, `Debug` no reenviaba el stderr del host,
+  `Commit` descartaba los errores de escritura y `setEvents` salía en orden aleatorio. Se borraron
+  campos y tipos sin uso.
+- **Publicación** (decidido por el usuario): nombres idiomáticos (`NodeID`, `ProtocolVersion`,
+  `HandshakeTimeout`, `Window`…), `go 1.22`, README y LICENSE dentro del módulo. Los módulos de
+  Go son solo código, así que el host va como asset del GitHub Release: `release.yml` (job
+  `github`) adjunta los tres hosts y `SHA256SUMS` y crea el tag `packages/client-go/v<versión>`.
+  El cliente busca el host en `$GPUI_BRIDGE_HOST`, junto al ejecutable, en `PATH` y en `target/`.
+  Sale con la próxima versión común. Los binarios siguen sin firmar (Windows y macOS).
+- `examples/counter.go` junto a los demás ejemplos, con `examples/go.mod` y un `go.work` en la
+  raíz. Comentarios y mensajes del cliente en inglés, como los otros.
+
+Verificado: `gofmt`, `go vet`, `go test -race` (con el host real sin ventana), el código del
+README compilado contra el módulo local, el script de renombrado de hosts con artefactos
+simulados y el contador en ventana real (el usuario). No verificado: el job `github` de
+`release.yml` (corre con el próximo tag) y la licencia en pkg.go.dev.
+
+### Fase 38 — M9: `Canvas` (2026-10-25)
+
+Nodo `Canvas`: el cliente manda una lista de comandos de dibujo en `commands` y el host los pinta
+con `paint_quad` y `PathBuilder::stroke` de GPUI. El protocolo sigue en 1: un host viejo responde
+`unknown_type` y nada más cambia. Spike y decisión en `docs/adr/0002-canvas.md`; la referencia es
+`PROTOCOL.md` §20.
+
+- **Spike.** El tiempo por commit no cambia de 10 a 5000 comandos, ni enviando la lista entera
+  ni enviando un parche (~21 ms en todos los casos, el mismo que un commit vacío), así que se
+  envía la lista entera. Un parche se puede añadir después sin romper el protocolo.
+- **Alcance recortado** (aprobado por el usuario, ADR §6.1). Comandos `rect`, `line` y `path`
+  (`d` solo con `M`, `L` y `Z` absolutos) y el evento `pointerDown`, cuyo `value` es `{x, y}`
+  local al lienzo; `simulate` toma el mismo `value`. Quedan fuera `text` (hay que dar forma al
+  texto), `image` (hay que cargarla), `pointerMove`, `pointerUp` y `click`.
+- **Host.** `components/canvas.rs` valida y pinta los comandos. Comparte los colores con `Chart`
+  (`chart-1`…`chart-5` y los del tema). Un comando malformado (`op` desconocido, campo que falta
+  o tiene otro tipo, tamaño o grosor negativo, número que no cabe en f32, color desconocido, `d`
+  inválido) es `invalid_props`. `class` y `a11y` pasan por `component_a11y`, como en `Chart`.
+  `conformance/canvas.txt` cubre las props, los errores y el evento.
+- **Clientes.** Node `canvas()` con los tipos `CanvasCommand`, `CanvasProps` y `CanvasPoint`;
+  React `<Canvas onPointerDown>`; Python `app.canvas(**props)`; Go `App.Canvas` (su test de
+  conformidad ya recorre `canvas.txt`).
+- **Ejemplo** `examples/canvas.ts`: dibuja con los tres comandos, y cada clic añade un cuadrado
+  y muestra `x, y`. Con `--stress N` añade N cuadrados (5000 por defecto).
+- **Ventana real (Windows).** Las coordenadas locales son correctas (un clic en la esquina da
+  `x 1, y 2`) y `class` da el tamaño. La prueba encontró un fallo: no se recortaba lo pintado
+  fuera del lienzo. Se arregló con `window.with_content_mask`. Con 5000 comandos, cada clic
+  reenvía unos 290 KB de JSON y no se nota retraso. Se probó a ojo, sin medir los cuadros del
+  host, porque el resultado no cambiaba ninguna decisión.
+- Las coordenadas de `pointerDown` salen de un f32 (`23.299999237`). No se redondean porque
+  ningún cliente compara coordenadas exactas.
+
+Verificado: `cargo fmt --check`, `clippy -D warnings`, 61 tests del host más la conformidad y
+`no_window`, 23 de Node, 19 de React, 23 de Python y `go test -race`. El ejemplo se probó en ventana real en
+Windows, también con 5000 comandos. No verificado: macOS y Linux en ventana real (como en M5).
+
+### Fase 39 — M10, paso 1: `Command` (2026-10-25)
+
+Plan de M10 aprobado por el usuario el mismo día: `Dock` sale a un hito propio (M11, con spike y
+ADR antes de programar), `Settings` se limita a cinco tipos de campo, y `change` con
+`{key, value}` va en `value` (que ya lleva objetos, como `sort`), sin campo `data` nuevo. Este
+paso es `Command`; `PROTOCOL.md` §21 es la referencia. El protocolo sigue en 1.
+
+- **Forma.** `items` usa las secciones de `Sidebar` (`{label?, items}`) con entradas `{id,
+  label, icon?, keywords?, checked?, disabled?}`, en vez del `group` por entrada que decía la
+  propuesta: es la forma que ya existe y cada sección pasa a ser un `CommandGroup`, así que el
+  `IndexPath` que devuelve gpui-component es (sección, entrada) y se traduce al `id` sin tabla.
+- **Recortes.** Solo el evento `confirm`. No hay `cancel` propio: dentro de un `Dialog`, Escape
+  con la consulta vacía llega al diálogo, que ya manda `cancel`. Tampoco se informa la consulta
+  (el componente filtra solo), ni paleta modal propia, `header`/`footer`/`empty` o `action`.
+- **Host.** `components/command.rs`: validación (ids únicos, iconos incluidos, `keywords` como
+  lista de textos), un `CommandState` por nodo (como `Select`) y `confirmed`, compartido con
+  `simulate`. Una entrada deshabilitada no manda nada; un id desconocido es
+  `invalid_operation`. `conformance/command.txt` cubre props, errores y evento.
+- **Clientes.** Node `command()` con `CommandEntry`, `CommandSection` y `CommandProps`; React
+  `<Command onConfirm>` (con test); Python `app.command(**props)`; Go `App.Command`.
+- **Ejemplo** `examples/command.ts`: la misma paleta en línea y dentro de un `Dialog`.
+- **Ventana real (Windows).** Captura del diálogo abierto: grupos con título, iconos, el check de
+  `checked` y la entrada deshabilitada atenuada. Sin pánicos en el stderr.
+- El test de React que fallaba antes de `app.close()` dejaba el host vivo y colgaba toda la
+  suite; parecía un fallo del entorno y no lo era.
+
+Verificado: `cargo fmt`, `clippy -D warnings`, 63 tests del host más la conformidad (24
+transcripciones) y `no_window`, 23 de Node, 20 de React, 23 de Python, `go test -race`, `go vet`
+y el type-check de los ejemplos. **Probado a mano por el usuario** (2026-10-25): filtrar,
+flechas y Enter, clic en una entrada, y Escape dentro del diálogo.
+
+### Fase 40 — M10, paso 2: `Settings` (2026-10-25)
+
+`Settings` con la forma aprobada en el plan de M10; `PROTOCOL.md` §22 es la referencia. El
+protocolo sigue en 1.
+
+- **Forma.** `pages: [{title, icon?, groups: [{title?, items: [{key, label, description?, type,
+  value, options?, min?, max?, step?, disabled?}]}]}]`, con `type` en `switch`, `checkbox`,
+  `input`, `dropdown` y `number`; `change` con `value: {key, value}`.
+- **Recortes.** Sin modo `controlled`: el host guarda cada valor que el usuario cambia (como un
+  control sincronizado) y un `setProps` de `pages` lo reemplaza. Fuera también `render`/`element`,
+  el botón de reset, `title_suffix`, `footer` y las variantes de grupo.
+- **Host.** `components/settings.rs` sin slot: el `Settings` de gpui-kit guarda la página
+  elegida y la búsqueda en su propio estado con clave (el id del nodo). La validación rechaza
+  claves repetidas, tipos desconocidos y valores que no encajan con su tipo (un `dropdown` debe
+  tener `options` y su valor estar entre ellas): con un par tipo-valor mal formado gpui-kit
+  haría `expect` o `unimplemented!`. `changed` (compartido con `simulate`) escribe el valor
+  dentro de `pages` y no manda nada si ya era ese valor. Los campos de texto y número guardan el
+  primer *setter* mientras vive su estado, así que el *setter* busca el campo por su posición
+  (página, grupo, campo) al ejecutarse, la misma clave que usa gpui-kit para ese estado.
+- **Clientes.** Node `settings()` con `SettingsPage`, `SettingsGroup`, `SettingsItem`,
+  `SettingsChange` y `SettingsProps`; React `<Settings onChange>` (con test); Python
+  `app.settings(**props)`; Go `App.Settings`.
+- **Ejemplo** `examples/settings.ts`: dos páginas con los cinco tipos, una descripción y un
+  campo deshabilitado; cada cambio muestra su clave y valor.
+- **Ventana real (Windows).** En el ejemplo: iconos de página, desplegable abierto y elegido
+  (`font = "sans"`), cambio de página, descripción y campo deshabilitado atenuado. Con dos
+  `Settings` en la misma ventana cada uno muestra sus propios valores (el estado de los campos
+  no choca); clic en `+` del número (`size` 11), clic en un switch (`dark` true) y escribir
+  `abc` en un campo de texto mandan un `change` por tecla sin que el texto se revierta. Sin
+  pánicos en el stderr (solo el aviso conocido `0x887A002D`).
+
+Verificado: `cargo fmt`, `clippy -D warnings`, 65 tests del host más la conformidad (25
+transcripciones) y `no_window`, 23 de Node, 21 de React, 23 de Python, `go test`, `go vet`,
+`gofmt` y el type-check de los ejemplos. **Probado a mano por el usuario** (2026-10-25) en
+`node examples/settings.ts`: búsqueda, los cinco campos y el campo deshabilitado.
+
+### Fase 41 — M10, paso 3: rendimiento con el host release (2026-10-25)
+
+Mismo método que la medición del 2026-10-19 (Windows, Intel Iris Xe), ahora con el host
+**release** recién compilado. Los números van resumidos al README.
+
+- **Arreglos de los scripts.** Desde el paso a `packages/`, `tree.mjs` buscaba el host en
+  `host/target/debug` y `render.mjs`/`payload.mjs` importaban `../client-node/dist`: ninguno
+  corría. `sample.ps1 -Log` no mostraba los cuadros/s porque el cliente Node reenvía el stderr del
+  host solo con `debug`; ahora le pasa `--debug` a `render.mjs`. Los comentarios decían `bench/`.
+
+**Aplicar el árbol** (`benchmarks/tree.mjs`, `host --no-window`, tres corridas):
+
+| nodos | stringify ms | flush ms | apply ms (release) | apply ms (debug, 10-19) |
+|---|---|---|---|---|
+| 0 | 0,0 | 0,6 | 0,0–0,1 | 0,5 |
+| 1 000 | 0,3–0,4 | 2,1–2,5 | 3,1–3,2 | 24,5 |
+| 10 000 | 3,5–3,9 | 13,6–14,7 | 19,5–21,9 | 244,7 |
+| 50 000 | 16,0–19,9 | 62,8–73,0 | 101,0–107,2 | 1 269,3 |
+
+**Dibujo** (`benchmarks/sample.ps1 -Log`, 5 s de muestra tras `READY`):
+
+| caso | rss MB | cpu % | cuadros/s | pasada propia |
+|---|---|---|---|---|
+| 200 nodos + spinner (control) | 71 | 11,6–13,4 | 57–60 | 0,21–0,26 ms |
+| 20 000 nodos + spinner (2 corridas) | 275–278 | 99,1–100,6 | 11,9–12,7 | 9,5–10,2 ms |
+| 20 000 nodos en reposo | 327 | 0,9 | — | — |
+
+- El host aplica el árbol entre 8 y 12 veces más rápido que en debug: 50 000 nodos en ~0,1 s.
+- Con 20 000 nodos y algo animado, la pasada propia (~10 ms) es una octava parte del cuadro
+  (~80 ms a 12 cuadros/s): el resto es el layout y el pintado de GPUI. Sigue siendo el atajo de
+  la medición anterior (cada cuadro recorre la ventana entera); la salida para listas largas es
+  `VirtualList`/`Table`.
+
+### Fase 42 — M10, paso 4: accesibilidad, árbol UIA y lista para el lector de pantalla (2026-10-25)
+
+**UI Automation sí ve el contenido de GPUI.** La nota del plan decía que no. Lancé con
+`pnpm dev <ejemplo>` y leí los descendientes de la ventana con `UIAutomationClient`
+(`FindAll(Descendants)`). Así salen los nodos que AccessKit informa, con rol, nombre y patrones.
+Hay que hacer una consulta antes: la primera despierta AccessKit, y el árbol llega unos instantes
+después (antes de eso, la cuenta da 0). Narrator y NVDA leen de esa misma fuente, así que el
+volcado ya muestra **qué nombre y qué rol** recibe el lector. Falta comprobar **lo que se oye**:
+el orden del foco, los cambios de estado y los anuncios.
+
+| ejemplo | nodos en UIA | qué se ve |
+|---|---|---|
+| `components` | 38 | ventana, `Rating` (slider), paginación, pasos, pestañas, acordeón, radios, campo, regiones, barra de herramientas |
+| `forms` | 10 | switch, radios, combo, slider, área de texto |
+| `command` | 10 (21 con el diálogo) | búsqueda, lista de 6 entradas, botón; con el diálogo, una segunda ventana con búsqueda, lista y dos «Close» |
+| `settings` | 9 | búsqueda, páginas (`TreeItem`), switch, desplegable, checkbox, switch deshabilitado |
+
+**Hallazgos del volcado** (sin arreglar: quedan para que el usuario decida):
+
+| # | dónde | qué | de quién |
+|---|---|---|---|
+| 1 | `Command` | Las 6 entradas son `ListItem` **sin nombre**, tanto en línea como dentro del `Dialog`. Es probable que el lector no diga «Open file» al moverse con las flechas. | componente (gpui-component) |
+| 2 | `Dialog` | La ventana del diálogo no tiene nombre (el título «Command palette» no llega) y hay dos botones «Close» (la × y el de OK). | componente |
+| 3 | `Settings` | El desplegable es un `Button` «Font: Monospace» **sin** `ExpandCollapse`: puede que no se anuncie como algo que abre una lista. | componente |
+| 4 | `Pagination` | Anterior, siguiente y los puntos suspensivos son botones sin nombre. | componente |
+| 5 | `Stepper` | Los 3 pasos son `ListItem` sin nombre. | componente |
+| 6 | `Accordion` | Las secciones no tienen nombre (ni el grupo ni el botón de expandir llevan el título). | componente |
+| 7 | texto | El texto suelto (`text` sin `a11y`, el mensaje del `Alert`, el cuerpo del acordeón) no está en el árbol o sale como `Text` sin nombre: el lector no lo lee al pasar por encima. | GPUI |
+| 8 | `Input` + `a11y.role: "textbox"` | Sale **dos veces** «Your name» (`Edit` del envoltorio y `Edit` del campo). El `Input` ya se informa solo; el `role` del ejemplo sobra. `PROTOCOL.md` §16 no advierte de esto. | ejemplo + doc |
+| 9 | `Rating` en `components` | `a11y.value` queda en `"3"`: el ejemplo no lo actualiza en `change`, así que el lector va a leer siempre 3. | ejemplo |
+| 10 | `forms` | El combo, el slider y el grupo de radios no tienen nombre: las etiquetas son `text` aparte y el ejemplo no usa `a11y`. `Progress` en `components`, igual. | ejemplo |
+| 11 | `Calendar` | No aparece, aunque tiene `a11y.label: "Start date"`. Puede ser que no se pintara por quedar fuera de la pantalla (la ventana mide 860 px de alto). Sin confirmar. | sin confirmar |
+
+`Tabs` es así a propósito: la barra es un `tablist` de gpui-component sin nombre, y el
+`a11y.label` va en un `group` que la rodea (`tabs::named`). Que `Kbd`, `Tag`, `Badge`,
+`DescriptionList` y `StatusBar` no aparezcan es lo esperado: no tienen id ni rol. Que el switch
+salga como `Button` con `Toggle` es cómo AccessKit lo muestra en Windows.
+
+**Lista para el lector de pantalla** (la hace el usuario con la pantalla desbloqueada). Narrator
+se abre con Ctrl+Win+Enter; NVDA se cierra con Insert+Q. Lanzar cada ejemplo con
+`pnpm dev <nombre>`, recorrerlo con Tab/Mayús+Tab y las flechas, y anotar lo que se oye.
+
+| # | ejemplo | acción | debería oírse (según el árbol) | se oyó |
+|---|---|---|---|---|
+| 1 | `components` | abrir la ventana | «Components», ventana; ¿anuncia la alerta? | si |
+| 2 | `components` | Tab hasta `Rating`, flecha derecha | «Rating, control deslizante, 3»; ¿cambia el número? (hallazgo 9: no debería) | no, el tab no llega al rating y por ende no dice nada |
+| 3 | `components` | Tab por la paginación | «1», «2»…; ¿qué dice en anterior/siguiente? (hallazgo 4) | en todos los botones q no tienen un numero solo dice "botton" |
+| 4 | `components` | Tab hasta las pestañas, flechas | «Sections»; «Files, pestaña, seleccionada»; ¿«History» como no disponible? | el tab solo seleccion el boton dentro de la pestaña Files, lo demas no se selecciona |
+| 5 | `components` | Tab hasta el acordeón, Enter | ¿lee el título? ¿expandido/contraído? (hallazgo 6) | tab no lo selecciona |
+| 6 | `components` | Tab hasta los radios, flechas | «Free»/«Pro», botón de opción, ¿marcado? | si |
+| 7 | `components` | Tab hasta el campo | «Your name, edición»; ¿una vez o dos? (hallazgo 8) | solo dice "Component's region" |
+| 8 | `components` | buscar el calendario | ¿llega el foco? ¿dice «Start date»? (hallazgo 11) | no |
+| 9 | `forms` | Espacio en Wi-Fi | «Wi-Fi», activado/desactivado al cambiar | solo dice "Space" |
+| 10 | `forms` | Tab por el combo y el slider | ¿sin nombre? ¿lee el valor al moverlo? (hallazgo 10) | el tab no lo selecciona |
+| 11 | `command` | foco en la búsqueda, flechas abajo | «Type a command or search…»; ¿lee cada entrada? (hallazgo 1) | no |
+| 12 | `command` | escribir «sa», Enter | ¿lee «Save» al filtrar? ¿algo al confirmar? | no, solo dice "s a" |
+| 13 | `command` | botón «Open palette in a dialog» | ¿anuncia diálogo? ¿el foco entra en la búsqueda? (hallazgo 2) | no anuncia el dialog, el foco en la busqueda llega luego de un tab |
+| 14 | `command` | Escape dos veces dentro del diálogo | la primera borra la búsqueda; la segunda cierra; ¿el foco vuelve al botón? | si |
+| 15 | `settings` | abrir la ventana, Tab | «Search…», «General», «Editor» como elementos de árbol | luego de General entra en el contenido del tab, no pasa al siguiente |
+| 16 | `settings` | Espacio en «Dark mode» y en «Check automatically» | estado nuevo al cambiar | si, y los anuncia correctamente |
+| 17 | `settings` | Tab hasta «Beta channel» | ¿no disponible? ¿lee «Coming soon»? | no, nunca llega el tab |
+| 18 | `settings` | Enter en «Font: Monospace», flechas | ¿anuncia que abre una lista? (hallazgo 3) | lo anuncia como un boton y al dar enter lee los items como "menuItem" |
+| 19 | `settings` | página «Editor»: «Font size» y «Project name» | número con su valor (8–32) y campo de texto con «demo» | campo de texto no, campo de numero si, incluido maximo y minimo valor |
+
+Las respuestas se anotan en la última columna. Con ellas se cierra el informe de accesibilidad de
+M10 y se decide qué hallazgos se arreglan (en el host, en los ejemplos o con un aviso en
+`PROTOCOL.md` §16).
+
+**Lectura de las respuestas (2026-10-26).** Las filas se reparten en tres grupos.
+
+*Arreglado en el host, los ejemplos o la doc*, y comprobado de nuevo con el volcado UIA:
+
+- Fila 13: ahora `focus` acepta un `Command` y pone el foco en su campo de búsqueda.
+  `command.ts` lo pide al abrir el diálogo. Tras pulsar el botón, «sa» escrito con `SendKeys` cae
+  en la búsqueda del diálogo. De paso, `focus` ya acepta `NumberInput`, `OtpInput`, `Calendar` y
+  `Tree`: el render sabía enfocarlos, pero la validación los rechazaba (y §18 decía que `Tree`
+  funcionaba).
+- Fila 7 y hallazgo 8: `components.ts` ya no pone `role: "textbox"` en el `Input`, y ahora sale
+  un solo `Edit` «Your name». §16 avisa que no hay que repetir el rol que el componente ya informa.
+- Hallazgo 9: el `a11y.value` del `Rating` se actualiza en cada `change`.
+- Hallazgo 10: en `forms`, el combo, el slider y los radios van dentro de un `group` con
+  nombre («Country», «Volume», «Size»), igual que `tabs::named`. El `Progress` de `components`
+  va en el grupo «Upload».
+
+*La expectativa de la lista estaba mal*:
+
+- Fila 17: un switch deshabilitado no entra en el orden de Tab, y es lo correcto.
+- Filas 4 y 15: una lista de pestañas o un árbol es **una** parada de Tab, y dentro se avanza
+  con las flechas. Falta probar, en la fila 15, si la flecha abajo desde «General» llega a
+  «Editor».
+- Filas 9 y 12: «Space» y «s a» son el eco de teclas de Narrator. El mismo `Switch` se anunció
+  bien en `settings` (fila 16), así que hay que repetir la 9 llegando al switch con Tab.
+
+*Es de gpui-component 0.8 y no se arregla aquí*: `Slider`, `Rating`, `Accordion`, `Tabs`,
+`Select`, `Pagination` y `Calendar` no tienen parada de Tab ni manejo de teclas (no hay
+`tab_stop` ni `on_key_down` en su código). Eso explica las filas 2, 4, 5, 8 y 10. Otros
+componentes no ponen nombre a sus elementos: las entradas de `Command` (filas 11 y 12), anterior
+y siguiente de `Pagination` (fila 3), el título del `Dialog` (fila 13), el campo de texto de
+`Settings` (fila 19) y el desplegable de `Settings`, que se anuncia como botón (fila 18). §16
+documenta el límite de teclado. Hacer que el envoltorio de `a11y` sea una parada de Tab
+empeoraría las cosas: el lector diría «control deslizante, 3» y las flechas no harían nada.
+Quedan tres caminos para decidir: (a) dejarlo documentado, (b) parchear gpui-component con
+`[patch.crates-io]` sobre un fork local, o (c) emular el teclado en el host como un hito nuevo.
+
+**Para repetir con el lector:** las filas 7, 9 (llegando con Tab), 10 (solo los nombres, en el
+modo de exploración de Narrator), 13 y 15 (con flechas).
+
+**Segunda pasada (2026-10-26).** El usuario repitió esas filas y se oía lo mismo. Hice un
+recorrido con Tab (`SendKeys`) y leí `FocusedElement` de UIA en cada paso. Al llegar al `Input`,
+el foco de UIA quedaba en la **ventana**, y GPUI dejaba en el log «focused element has no
+accessibility node (it has an id but no role)». La causa está en gpui-component 0.8.0: el rol de
+campo de texto va en el marco del `Input`, pero el foco lo toma el elemento de texto de dentro,
+que no tiene rol. Por eso Narrator decía «Components region» (fila 7) y no leía la búsqueda de
+`Command` (filas 11 y 13), aunque el foco del teclado sí estaba ahí. **gpui-kit 0.8.1** traslada
+la accesibilidad del `Input` a ese elemento interior (`InputAccessibility`). Subí a la 0.8.1
+(`gpui-pre` 0.3.10), y el host pide ahora `gpui-kit = "0.8.1"`. Trae un cambio incompatible:
+`Keystroke::parse`/`unparse` piden el sistema operativo. `keys::OS` lo resuelve en un único
+sitio, y los nombres de los modificadores no cambian (`win-` en Windows, `cmd-` en macOS,
+`super-` en Linux). Con la 0.8.1, Tab sobre el campo da «Edit | Your name», y al abrir el diálogo
+de `command` el foco de UIA cae en «Search...». La 0.8.1 no cambia el resto: siguen sin parada
+de Tab `Slider`, `Rating`, `Accordion`, `Tabs`, `Select` y `Pagination`, y siguen sin nombre las
+entradas de `Command` y las flechas de `Pagination`.
+
+**Decisión del usuario:** camino (a). Los límites de gpui-component quedan documentados en
+§16 y no se toca su código. La viabilidad de (c) queda anotada en el informe para decidir más
+adelante.
+
+**Tercera pasada (2026-10-26).** El usuario repitió con Narrator las filas 7, 11 y 13 sobre la
+0.8.1 y ya se oyen bien. Con esto se cierra el paso 4 y **M10 queda cerrado**.
+
+### Fase 43 — M11: teclado en el host para `Slider`, `Rating`, `Tabs` y `Pagination` (2026-10-27)
+
+Es la opción (c) de «Fase 42». El usuario la eligió antes de `Dock`, que pasa a M12. De los siete
+componentes sin teclado entran cuatro: los que se mueven con flechas sobre un valor en un rango.
+Fuera: `Select` (abrir su lista depende de las partes internas de gpui-component), `Calendar`
+(moverse día a día en la cuadrícula) y `Accordion` (una parada por encabezado), además de
+RePág/AvPág.
+
+- **Sin cambio de protocolo.** Cada cambio de valor de esos componentes ya pasaba por el host
+  (`value_chosen`, `prop_chosen` para `page`). `components/keyboard.rs` traduce la tecla a la misma
+  elección que un clic, así que los modos sincronizado y controlado se comportan igual.
+  `PROTOCOL_VERSION` sigue en 1 y los cuatro clientes no cambian.
+- **La parada es el envoltorio con tamaño** (como `component_a11y`). Tiene el foco, el nodo de
+  accesibilidad y el anillo del tema (`ring`, como sombra: no mueve el layout). Lleva el foco y el
+  rol en el mismo elemento, que es la lección de la 0.8.1. Toma las teclas en la fase de burbuja y
+  solo detiene las que usa, así un `div` padre con `keyDown` las sigue viendo. Un componente
+  `disabled` no tiene parada.
+- **El rol y el valor los pone el host** (decisión del usuario): `slider` para `Slider` y `Rating`,
+  `spinbutton` para `Pagination` y la pestaña elegida (`tab`, `selected`) para `Tabs`. Del `a11y`
+  del cliente quedan `id`, `label`, `description` y `keyshortcuts`. §15 y §16 lo dicen. Los
+  ejemplos ya no ponen `role: "group"` en el `Slider` ni mantienen a mano el `a11y.value` del
+  `Rating`.
+- **Pruebas:** `keyboard::tests`: el paso, el recorte al rango, Inicio/Fin y las pestañas
+  deshabilitadas que se saltan. Ventana real con SendKeys y UIA `FocusedElement` +
+  `RangeValuePattern`:
+  - `components`: Tab llega a «Rating» (Slider, 3 [0..5]), «Pages» (Spinner, 1 [1..12]) y
+    «Files» (TabItem, seleccionada). Las flechas cambian el valor que lee UIA (Rating 3→4→3→2,
+    Fin 5, Inicio 0; Pages 1→2→3, Fin 12; Files→Changes, saltando la pestaña deshabilitada).
+  - `forms`: «Volume» (Slider, 40). El ejemplo es controlado y redondea a múltiplos de 10, así que
+    → vuelve a 40, y Fin/Inicio dan 100/0. Es lo esperado.
+  - Ningún pánico ni aviso de foco sin nodo de accesibilidad en el log.
+
+**Visto de paso:** los botones de página de `Pagination` y el `Select` (ComboBox) de gpui-kit
+0.8.1 ya son paradas de Tab, al contrario de lo que anotaba «Fase 42». El área de texto de `forms`
+se queda con Tab y Mayús+Tab (no sale con el teclado); es de gpui-component y no se tocó.
+
+**Pendiente:** la pasada del usuario con Narrator. UIA da los nombres y valores, no lo que se oye.
+
+**Segunda vuelta, el mismo día:**
+
+- El `Slider` de `forms` pasa a `step: 10`. Con `step: 1`, cada flecha proponía un valor que la app
+  redondeaba de vuelta a 40. §16 lo avisa para cualquier `Slider` controlado que redondee.
+- Anillo de foco: una sombra exterior rellenaba de gris el envoltorio transparente, porque GPUI no
+  la recorta por fuera. Ahora es una sombra `inset` de 2px con `ring`. No mueve el layout.
+- Capturas de `forms`, `components` y `data`, con y sin foco: `w-64` sigue dando el ancho del
+  `Slider`, la barra de `Tabs` sigue ocupando todo el ancho y el anillo se ve entero.
+
+**Tercera vuelta (2026-10-27).** Narrator lee `Rating`, `Pages` y las pestañas, pero no el
+`Slider` de `forms`. gpui-kit 0.8.1 ya informa el `Slider` como slider (con valor y acciones de
+subir y bajar), pero sin nombre y sin parada de Tab. Por eso dentro de la parada «Volume» había
+otro slider sin nombre. Un oyente de eventos de UIA lo confirmó: en cada flecha llegaban dos
+cambios de valor, el de «Volume» y el del nodo sin nombre.
+- `slider::build` le pasa el `a11y.label` del cliente (`accessibility_label`). Ahora los dos nodos
+  se llaman «Volume».
+- Un `Rating` o `Pagination` deshabilitado no tiene parada y se quedaba sin rol, porque el ejemplo
+  ya solo da `label`. Ahora usa el mismo `keyboard::spec` (probado: slider «Rating», 3, sin foco).
+  Un `Slider` deshabilitado no lleva envoltorio, porque ya se informa solo.
+
+**Pendiente:** que el usuario confirme con Narrator que «Volume» se lee. Si sigue sin leerse con
+los dos nodos nombrados, el problema es el nodo repetido. El host no puede quitarlo: está en un
+`Div` privado de gpui-kit y GPUI no tiene `aria-hidden`. Las salidas serían aceptar el doble anuncio
+o parchear gpui-component (la opción b de M10).
+

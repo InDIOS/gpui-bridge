@@ -98,7 +98,7 @@ pub fn tag(node: &Node) -> Tag {
 /// Props: `keys` (a key such as `ctrl-s`, or several separated by `+`), `outline`.
 pub fn kbd(node: &Node) -> Option<Kbd> {
     let keys = prop_str(node, "keys")?;
-    let stroke = Keystroke::parse(keys).ok()?;
+    let stroke = crate::keys::parse(keys)?;
     let kbd = Kbd::new(stroke);
     Some(if prop_bool(node, "outline") {
         kbd.outline()

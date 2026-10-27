@@ -196,6 +196,16 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+    optionalDependencies:
+      '@indios/gpui-bridge-darwin-arm64':
+        specifier: workspace:*
+        version: link:../host-darwin-arm64
+      '@indios/gpui-bridge-linux-x64':
+        specifier: workspace:*
+        version: link:../host-linux-x64
+      '@indios/gpui-bridge-win32-x64':
+        specifier: workspace:*
+        version: link:../host-win32-x64
 
   packages/client-react:
     dependencies:
@@ -221,6 +231,12 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+
+  packages/host-darwin-arm64: {}
+
+  packages/host-linux-x64: {}
+
+  packages/host-win32-x64: {}
 
 packages:
 

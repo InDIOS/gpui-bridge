@@ -1,14 +1,14 @@
 // Components from gpui-kit's Basic, Form and Layout groups: an alert, badges, tags, keys, a
 // progress bar, a rating, a pagination, a stepper, an accordion, a form of fields, a description
-// list, a toolbar, a status bar, a resizable split and a calendar. Everything carries an `a11y`
-// prop where its own label is not enough.
+// list, a toolbar, a status bar, a resizable split, a calendar and a tab bar built from `Tab`
+// nodes. Everything carries an `a11y` prop where its own label is not enough.
 // Run: node examples/components.ts   (after `npm run build` in client-node/ and `cargo build` in host/)
 
 import { createApp, type NodeType, type UINode } from "gpui-bridge";
 
 const app = await createApp({ debug: process.argv.includes("--debug") });
 
-const state = { stars: 3, page: 1, step: "account", day: "2024-08-03", plan: "pro", name: "" };
+const state = { stars: 3, page: 1, step: "account", day: "2024-08-03", plan: "pro", name: "", section: "files", closed: 0 };
 const summary = app.text({ class: "text-sm text-muted-foreground" });
 const show = () => summary.set({ content: JSON.stringify(state) });
 show();
@@ -20,8 +20,9 @@ const onChange = <T>(apply: (value: T) => void) => ({ value }: { value: T }) => 
   app.commit();
 };
 
+// The host reports a Rating as a slider with its value, so `a11y` only names it.
 const stars = app
-  .rating({ value: state.stars, max: 5, a11y: { role: "slider", label: "Rating", value: String(state.stars), min: 0, max: 5 } })
+  .rating({ value: state.stars, max: 5, a11y: { label: "Rating" } })
   .on("change", onChange<number>((value) => (state.stars = value)));
 
 const pages = app
@@ -62,7 +63,7 @@ const plan = app
   .on("change", onChange<string>((value) => (state.plan = value)));
 
 const name = app
-  .input({ placeholder: "Your name", a11y: { role: "textbox", label: "Your name" } })
+  .input({ placeholder: "Your name" })
   .on("change", onChange<string>((value) => (state.name = value)));
 
 const form = app
@@ -71,6 +72,48 @@ const form = app
     app.field({ label: "Plan", description: "You can change it later" }).append(plan),
     app.field({ label: "Name", required: true }).append(name),
   );
+
+// A `Tabs` whose tabs are nodes: every `Tab` child holds its own chip — an icon, a text and a
+// `Tag` with a count — instead of `tabs` entries. The bar is a tablist already, so `a11y` only
+// names it. Only the bar is drawn: the app fills the panel below with the chosen tab.
+const chips = [
+  { value: "files", label: "Files", icon: "folder", count: 12, panel: "12 files in the working tree." },
+  { value: "changes", label: "Changes", icon: "replace", count: 2, panel: "2 files changed since the last commit." },
+  { value: "history", label: "History", icon: "undo", count: 4, disabled: true, panel: "" },
+];
+const panel = app.text({ class: "text-sm px-1" });
+const showPanel = () => panel.set({ content: chips.find((chip) => chip.value === state.section)?.panel ?? "" });
+showPanel();
+const tabs = app
+  .tabs({ value: state.section, variant: "underline", a11y: { label: "Sections" } })
+  .on("change", onChange<string>((value) => {
+    state.section = value;
+    showPanel();
+  }));
+for (const chip of chips) {
+  // A `label` would come first in the chip; the icon goes before the text, so the text is a node
+  // and `a11y.label` names the tab for the reader.
+  const tab = app.tab({ value: chip.value, disabled: chip.disabled, a11y: { label: chip.label } });
+  tab.append(
+    app.icon({ name: chip.icon, class: "size-4" }),
+    app.text({ content: chip.label }),
+    app.tag({ label: String(chip.count), variant: chip.disabled ? "secondary" : "primary" }),
+  );
+  // A control last in a chip is drawn after it at its own size, and keeps its own click: the
+  // Button closes nothing and does not choose the tab.
+  if (chip.value === "files") {
+    tab.append(
+      app
+        .button({ label: "×", variant: "ghost", tooltip: "Closing a tab is the app's job" })
+        .on("click", () => {
+          state.closed += 1;
+          show();
+          app.commit();
+        }),
+    );
+  }
+  tabs.append(tab);
+}
 
 const split = app
   .resizable({ axis: "horizontal", sizes: [200], class: "h-48 border border-border rounded-md" })
@@ -99,12 +142,13 @@ root.append(
     app.badge({ count: 3 }).append(app.icon({ name: "bell", class: "size-5" })),
     app.tag({ label: "beta", variant: "success", outline: true }),
     app.kbd({ keys: "ctrl-s" }),
-    app.progress({ value: 42, class: "w-40" }),
+    app.progress({ value: 42, class: "w-40", a11y: { role: "group", label: "Upload" } }),
     app.spinner({ class: "size-4" }),
     app.avatar({ name: "Ada Lovelace" }),
   ),
   row(stars, pages),
   steps,
+  app.div({ class: "flex flex-col gap-2" }).append(tabs, panel),
   accordion,
   row(
     form,
@@ -131,5 +175,5 @@ root.append(
   app.statusBar({ left: "Ready", right: "gpui-bridge" }),
   summary,
 );
-app.window({ title: "Components", width: 900, height: 860, root, theme: "dark" });
+app.window({ title: "Components", width: 900, height: 860, root });
 app.commit();

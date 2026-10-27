@@ -1,0 +1,23 @@
+# Section 3: x/y and the minimum size are read when the window opens, `minimized` is an action,
+# and window events are opt-in: `events` replaces the previous list.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+> {"op":"window","root":1,"x":120,"y":80,"minWidth":320,"minHeight":200,"events":["focus","blur","resize","move","visibility"]}
+> {"op":"commit"}
+# An unknown event name rejects the whole message; the previous list stays.
+> {"op":"window","events":["focus","hover"]}
+< {"type":"error","code":"invalid_json","op":"window"}
+# Wrong types are invalid JSON.
+> {"op":"window","minimized":"yes"}
+< {"type":"error","code":"invalid_json","op":"window"}
+> {"op":"window","x":"left"}
+< {"type":"error","code":"invalid_json","op":"window"}
+> {"op":"window","minWidth":"320"}
+< {"type":"error","code":"invalid_json","op":"window"}
+# `minimized` for a window that never opened is ignored with a warning, not an error.
+> {"op":"window","id":2,"minimized":true}
+> {"op":"commit"}
+# An empty list unsubscribes.
+> {"op":"window","events":[]}
+> {"op":"commit"}

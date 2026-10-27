@@ -30,6 +30,7 @@ Two more scripts take one sample by hand, for the checks that are not a table:
 
 ```sh
 pwsh -File benchmarks/sample.ps1 -Nodes 20000 -Mode spin -Seconds 5 -Log   # one render case, with the host's frames/s
+pwsh -File benchmarks/sample.ps1 -Nodes 20000 -Log -HostPath target/release/gpui-bridge-host.exe   # the README's numbers
 pwsh -File benchmarks/hover-check.ps1                                     # a real pointer over a `hover:` transition
 pwsh -File benchmarks/hover-check.ps1 -Example examples/data.ts -Width 720 -Height 560 -AtX 300 -AtY 150
 ```
@@ -58,7 +59,7 @@ prints `READY` only after the first build settled, so the sample is steady state
 Because the spinner keeps drawing, `spin` also measures the platform: on the machine the numbers
 below were taken from, a frame of a small window already costs a few milliseconds, so the host can
 sit at one core while its own pass is a fraction of a millisecond. Run the host with
-`RUST_LOG=debug` (`bench/sample.ps1 -Log`) to see the two separately: `window 1: 60.0 frames/s,
+`RUST_LOG=debug` (`benchmarks/sample.ps1 -Log`) to see the two separately: `window 1: 60.0 frames/s,
 0.2 ms and 14 nodes per pass` is the host's work, the rest is GPUI drawing and presenting.
 
 **`payload.mjs` + `run.ps1`** — one large value in one protocol line, and the host's working set and

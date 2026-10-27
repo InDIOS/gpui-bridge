@@ -1,9 +1,9 @@
 // The JSON floor: what one protocol line costs on its own, with no host in the way. Isolates
 // `JSON.stringify` and `JSON.parse` at the sizes an image would have, so the numbers from
-// `bench/payload.mjs` (which include the host, the pipe and a retained copy) can be read
+// `benchmarks/payload.mjs` (which include the host, the pipe and a retained copy) can be read
 // against something.
 //
-//   node bench/payload-micro.mjs
+//   node benchmarks/payload-micro.mjs
 
 import { randomBytes } from "node:crypto";
 

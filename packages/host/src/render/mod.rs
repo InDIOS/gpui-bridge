@@ -20,18 +20,24 @@ use crate::Session;
 use crate::a11y;
 use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
+use crate::components::carousel::{self, CarouselSlot};
+use crate::components::chart::{self, ChartSlot};
+use crate::components::command::{self, CommandSlot};
+use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
 use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, checkbox, layout, menu, radio, switch, tabs,
+    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, radio, settings,
+    sidebar, switch, tabs, tree,
 };
 use crate::keys;
-use crate::protocol::{NodeId, WindowId as ClientWindowId};
+use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
 use crate::schema::NodeType;
 use crate::styles::{self, Class, ScrollAxis, StyleCache};
+use crate::transport;
 use crate::tree::{Node, Tree};
 use gpui_kit::component::input::{InputMode, TextareaMode};
 
@@ -49,6 +55,13 @@ pub struct RootView {
     /// One per OtpInput and per Calendar: their state keeps what the user typed or chose.
     otps: HashMap<NodeId, OtpSlot>,
     calendars: HashMap<NodeId, CalendarSlot>,
+    trees: HashMap<NodeId, tree::TreeSlot>,
+    diffs: HashMap<NodeId, DiffSlot>,
+    carousels: HashMap<NodeId, CarouselSlot>,
+    /// One per Chart: its data, parsed once per change (a series can be 1 000 points long).
+    charts: HashMap<NodeId, ChartSlot>,
+    /// One per Command: the query and highlight the user typed and moved.
+    commands: HashMap<NodeId, CommandSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -85,6 +98,12 @@ pub struct RootView {
     focusables: HashMap<NodeId, FocusHandle>,
     /// The Dialog node shown in gpui-component's dialog layer, if any.
     open_dialog: Option<NodeId>,
+    /// Last window state reported to the client, so `focus`/`blur` and friends are only sent on
+    /// changes. `None` until the first observer call, which primes it (see `track_window`).
+    window_active: Option<bool>,
+    window_visible: Option<bool>,
+    /// Last bounds reported, as `x, y, width, height`.
+    window_bounds: Option<(f32, f32, f32, f32)>,
     _observe_session: Subscription,
 }
 
@@ -112,6 +131,11 @@ impl RootView {
             tables: HashMap::new(),
             otps: HashMap::new(),
             calendars: HashMap::new(),
+            trees: HashMap::new(),
+            diffs: HashMap::new(),
+            carousels: HashMap::new(),
+            charts: HashMap::new(),
+            commands: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -128,12 +152,106 @@ impl RootView {
             focus: cx.focus_handle(),
             focusables: HashMap::new(),
             open_dialog: None,
+            window_active: None,
+            window_visible: None,
+            window_bounds: None,
             _observe_session,
         };
         // Root focus first, so a `focus` request in the commit that opens the window overrides it.
         this.focus.focus(window, cx);
         this.sync_inputs(window, cx);
+        this.track_window(window, cx);
         this
+    }
+
+    /// Reports `focus`/`blur`, `resize`/`move` and `visibility` to the client when it asked for
+    /// them in `window.events` (PROTOCOL.md section 3). The observers call back once when
+    /// registered, with the current state: that call primes the stored state, and only a real
+    /// change is sent (an opening window does report `focus`, so the app knows it is active).
+    /// The subscriptions are detached: they live as long as this view, which lives as long as
+    /// its window.
+    fn track_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // The visibility observer does not call back when it is registered, so its state is
+        // primed here; the bounds one is primed too, so opening a window reports no geometry.
+        // `window_bounds` is the frame's origin (what `x`/`y` set) with the client size, which
+        // is what the client can feed back into `window`; `bounds()` is the client area, so its
+        // origin carries the title bar (it would make a saved position drift).
+        self.window_visible = Some(window.visibility().is_visible());
+        self.window_bounds = Some(bounds_of(window));
+
+        cx.observe_window_activation(window, |this, window, cx| {
+            let active = window.is_window_active();
+            let Some(previous) = this.window_active.replace(active) else {
+                // First call: the state is primed. An opening window reports `focus`, so the
+                // app knows it is active without asking.
+                if active {
+                    this.send_window_event("focus", None, None, cx);
+                }
+                return;
+            };
+            if previous != active {
+                this.send_window_event(if active { "focus" } else { "blur" }, None, None, cx);
+            }
+        })
+        .detach();
+
+        cx.observe_window_bounds(window, |this, window, cx| {
+            let state = bounds_of(window);
+            let Some(previous) = this.window_bounds.replace(state) else {
+                return;
+            };
+            if previous == state {
+                return;
+            }
+            // A drag-resize changes both; report the size, then the position on the next change.
+            let event = if (previous.2, previous.3) != (state.2, state.3) {
+                "resize"
+            } else {
+                "move"
+            };
+            this.send_window_event(event, Some(state), None, cx);
+        })
+        .detach();
+
+        cx.observe_window_visibility(window, |this, visibility, _window, cx| {
+            let visible = visibility.is_visible();
+            if this.window_visible.replace(visible) != Some(visible) {
+                this.send_window_event("visibility", None, Some(visible), cx);
+            }
+        })
+        .detach();
+    }
+
+    /// Sends one window event, if this window subscribed to it. `bounds` is
+    /// `x, y, width, height`, for `move` and `resize`.
+    fn send_window_event(
+        &self,
+        event: &str,
+        bounds: Option<(f32, f32, f32, f32)>,
+        visible: Option<bool>,
+        cx: &mut Context<Self>,
+    ) {
+        if !self
+            .session
+            .read(cx)
+            .tree
+            .wants_window_event(self.window_id, event)
+        {
+            return;
+        }
+        let (x, y, width, height) = match bounds {
+            Some((x, y, width, height)) => (Some(x), Some(y), Some(width), Some(height)),
+            None => (None, None, None, None),
+        };
+        transport::send(&HostMessage::WindowEvent {
+            id: self.window_id,
+            event: event.to_owned(),
+            x,
+            y,
+            width,
+            height,
+            visible,
+        });
     }
 
     /// Keeps one state per Input, Textarea, Select and Slider in this window. Text values
@@ -165,6 +283,11 @@ impl RootView {
         let selects = select::snapshot(tree, &members);
         let sliders = slider::snapshot(tree, &members);
         let tables = table::snapshot(tree, &members);
+        let trees = tree::snapshot(tree, &members);
+        let diffs = diff::snapshot(tree, &members);
+        let carousels = carousel::snapshot(tree, &members);
+        let charts = chart::snapshot(tree, &members);
+        let commands = command::snapshot(tree, &members);
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -178,7 +301,8 @@ impl RootView {
             .copied()
             .filter(|&id| {
                 tree.node(id).is_some_and(|node| {
-                    node.node_type == NodeType::Div && node.events.contains("keyDown")
+                    (node.node_type == NodeType::Div && node.events.contains("keyDown"))
+                        || keyboard::takes_stop(node)
                 })
             })
             .collect();
@@ -207,6 +331,11 @@ impl RootView {
         select::sync(&mut self.selects, selects, &self.session, window, cx);
         slider::sync(&mut self.sliders, sliders, &self.session, window, cx);
         table::sync(&mut self.tables, tables, &self.session, window, cx);
+        tree::sync(&mut self.trees, trees, &self.session, cx);
+        diff::sync(&mut self.diffs, diffs, &self.session, cx);
+        carousel::sync(&mut self.carousels, carousels, &self.session, cx);
+        chart::sync(&mut self.charts, charts, &self.session, cx);
+        command::sync(&mut self.commands, commands, window, cx);
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
@@ -272,9 +401,13 @@ impl RootView {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.calendars.get(&id) {
                 slot.focus(window, cx);
+            } else if let Some(slot) = self.trees.get(&id) {
+                slot.focus(window, cx);
             } else if let Some(handle) = self.focusables.get(&id) {
                 handle.focus(window, cx);
             } else if let Some(slot) = self.tables.get(&id) {
+                slot.focus(window, cx);
+            } else if let Some(slot) = self.commands.get(&id) {
                 slot.focus(window, cx);
             }
             self.session
@@ -310,11 +443,17 @@ impl RootView {
             numbers: &self.numbers,
             otps: &self.otps,
             calendars: &self.calendars,
+            trees: &self.trees,
+            diffs: &self.diffs,
+            carousels: &self.carousels,
+            charts: &self.charts,
+            commands: &self.commands,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
             theme: cx.theme(),
             in_control: false,
+            in_chip: false,
             transitions: &mut self.transitions,
             hovered,
             stateful: &mut self.stateful,
@@ -621,6 +760,11 @@ struct RenderCx<'a> {
     numbers: &'a HashMap<NodeId, InputSlot<InputMode>>,
     otps: &'a HashMap<NodeId, OtpSlot>,
     calendars: &'a HashMap<NodeId, CalendarSlot>,
+    trees: &'a HashMap<NodeId, tree::TreeSlot>,
+    diffs: &'a HashMap<NodeId, DiffSlot>,
+    carousels: &'a HashMap<NodeId, CarouselSlot>,
+    charts: &'a HashMap<NodeId, ChartSlot>,
+    commands: &'a HashMap<NodeId, CommandSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -629,6 +773,10 @@ struct RenderCx<'a> {
     theme: &'a Theme,
     /// Inside a `windowControl` area, where interactive nodes must block it (see `blocks`).
     in_control: bool,
+    /// Inside a `Tab` chip, where the control of a node keeps its own click so it does not
+    /// choose the tab (see `blocks_area`; the chip's own text, icons and `Badge`s are part of
+    /// the chip and still choose it, so `component_a11y` does not block them).
+    in_chip: bool,
     /// Every node's transition, by the state of its last frame. Shared with the view, so the pass
     /// a Dialog body or a list row runs in keeps it too.
     transitions: &'a mut HashMap<NodeId, Transition>,
@@ -680,6 +828,12 @@ impl RenderCx<'_> {
             });
         }
 
+        let accessibility = a11y::of(node);
+        if keyboard::takes_stop(node)
+            && let Some(handle) = self.focusables.get(&id).cloned()
+        {
+            return self.keyboard_stop(id, node, &classes, &handle, accessibility);
+        }
         let element = match node.node_type {
             NodeType::Div => self.div_node(id, node, &classes),
             NodeType::MenuBar => self.menu_bar_node(id, node, &classes),
@@ -689,7 +843,9 @@ impl RenderCx<'_> {
             NodeType::Button => self.button_node(id, node, &classes),
             NodeType::Checkbox => self.checkbox_node(id, node, &classes),
             NodeType::Switch => self.switch_node(id, node, &classes),
-            NodeType::Tabs => self.tabs_node(id, node, &classes),
+            NodeType::Tabs => self.tabs_node(id, node, &classes, accessibility.as_ref()),
+            // Drawn by its `Tabs`: on its own a `Tab` is not a chip (PROTOCOL.md section 15).
+            NodeType::Tab => div().into_any_element(),
             NodeType::Table => self.table_node(id, node, &classes),
             NodeType::VirtualList => self.virtual_list_node(id, node, &classes),
             // Drawn in gpui-component's dialog layer (`dialog::open`), not where it sits in the tree.
@@ -730,11 +886,45 @@ impl RenderCx<'_> {
             NodeType::Toolbar => self.toolbar_node(id, node, &classes),
             NodeType::Resizable => self.resizable_node(id, node, &classes),
             NodeType::Calendar => self.calendar_node(id, node, &classes),
+            NodeType::Tree => self.tree_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Diff => self.diff_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Sidebar => self.sidebar_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
+            NodeType::Command => self.command_node(id, node, &classes),
+            NodeType::Settings => {
+                let element = settings::build(id, node, self.session);
+                self.component_a11y(id, element, &classes, accessibility.as_ref())
+            }
         };
-        // `div` and `text` apply `a11y` themselves; a component cannot take an id or a role from
-        // outside, so it gets a wrapper (only when the client asked for one).
-        match a11y::of(node) {
-            Some(spec) if !matches!(node.node_type, NodeType::Div | NodeType::Text) => {
+        // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
+        // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // Any other component cannot take an id or a role from outside, so it gets a wrapper
+        // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
+        // still reads as what it is; a Slider reports itself, so a wrapper would repeat it.
+        let accessibility = match node.node_type {
+            NodeType::Slider => None,
+            NodeType::Rating | NodeType::Pagination => {
+                Some(keyboard::spec(self.tree, node, accessibility))
+            }
+            _ => accessibility,
+        };
+        match accessibility {
+            Some(spec)
+                if !matches!(
+                    node.node_type,
+                    NodeType::Div
+                        | NodeType::Text
+                        | NodeType::Tabs
+                        | NodeType::Tree
+                        | NodeType::Diff
+                        | NodeType::Carousel
+                        | NodeType::Sidebar
+                        | NodeType::Chart
+                        | NodeType::Canvas
+                ) =>
+            {
                 a11y::wrap(&spec, id, element)
             }
             _ => element,
@@ -749,6 +939,12 @@ impl RenderCx<'_> {
             .collect()
     }
 
+    /// Whether an interactive node built here keeps its own click and blocks whatever holds it:
+    /// inside a `windowControl` area, or inside a `Tab` chip, where it must not choose the tab.
+    fn blocks_area(&self) -> bool {
+        self.in_control || self.in_chip
+    }
+
     /// A component that does not take the node's classes itself: a wrapper holds them, and it
     /// blocks a `windowControl` area.
     fn component(
@@ -757,14 +953,87 @@ impl RenderCx<'_> {
         element: impl IntoElement + 'static,
         classes: &[Class],
     ) -> AnyElement {
+        self.component_a11y(id, element, classes, None)
+    }
+
+    /// A component `keyboard` gives a Tab stop: the stop is its sized wrapper (as in
+    /// `component_a11y`) and carries the accessibility node, so the reader follows the focus.
+    fn keyboard_stop(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        handle: &FocusHandle,
+        client: Option<a11y::A11y>,
+    ) -> AnyElement {
+        let element = match node.node_type {
+            NodeType::Slider => self.slider_node(id, node, &[]),
+            NodeType::Tabs => self.tabs_node(id, node, &[], None),
+            NodeType::Rating => self.component(id, basic::rating(id, node, self.session), &[]),
+            _ => self.component(id, basic::pagination(id, node, self.session), &[]),
+        };
+        let spec = keyboard::spec(self.tree, node, client);
         let wrapper = if self.in_control {
             div().occlude()
         } else {
             div()
         };
-        self.style(id, wrapper, classes, false)
+        // Inset: an outer shadow fills the transparent wrapper instead of drawing a ring.
+        let ring = BoxShadow {
+            color: self.theme.ring,
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+            inset: true,
+        };
+        let session = self.session.clone();
+        let stop = a11y::apply(
+            &spec,
+            id,
+            wrapper.rounded(self.theme.radius).track_focus(handle),
+        )
+        .focus(move |style| style.shadow(vec![ring]))
+        .on_key_down(move |event: &KeyDownEvent, _, cx| {
+            let taken = session.update(cx, |session, cx| {
+                let taken = keyboard::key_down(&mut session.tree, id, &event.keystroke);
+                if taken {
+                    cx.notify();
+                }
+                taken
+            });
+            if taken {
+                cx.stop_propagation();
+            }
+        });
+        self.style(id, stop, classes, false)
             .child(element)
             .into_any_element()
+    }
+
+    /// `component` for a node whose `a11y` goes on the same sized wrapper. The general
+    /// `a11y::wrap` is a flex row, which gives a `size_full` component no width to size against.
+    fn component_a11y(
+        &mut self,
+        id: NodeId,
+        element: impl IntoElement + 'static,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let wrapper = if self.in_control {
+            div().occlude()
+        } else {
+            div()
+        };
+        match a11y {
+            Some(spec) => self
+                .style(id, a11y::apply(spec, id, wrapper), classes, false)
+                .child(element)
+                .into_any_element(),
+            None => self
+                .style(id, wrapper, classes, false)
+                .child(element)
+                .into_any_element(),
+        }
     }
 
     fn badge_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -846,9 +1115,96 @@ impl RenderCx<'_> {
         }
     }
 
+    fn tree_node(
+        &mut self,
+        id: NodeId,
+        _node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.trees.get(&id) {
+            Some(slot) => {
+                self.component_a11y(id, tree::build(id, slot, self.session), classes, a11y)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    /// The component keeps its own scrolling: it needs a bounded height in `class`.
+    fn diff_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.diffs.get(&id) {
+            Some(slot) => self.component_a11y(id, diff::build(node, slot), classes, a11y),
+            None => div().into_any_element(),
+        }
+    }
+
+    /// One child per slide, in order.
+    fn carousel_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let slides = self.children(node);
+        match self.carousels.get(&id) {
+            Some(slot) => {
+                self.component_a11y(id, carousel::build(id, node, slot, slides), classes, a11y)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    /// Its content is the `items` prop: the node takes no children. It needs a bounded height
+    /// (`h-full` inside a row, or `class`), and the wrapper is that box.
+    fn sidebar_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let element = sidebar::build(id, node, self.session);
+        self.component_a11y(id, element, classes, a11y)
+    }
+
+    /// The plot fills the box (`h-64` in `class`), which the wrapper provides.
+    fn chart_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        match self.charts.get(&id) {
+            Some(slot) => {
+                let element = chart::build(id, node, slot, self.theme);
+                self.component_a11y(id, element, classes, a11y)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    fn canvas_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let element = canvas::build(id, node, self.theme, self.session);
+        self.component_a11y(id, element, classes, a11y)
+    }
+
     fn div_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let control = window_control(node);
-        let blocks = self.in_control && (control.is_some() || node.events.contains("click"));
+        let blocks = self.blocks_area() && (control.is_some() || node.events.contains("click"));
         let outer = self.in_control;
         self.in_control |= control.is_some();
         let children: Vec<AnyElement> = node
@@ -955,7 +1311,11 @@ impl RenderCx<'_> {
             .and_then(Value::as_array)
             .map_or(&[][..], Vec::as_slice);
         let bar = menu::bar(id, menus, self.session);
-        let bar = if self.in_control { bar.occlude() } else { bar };
+        let bar = if self.blocks_area() {
+            bar.occlude()
+        } else {
+            bar
+        };
         self.style(id, bar, classes, false).into_any_element()
     }
 
@@ -1012,7 +1372,7 @@ impl RenderCx<'_> {
     // Inside a `windowControl` area, a control must block it or Windows takes its clicks as title bar ones.
     fn button_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let button = button::build(id, node, self.session);
-        let button = if self.in_control {
+        let button = if self.blocks_area() {
             button.occlude()
         } else {
             button
@@ -1022,7 +1382,7 @@ impl RenderCx<'_> {
 
     fn checkbox_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let checkbox = checkbox::build(id, node, self.session);
-        let checkbox = if self.in_control {
+        let checkbox = if self.blocks_area() {
             checkbox.occlude()
         } else {
             checkbox
@@ -1035,16 +1395,59 @@ impl RenderCx<'_> {
         self.blocking(id, switch, classes)
     }
 
-    fn tabs_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
-        let tabs = tabs::build(id, node, self.session);
-        self.blocking(id, tabs, classes)
+    /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`. Its `a11y`
+    /// goes on a sized wrapper, so the bar still fills the width its parent gives it.
+    fn tabs_node(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        a11y: Option<&a11y::A11y>,
+    ) -> AnyElement {
+        let mut chips = Vec::new();
+        for &child in &node.children {
+            let Some(tab) = self
+                .tree
+                .node(child)
+                .filter(|tab| tab.node_type == NodeType::Tab)
+            else {
+                continue;
+            };
+            let mut content = self.tab_content(tab);
+            let suffix = tab
+                .children
+                .last()
+                .and_then(|&last| self.tree.node(last))
+                .filter(|last| tabs::is_control(last))
+                .and_then(|_| content.pop());
+            let (value, disabled, chip) = tabs::chip(tab, content, suffix);
+            // The chip is the `Tab` node, so its `class` styles the chip itself (`flex-1` makes
+            // the tabs share the bar's width).
+            let class = tab.props.get("class").and_then(Value::as_str).unwrap_or("");
+            let classes = self.styles.classes(class);
+            chips.push((value, disabled, styles::apply(chip, &classes, self.theme)));
+        }
+        let bar = tabs::build(id, node, chips, self.session);
+        match a11y {
+            Some(spec) => self.component_a11y(id, bar, classes, Some(&tabs::named(spec.clone()))),
+            None => self.blocking(id, bar, classes),
+        }
+    }
+
+    /// The content of a `Tab`: here the control of a node keeps its own click, so clicking a
+    /// `Button` in a tab does not choose the tab (see `in_chip`).
+    fn tab_content(&mut self, node: &Node) -> Vec<AnyElement> {
+        let outer = std::mem::replace(&mut self.in_chip, true);
+        let children = self.children(node);
+        self.in_chip = outer;
+        children
     }
 
     // A wrapper takes the classes (DataTable fills it) and blocks a `windowControl` area.
     fn table_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.tables.get(&id) {
             Some(slot) => {
-                let wrapper = if self.in_control {
+                let wrapper = if self.blocks_area() {
                     div().occlude()
                 } else {
                     div()
@@ -1089,7 +1492,7 @@ impl RenderCx<'_> {
     fn radio_group_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         // A wrapper takes the classes: RadioGroup lays out its own radios.
         let group = radio::build(id, node, self.session);
-        let wrapper = if self.in_control {
+        let wrapper = if self.blocks_area() {
             div().occlude()
         } else {
             div()
@@ -1103,6 +1506,16 @@ impl RenderCx<'_> {
     fn select_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.selects.get(&id) {
             Some(slot) => self.blocking(id, select::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn command_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.commands.get(&id) {
+            Some(slot) => {
+                let element = command::build(id, node, slot, self.session);
+                self.blocking(id, element, classes)
+            }
             None => div().into_any_element(),
         }
     }
@@ -1124,8 +1537,8 @@ impl RenderCx<'_> {
     fn input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.inputs.get(&id) {
             // Input cannot occlude itself or listen to keys: a wrapper takes its classes instead.
-            Some(slot) if self.in_control || node.events.contains("keyDown") => {
-                let wrapper = if self.in_control {
+            Some(slot) if self.blocks_area() || node.events.contains("keyDown") => {
+                let wrapper = if self.blocks_area() {
                     div().occlude().flex()
                 } else {
                     div().flex()
@@ -1169,15 +1582,15 @@ impl RenderCx<'_> {
         })
     }
 
-    /// A control that cannot `occlude` itself: inside a `windowControl` area a blocking wrapper
-    /// takes its classes; elsewhere it takes them itself.
+    /// A control that cannot `occlude` itself: where it must block what holds it a blocking
+    /// wrapper takes its classes; elsewhere it takes them itself.
     fn blocking<E: Styled + IntoElement + 'static>(
         &mut self,
         id: NodeId,
         element: E,
         classes: &[Class],
     ) -> AnyElement {
-        if self.in_control {
+        if self.blocks_area() {
             self.style(id, div().occlude().flex(), classes, false)
                 .child(element)
                 .into_any_element()
@@ -1254,6 +1667,19 @@ fn loops(node: &Node, class: &str) -> bool {
     class
         .split_whitespace()
         .any(|name| name == "animate-pulse" || (spins && name == "animate-spin"))
+}
+
+/// The window's frame origin and client size, as `x, y, width, height`: the coordinates a
+/// client sets with `window` and can persist from `windowEvent`. `Window::bounds()` is the
+/// client area, so its origin differs by the title bar height.
+fn bounds_of(window: &Window) -> (f32, f32, f32, f32) {
+    let bounds = window.window_bounds().get_bounds();
+    (
+        f32::from(bounds.origin.x),
+        f32::from(bounds.origin.y),
+        f32::from(bounds.size.width),
+        f32::from(bounds.size.height),
+    )
 }
 
 /// `windowControl`: Windows treats the area as its own title bar part (drag, snap, buttons).

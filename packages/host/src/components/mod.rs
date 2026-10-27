@@ -8,17 +8,26 @@ pub mod accordion;
 pub mod basic;
 pub mod button;
 pub mod calendar;
+pub mod canvas;
+pub mod carousel;
+pub mod chart;
 pub mod checkbox;
+pub mod command;
+pub mod diff;
 pub mod input;
+pub mod keyboard;
 pub mod layout;
 pub mod menu;
 pub mod otp;
 pub mod radio;
 pub mod select;
+pub mod settings;
+pub mod sidebar;
 pub mod slider;
 pub mod switch;
 pub mod table;
 pub mod tabs;
+pub mod tree;
 
 use gpui_kit::{App, Entity};
 use serde_json::Value;
@@ -120,7 +129,13 @@ pub fn double_clicked(tree: &Tree, id: NodeId) {
 
 /// A key pressed while the node (or something inside it) has the focus.
 pub fn key_down(tree: &Tree, id: NodeId, keystroke: &gpui_kit::Keystroke) {
-    emit(tree, id, "keyDown", Some(keystroke.unparse().into()), None);
+    emit(
+        tree,
+        id,
+        "keyDown",
+        Some(keystroke.unparse(crate::keys::OS).into()),
+        None,
+    );
 }
 
 /// A checkbox or switch click: synced mode keeps the new state in the host, controlled mode

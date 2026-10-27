@@ -1,0 +1,54 @@
+# Section 19: Sidebar and Chart, their props and events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Sidebar","props":{"items":[{"label":"General","items":[{"id":"dashboard","label":"Dashboard","icon":"layout-dashboard"},{"id":"inbox","label":"Inbox","icon":"inbox"},{"id":"soon","label":"Soon","disabled":true}]},{"items":[{"id":"settings","label":"Settings","open":true,"children":[{"id":"theme","label":"Theme"}]}]}],"value":"dashboard"},"events":["change"]}
+> {"op":"create","id":2,"type":"Chart","props":{"chart":"line","data":[{"label":"Mon","value":12},{"label":"Tue","value":18},{"label":"Wed","value":9}],"color":"primary","name":"Visits","dot":true,"yAxis":true,"xTicks":2}}
+> {"op":"create","id":3,"type":"Chart","props":{"chart":"bar","data":[{"label":"Mon","value":12},{"label":"Tue","value":18}],"horizontal":true,"color":"chart-3","yTicks":3}}
+> {"op":"create","id":4,"type":"Chart","props":{"chart":"pie","data":[{"label":"Rust","value":60},{"label":"TypeScript","value":30}],"innerRadius":40,"padAngle":0.03}}
+> {"op":"commit"}
+# Sidebar: a click on an entry selects it; the active one again is not a change.
+> {"op":"simulate","id":1,"event":"change","value":"inbox"}
+< {"type":"event","id":1,"event":"change","value":"inbox"}
+> {"op":"simulate","id":1,"event":"change","value":"dashboard"}
+< {"type":"event","id":1,"event":"change","value":"dashboard"}
+> {"op":"simulate","id":1,"event":"change","value":"dashboard"}
+# An entry of a submenu is an entry like any other; a disabled one does nothing.
+> {"op":"simulate","id":1,"event":"change","value":"theme"}
+< {"type":"event","id":1,"event":"change","value":"theme"}
+> {"op":"simulate","id":1,"event":"change","value":"soon"}
+> {"op":"simulate","id":1,"event":"change","value":"missing"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Controlled: the host reports the click; the client confirms it with `value`.
+> {"op":"setProps","id":1,"props":{"controlled":true,"value":"dashboard"}}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"change","value":"theme"}
+< {"type":"event","id":1,"event":"change","value":"theme"}
+# A chart has no events of its own: the tooltip is the component's.
+> {"op":"simulate","id":2,"event":"change","value":"Mon"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed props are invalid_props.
+> {"op":"create","id":10,"type":"Sidebar","props":{"items":[{"items":[{"id":"a"}]}]}}
+> {"op":"create","id":11,"type":"Sidebar","props":{"items":[{"items":[{"id":"a","label":"A"}]},{"items":[{"id":"a","label":"B"}]}]}}
+> {"op":"create","id":12,"type":"Sidebar","props":{"items":[{"label":"General"}]}}
+> {"op":"create","id":13,"type":"Sidebar","props":{"items":[{"items":[{"id":"a","label":"A","icon":"house"}]}]}}
+> {"op":"create","id":14,"type":"Sidebar","props":{"items":[],"collapsible":"float"}}
+> {"op":"create","id":15,"type":"Chart","props":{"data":[{"label":"Mon"}]}}
+> {"op":"create","id":16,"type":"Chart","props":{"chart":"radar"}}
+> {"op":"create","id":17,"type":"Chart","props":{"color":"chart-9"}}
+> {"op":"create","id":18,"type":"Chart","props":{"curve":"wobbly"}}
+> {"op":"create","id":19,"type":"Chart","props":{"yMin":"low"}}
+> {"op":"create","id":20,"type":"Chart","props":{"xTicks":-1}}
+> {"op":"create","id":21,"type":"Chart","props":{"yTicks":2.5}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

@@ -1,5 +1,8 @@
-# The host uses edition 2024 (Rust 1.85+). `components` keeps rustfmt and clippy
-# available for `cargo fmt --check` / `cargo clippy`, which CI runs.
+# Pinned so every checkout (and CI) compiles with the same Rust: the host ships a native
+# binary and GPUI is sensitive to toolchain changes. Bump this together with RUST_VERSION
+# in .github/workflows/ci.yml and verify `pnpm test` before committing.
+# Edition 2024 needs Rust 1.85+; `components` keeps rustfmt and clippy available for
+# `cargo fmt --check` / `cargo clippy`, which CI runs.
 [toolchain]
-channel = "stable"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]

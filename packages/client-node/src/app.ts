@@ -14,6 +14,7 @@ import {
   type NodeType,
   type TableSort,
   type ThemeSet,
+  type WindowEventName,
   type WindowId,
   type WindowTheme,
 } from "./protocol.js";
@@ -50,11 +51,34 @@ export interface WindowOptions {
   title?: string;
   width?: number;
   height?: number;
+  /** Initial position. Only read when the window opens. */
+  x?: number;
+  y?: number;
+  /** Minimum size the user can resize to. Only read when the window opens. */
+  minWidth?: number;
+  minHeight?: number;
   root?: UINode<NodeType>;
   theme?: WindowTheme;
   themeSet?: ThemeSet;
   /** No system title bar (draw your own with `windowControl` divs). Only read when the window opens. */
   frameless?: boolean;
+  /** Minimizes (`true`) or restores (`false`) on the next commit. An action, not a remembered state. */
+  minimized?: boolean;
+  /** Window events to receive; `AppWindow.on` sets this for you. Replaces the previous list. */
+  events?: WindowEventName[];
+}
+
+/** A window event (PROTOCOL.md section 3); only the ones the window subscribed to arrive. */
+export interface WindowEventPayload {
+  id: WindowId;
+  event: WindowEventName;
+  /** `move` and `resize`: the window's bounds. */
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  /** `visibility`: whether the window is being presented. */
+  visible?: boolean;
 }
 
 /** A toast (PROTOCOL.md section 14). */
@@ -109,6 +133,8 @@ interface AppEvents {
   error: HostError;
   /** The user closed a window. */
   windowClosed: { id: WindowId };
+  /** A window event the client subscribed to (`window.events`, or `AppWindow.on` for that window). */
+  windowEvent: WindowEventPayload;
   /** The user clicked a toast that has an `id`. */
   notification: { id: string; window: WindowId };
   /** A key registered with `shortcuts()` was pressed in window `window`. */
@@ -153,50 +179,53 @@ export class UINode<T extends NodeType> {
 
   append(...children: UINode<NodeType>[]): this {
     for (const child of children) {
-      this.app.tree.queue({ op: "append", parent: this.id, child: child.id });
-      this.app.tree.attach(this.id, child.id);
+      this.app.wire.queue({ op: "append", parent: this.id, child: child.id });
+      this.app.wire.attach(this.id, child.id);
     }
     return this;
   }
 
   insertBefore(child: UINode<NodeType>, before: UINode<NodeType>): this {
-    this.app.tree.queue({ op: "insertBefore", parent: this.id, child: child.id, before: before.id });
-    this.app.tree.attach(this.id, child.id);
+    this.app.wire.queue({ op: "insertBefore", parent: this.id, child: child.id, before: before.id });
+    this.app.wire.attach(this.id, child.id);
     return this;
   }
 
   /** Merges props; `null` removes one. */
   set(props: PropsUpdate<T>): this {
-    this.app.tree.queue({ op: "setProps", id: this.id, props });
+    this.app.wire.queue({ op: "setProps", id: this.id, props });
     return this;
   }
 
   /** Subscribes to an event; the host only emits subscribed events. */
   on<E extends keyof NodeEvents[T] & string>(event: E, handler: (payload: NodeEvents[T][E]) => void): this {
-    this.app.tree.setHandler(this.id, event, handler);
+    this.app.wire.setHandler(this.id, event, handler);
     return this;
   }
 
   off<E extends keyof NodeEvents[T] & string>(event: E): this {
-    this.app.tree.setHandler(this.id, event, undefined);
+    this.app.wire.setHandler(this.id, event, undefined);
     return this;
   }
 
-  /** Gives the node the keyboard focus on the next commit (an Input, a Textarea or a div with `keyDown`). */
+  /** Gives the node the keyboard focus on the next commit (an Input, a Textarea, a Command, a div with `keyDown`…). */
   focus(): this {
-    this.app.tree.queue({ op: "focus", id: this.id });
+    this.app.wire.queue({ op: "focus", id: this.id });
     return this;
   }
 
   /** Removes the node and all its descendants. */
   remove(): void {
-    this.app.tree.remove(this.id);
+    this.app.wire.remove(this.id);
   }
 }
 
 /** A window other than the main one (`App.createWindow`). */
 export class AppWindow {
   private readonly closedListeners = new Set<() => void>();
+  private readonly eventListeners = new Map<WindowEventName, Set<(payload: WindowEventPayload) => void>>();
+  /** The subscription list last sent, to avoid one message per listener. */
+  private eventNames = "";
 
   /** @internal */
   constructor(
@@ -215,14 +244,32 @@ export class AppWindow {
     this.app.queueCloseWindow(this.id);
   }
 
-  /** The user closed the window. */
-  on(event: "closed", listener: () => void): this {
-    this.closedListeners.add(listener);
+  /** The user closed the window, or a window event (which the window subscribes to on commit). */
+  on(event: "closed", listener: () => void): this;
+  on(event: WindowEventName, listener: (payload: WindowEventPayload) => void): this;
+  on(event: "closed" | WindowEventName, listener: (() => void) | ((payload: WindowEventPayload) => void)): this {
+    if (event === "closed") {
+      this.closedListeners.add(listener as () => void);
+      return this;
+    }
+    const listeners = this.eventListeners.get(event) ?? new Set<(payload: WindowEventPayload) => void>();
+    listeners.add(listener as (payload: WindowEventPayload) => void);
+    this.eventListeners.set(event, listeners);
+    this.syncEvents();
     return this;
   }
 
-  off(event: "closed", listener: () => void): this {
-    this.closedListeners.delete(listener);
+  off(event: "closed", listener: () => void): this;
+  off(event: WindowEventName, listener: (payload: WindowEventPayload) => void): this;
+  off(event: "closed" | WindowEventName, listener: (() => void) | ((payload: WindowEventPayload) => void)): this {
+    if (event === "closed") {
+      this.closedListeners.delete(listener as () => void);
+      return this;
+    }
+    const listeners = this.eventListeners.get(event);
+    listeners?.delete(listener as (payload: WindowEventPayload) => void);
+    if (listeners?.size === 0) this.eventListeners.delete(event);
+    this.syncEvents();
     return this;
   }
 
@@ -230,14 +277,29 @@ export class AppWindow {
   handleClosed(): void {
     for (const listener of this.closedListeners) listener();
   }
+
+  /** @internal */
+  handleWindowEvent(payload: WindowEventPayload): void {
+    for (const listener of this.eventListeners.get(payload.event) ?? []) listener(payload);
+  }
+
+  /** Sends the subscription list only when the set of subscribed events changes. */
+  private syncEvents(): void {
+    const events = [...this.eventListeners.keys()];
+    const names = events.join(",");
+    if (names === this.eventNames) return;
+    this.eventNames = names;
+    this.app.queueWindow(this.id, { events });
+  }
 }
 
 export class App {
-  /** @internal */
-  readonly tree = new Tree();
+  /** @internal Protocol operations queued until `commit`. */
+  readonly wire = new Tree();
   private readonly listeners: { [K in keyof AppEvents]: Set<(payload: AppEvents[K]) => void> } = {
     error: new Set(),
     windowClosed: new Set(),
+    windowEvent: new Set(),
     shortcut: new Set(),
     notification: new Set(),
     tray: new Set(),
@@ -328,6 +390,11 @@ export class App {
   /** A tab bar; show the chosen tab's content yourself. */
   tabs(props: NodeProps["Tabs"] = {}) {
     return this.create("Tabs", props);
+  }
+
+  /** One tab of a `Tabs`; append the nodes of its chip (an `Icon`, a `text`, a `Tag`…; a last `Button` is drawn after them). */
+  tab(props: NodeProps["Tab"] = {}) {
+    return this.create("Tab", props);
   }
 
   /** A menu bar: one button per menu (PROTOCOL.md section 10). */
@@ -449,9 +516,49 @@ export class App {
     return this.create("Calendar", props);
   }
 
+  /** Items in props; `change` with the chosen item's id, `expand`/`collapse` with a folder's id. */
+  tree(props: NodeProps["Tree"] = {}) {
+    return this.create("Tree", props);
+  }
+
+  /** A parsed patch; `change` with the selected lines. */
+  diff(props: NodeProps["Diff"] = {}) {
+    return this.create("Diff", props);
+  }
+
+  /** Slides as children; `change` with the selected index. */
+  carousel(props: NodeProps["Carousel"] = {}) {
+    return this.create("Carousel", props);
+  }
+
+  /** Sections of entries in props; `change` with the clicked entry's id. */
+  sidebar(props: NodeProps["Sidebar"] = {}) {
+    return this.create("Sidebar", props);
+  }
+
+  /** A line, bar or pie chart of the points in `data`. */
+  chart(props: NodeProps["Chart"] = {}) {
+    return this.create("Chart", props);
+  }
+
+  /** Paints the drawing commands in `commands`; `pointerDown` with the local point. */
+  canvas(props: NodeProps["Canvas"] = {}) {
+    return this.create("Canvas", props);
+  }
+
+  /** A command palette over the sections in `items`; `confirm` with the chosen entry's `id`. */
+  command(props: NodeProps["Command"] = {}) {
+    return this.create("Command", props);
+  }
+
+  /** Settings pages of typed fields in `pages`; `change` with `{key, value}` of the field set. */
+  settings(props: NodeProps["Settings"] = {}) {
+    return this.create("Settings", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
-    return new UINode(this, this.tree.create(type, { ...props }), type);
+    return new UINode(this, this.wire.create(type, { ...props }), type);
   }
 
   /** Creates or updates the main window (window 1). It opens on the first commit that sets `root`. */
@@ -470,13 +577,13 @@ export class App {
   /** @internal */
   queueWindow(id: WindowId | undefined, options: WindowOptions): void {
     const { root, ...rest } = options;
-    this.tree.queue({ op: "window", ...(id !== undefined && { id }), ...rest, ...(root && { root: root.id }) });
+    this.wire.queue({ op: "window", ...(id !== undefined && { id }), ...rest, ...(root && { root: root.id }) });
     if (root) this.openWindows.add(id ?? 1);
   }
 
   /** @internal */
   queueCloseWindow(id: WindowId): void {
-    this.tree.queue({ op: "closeWindow", id });
+    this.wire.queue({ op: "closeWindow", id });
     this.openWindows.delete(id);
   }
 
@@ -530,20 +637,20 @@ export class App {
 
   /** App-wide keyboard shortcuts (`ctrl-s`, `f5`…), applied on the next commit; replaces the list. */
   shortcuts(keys: string[]): this {
-    this.tree.queue({ op: "shortcuts", keys });
+    this.wire.queue({ op: "shortcuts", keys });
     return this;
   }
 
   /** Shows or updates the system tray icon on the next commit. */
   tray(options: TrayOptions): this {
-    this.tree.queue({ op: "tray", ...options });
+    this.wire.queue({ op: "tray", ...options });
     this.hasTray = true;
     return this;
   }
 
   /** Removes the tray icon on the next commit; with no window open, the host then exits. */
   removeTray(): this {
-    this.tree.queue({ op: "removeTray" });
+    this.wire.queue({ op: "removeTray" });
     this.hasTray = false;
     if (this.openWindows.size === 0) this.closing = true;
     return this;
@@ -552,7 +659,7 @@ export class App {
   /** Sends every pending operation; the host renders once per commit. */
   commit(): void {
     if (this.exitInfo) throw new HostExitedError(describeExit(this.exitInfo, this.hostPath), this.exitInfo);
-    this.tree.commit((message) => this.host.send(message));
+    this.wire.commit((message) => this.host.send(message));
   }
 
   on<K extends keyof AppEvents>(event: K, listener: (payload: AppEvents[K]) => void): this {
@@ -582,9 +689,9 @@ export class App {
   handleMessage(message: HostMessage): void {
     switch (message.type) {
       case "event": {
-        const handler = this.tree.handler(message.id, message.event);
+        const handler = this.wire.handler(message.id, message.event);
         if (!handler) return;
-        const type = this.tree.type(message.id);
+        const type = this.wire.type(message.id);
         const payload =
           message.event === "menu"
             ? { item: message.value ?? "" }
@@ -623,6 +730,20 @@ export class App {
         this.windows.get(message.id)?.handleClosed();
         this.emit("windowClosed", { id: message.id });
         return;
+      case "windowEvent": {
+        const payload: WindowEventPayload = {
+          id: message.id,
+          event: message.event,
+          x: message.x,
+          y: message.y,
+          width: message.width,
+          height: message.height,
+          visible: message.visible,
+        };
+        this.windows.get(message.id)?.handleWindowEvent(payload);
+        this.emit("windowEvent", payload);
+        return;
+      }
       case "result":
         this.requests.get(message.request)?.resolve(message);
         this.requests.delete(message.request);

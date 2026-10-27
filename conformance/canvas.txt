@@ -1,0 +1,31 @@
+# Section 20: Canvas, its commands and its pointer event.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Canvas","props":{"class":"h-64 w-full","commands":[{"op":"rect","x":10,"y":10,"w":100,"h":60,"color":"primary","corner_radius":8},{"op":"line","x1":0,"y1":0,"x2":200,"y2":200,"color":"danger","width":2},{"op":"path","d":"M10 10 L90 10 L90 90 Z","color":"chart-2","width":3}]},"events":["pointerDown"]}
+> {"op":"commit"}
+# A press reports where it happened, local to the canvas.
+> {"op":"simulate","id":1,"event":"pointerDown","value":{"x":14,"y":23.5}}
+< {"type":"event","id":1,"event":"pointerDown","value":{"x":14.0,"y":23.5}}
+> {"op":"simulate","id":1,"event":"pointerDown","value":"14,23"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":1,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed commands are rejected and the operation is not applied.
+> {"op":"setProps","id":1,"props":{"commands":[{"op":"text","x":0,"y":0,"content":"Hi"}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"commands":[{"op":"rect","x":0,"y":0,"w":10}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"commands":[{"op":"line","x1":0,"y1":0,"x2":9,"y2":9,"color":"pink"}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"commands":[{"op":"path","d":"M1 1 C2 2"}]}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":1,"props":{"commands":"rect"}}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+# The whole list is replaced; null removes it.
+> {"op":"setProps","id":1,"props":{"commands":[]}}
+> {"op":"setProps","id":1,"props":{"commands":null}}
+> {"op":"commit"}
+# Without the opt-in, a press sends nothing.
+> {"op":"setEvents","id":1,"events":[]}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"pointerDown","value":{"x":1,"y":2}}

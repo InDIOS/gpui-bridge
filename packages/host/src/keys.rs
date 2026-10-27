@@ -1,7 +1,7 @@
 //! Keyboard shortcuts (PROTOCOL.md section 12): app-wide `shortcuts` and `shortcut` on menu
 //! items. Shared by the window's key listener and `simulate`.
 
-use gpui_kit::Keystroke;
+use gpui_kit::{Keystroke, OperatingSystem};
 use serde_json::Value;
 
 use crate::components::menu;
@@ -10,9 +10,18 @@ use crate::schema::NodeType;
 use crate::transport;
 use crate::tree::Tree;
 
+/// The OS whose modifier names GPUI parses and writes (`cmd` on macOS, `win` elsewhere).
+pub const OS: OperatingSystem = if cfg!(target_os = "macos") {
+    OperatingSystem::Mac
+} else if cfg!(target_os = "windows") {
+    OperatingSystem::Windows
+} else {
+    OperatingSystem::Linux
+};
+
 /// A key in GPUI's format (`ctrl-shift-s`, `escape`, `f5`), or `None` if it does not parse.
 pub fn parse(keys: &str) -> Option<Keystroke> {
-    Keystroke::parse(keys)
+    Keystroke::parse_with_os(keys, OS)
         .ok()
         .filter(|keystroke| !keystroke.key.is_empty())
 }

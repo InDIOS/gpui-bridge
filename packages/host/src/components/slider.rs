@@ -103,7 +103,12 @@ pub fn sync<V: 'static>(
     }
 }
 
-/// Props: `value`, `min`, `max`, `step` (applied by `sync`), `disabled`, `controlled`.
+/// Props: `value`, `min`, `max`, `step` (applied by `sync`), `disabled`, `controlled`, and
+/// `a11y.label`, which names the slider gpui-kit reports (unnamed, a reader announces it blank).
 pub fn build(node: &Node, slot: &SliderSlot) -> Slider {
-    Slider::new(&slot.state).disabled(prop_bool(node, "disabled"))
+    let slider = Slider::new(&slot.state).disabled(prop_bool(node, "disabled"));
+    match crate::a11y::of(node).and_then(|spec| spec.label) {
+        Some(label) => slider.accessibility_label(label),
+        None => slider,
+    }
 }

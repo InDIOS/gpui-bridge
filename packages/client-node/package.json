@@ -1,27 +1,48 @@
 {
   "name": "gpui-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node.js client for the gpui-bridge native UI host",
+  "license": "MIT",
+  "author": "gpui-bridge contributors",
+  "keywords": [
+    "gpui",
+    "gpui-component",
+    "native",
+    "desktop",
+    "ui",
+    "node",
+    "typescript"
+  ],
+  "homepage": "https://github.com/InDIOS/gpui-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/InDIOS/gpui-bridge.git",
+    "directory": "packages/client-node"
+  },
+  "bugs": {
+    "url": "https://github.com/InDIOS/gpui-bridge/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "tsc && node --test test/*.test.ts",
-    "prepack": "tsc && node ../../scripts/stage-host.mjs --to node",
-    "postpack": "node -e \"require('fs').rmSync('bin',{recursive:true,force:true})\""
+    "prepack": "tsc"
   },
   "engines": {
     "node": ">=22.6"
   },
-  "os": ["win32"],
-  "cpu": ["x64"],
+  "optionalDependencies": {
+    "@indios/gpui-bridge-darwin-arm64": "workspace:*",
+    "@indios/gpui-bridge-linux-x64": "workspace:*",
+    "@indios/gpui-bridge-win32-x64": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2"
   },
   "files": [
-    "dist",
-    "bin"
+    "dist"
   ]
 }

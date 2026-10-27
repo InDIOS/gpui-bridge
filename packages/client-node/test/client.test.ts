@@ -2,7 +2,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp, HostExitedError, type HostError, type HostExit } from "../dist/index.js";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { createApp, defaultHostPath, HostExitedError, type HostError, type HostExit } from "../dist/index.js";
 
 const headless = { headless: true };
 
@@ -374,6 +376,119 @@ test("VirtualList, Table and Tabs are accepted; their events are dispatched", as
   ]);
 });
 
+test("a Tabs built from Tab nodes commits; `change` still comes from the Tabs", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const tabs = app.tabs({ value: "files", variant: "underline" }).on("change", ({ value }) => seen.push(value));
+  const files = app.tab({ value: "files", a11y: { label: "Files" } });
+  files.append(app.icon({ name: "folder", class: "size-4" }), app.text({ content: "Files" }), app.badge({ count: 3 }));
+  tabs.append(files, app.tab({ value: "history", label: "History", disabled: true }));
+  app.window({ root: app.div().append(tabs) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: tabs.id, event: "change", value: "files" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["files"]);
+});
+
+test("Tree, Diff and Carousel are accepted; their events are dispatched", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const tree = app
+    .tree({
+      items: [
+        { id: "src", label: "src", expanded: true, children: [{ id: "src/lib.rs", label: "lib.rs" }] },
+        { id: "README.md", label: "README.md" },
+      ],
+      value: "src",
+    })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("expand", ({ value }) => seen.push(["expand", value]))
+    .on("collapse", ({ value }) => seen.push(["collapse", value]));
+  const diff = app
+    .diff({
+      patch: "diff --git a/notes.txt b/notes.txt\n--- a/notes.txt\n+++ b/notes.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n",
+      mode: "split",
+    })
+    .on("change", ({ value }) => seen.push(["diff", value]));
+  const carousel = app
+    .carousel({ value: 0, pagination: true, class: "h-40" })
+    .append(app.text({ content: "One" }), app.text({ content: "Two" }))
+    .on("change", ({ value }) => seen.push(["carousel", value]));
+  app.window({ root: app.div().append(tree, diff, carousel) });
+  app.commit();
+
+  const selection = { path: "notes.txt", side: "modified", start: 1, end: 2, endSide: "modified" };
+  app.handleMessage({ type: "event", id: tree.id, event: "change", value: "README.md" });
+  app.handleMessage({ type: "event", id: tree.id, event: "expand", value: "src" });
+  app.handleMessage({ type: "event", id: tree.id, event: "collapse", value: "src" });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: selection });
+  app.handleMessage({ type: "event", id: diff.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: carousel.id, event: "change", value: 1 });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["change", "README.md"],
+    ["expand", "src"],
+    ["collapse", "src"],
+    ["diff", selection],
+    ["diff", null],
+    ["carousel", 1],
+  ]);
+});
+
+test("Sidebar and Chart are accepted; the sidebar reports the chosen entry", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const sidebar = app
+    .sidebar({
+      items: [
+        {
+          label: "General",
+          items: [
+            { id: "home", label: "Home", icon: "layout-dashboard" },
+            { id: "inbox", label: "Inbox", icon: "inbox" },
+          ],
+        },
+        { items: [{ id: "settings", label: "Settings", children: [{ id: "theme", label: "Theme" }] }] },
+      ],
+      value: "home",
+    })
+    .on("change", ({ value }) => seen.push(["sidebar", value]));
+  const line = app.chart({ chart: "line", data: [{ label: "Mon", value: 12 }, { label: "Tue", value: 18 }], yAxis: true });
+  const pie = app.chart({ chart: "pie", data: [{ label: "Rust", value: 60 }], innerRadius: 20 });
+  app.window({ root: app.div().append(sidebar, line, pie) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: sidebar.id, event: "change", value: "theme" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["sidebar", "theme"]]);
+});
+
+test("malformed sidebar and chart props are invalid_props, and the host keeps running", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  app.sidebar({ items: [{ items: [{ id: "home" }] }] });
+  app.chart({ data: [{ label: "Mon" }] });
+  app.window({ root: app.div() });
+  app.commit();
+  await app.close();
+  assert.deepEqual(
+    errors.map((error) => error.code),
+    ["invalid_props", "invalid_props"],
+  );
+});
+
 test("a host crash is reported clearly", async () => {
   const app = await createApp(headless);
   const exited = new Promise<HostExit>((resolve) => app.on("exit", resolve));
@@ -384,8 +499,51 @@ test("a host crash is reported clearly", async () => {
   assert.throws(() => app.commit(), (err: unknown) => err instanceof HostExitedError && /host exited/.test(err.message));
 });
 
+test("window events are opt-in: the window subscribes and both the window and the app receive them", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  app.window({ root: app.div(), events: ["resize"] });
+  app.commit();
+  const settings = app.createWindow({ root: app.div() });
+  const resized: number[] = [];
+  settings.on("resize", (payload) => resized.push(payload.width ?? 0));
+  app.commit();
+
+  const all: string[] = [];
+  app.on("windowEvent", (payload) => all.push(`${payload.id}:${payload.event}:${payload.width ?? "-"}`));
+  app.handleMessage({ type: "windowEvent", id: settings.id, event: "resize", x: 10, y: 20, width: 300, height: 200 });
+  app.handleMessage({ type: "windowEvent", id: 1, event: "resize", x: 0, y: 0, width: 420, height: 320 });
+  // An event this window did not subscribe to still reaches the app-level listener.
+  app.handleMessage({ type: "windowEvent", id: settings.id, event: "focus" });
+
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(resized, [300]);
+  assert.deepEqual(all, [`${settings.id}:resize:300`, "1:resize:420", `${settings.id}:focus:-`]);
+});
+
 test("a missing host binary fails with a helpful message", async () => {
   await assert.rejects(createApp({ hostPath: "does-not-exist.exe" }), /host not found at does-not-exist\.exe/);
+});
+
+test("defaultHostPath prefers the packaged host, then the build in this repository", () => {
+  const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
+  // The platform package (`@indios/gpui-bridge-<platform>-<arch>`) carries the asset; a checkout has
+  // none until it is staged, so this asserts whichever of the two applies and the order.
+  const packaged = join(import.meta.dirname, "..", "..", `host-${process.platform}-${process.arch}`, "bin", exe);
+  const saved = process.env.GPUI_BRIDGE_HOST;
+  delete process.env.GPUI_BRIDGE_HOST;
+  try {
+    if (existsSync(packaged)) assert.equal(defaultHostPath(), packaged);
+    else assert.match(defaultHostPath(), /[\\/]target[\\/](debug|release)[\\/]gpui-bridge-host(\.exe)?$/);
+    process.env.GPUI_BRIDGE_HOST = "an-explicit-host";
+    assert.equal(defaultHostPath(), "an-explicit-host");
+  } finally {
+    if (saved === undefined) delete process.env.GPUI_BRIDGE_HOST;
+    else process.env.GPUI_BRIDGE_HOST = saved;
+  }
 });
 
 test("createWindow gives each window its own id, root and closed event", async () => {

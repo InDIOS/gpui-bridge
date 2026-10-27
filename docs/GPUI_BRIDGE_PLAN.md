@@ -20,11 +20,12 @@ Hecho (ver §6): host con 40 tipos de nodo, varias ventanas, ventanas sin marco,
 bandeja del sistema, animaciones, formularios, teclado y foco, diálogos nativos y portapapeles,
 diálogos y avisos, lista virtualizada y tablas, accesibilidad (`a11y` en todo nodo) y los
 componentes de gpui-kit de las categorías Basic, Form, Layout y Advanced que no piden
-dependencias extra; clientes de Node, txiki.js, React y Python; transcripciones de conformidad y
-empaquetado local (tarball de npm y wheel).
+dependencias extra; clientes de Node, txiki.js, React y Python; transcripciones de conformidad;
+empaquetado por plataforma (un paquete npm por sistema, wheel con tag de plataforma) y el host
+compilado y probado en CI en Windows x64, macOS arm64 y Linux x64 (glibc 2.35 o más nueva). En
+ventana real (dibujo, clics, teclado) solo se probó en Windows.
 
-Fuera de alcance por ahora: plataformas distintas de Windows (GPUI las soporta, pero el host no
-se probó ahí) y componentes definidos desde el cliente.
+Fuera de alcance por ahora: componentes definidos desde el cliente.
 
 ## 2. Reglas para el asistente de IA
 
@@ -45,7 +46,9 @@ se probó ahí) y componentes definidos desde el cliente.
 - Dependencias de sistema de GPUI según plataforma:
   - **macOS:** Xcode completo (GPUI usa Metal).
   - **Windows:** Visual Studio Build Tools con el componente de C++ (MSVC).
-  - **Linux:** librerías de desarrollo de Vulkan, Wayland/X11 y `libxkbcommon`. El repositorio de Zed tiene un script que las instala por distribución; úsalo como referencia.
+  - **Linux:** las bibliotecas de desarrollo de Vulkan, Wayland/X11, `libxkbcommon` y fontconfig.
+    La lista exacta que instala CI (`apt-get`) está en `.github/workflows/ci.yml`; el repositorio
+    de Zed tiene además un script que las instala por distribución, útil como referencia.
 - La primera compilación de GPUI tarda varios minutos. Es normal.
 
 ### 3.1 Instalación en esta máquina (Windows)
@@ -242,13 +245,88 @@ Acordado el 2026-10-19: primero se cierran los cabos sueltos que quedaron sin ve
 estado en [HISTORIAL.md](HISTORIAL.md), "Extra — Cabos sueltos"), de a uno y con revisión entre
 cada uno; recién después se elige de esta lista. Se para después de cada iteración.
 
-Sin orden acordado para el resto; se eligen con el usuario y se hacen con las reglas de la §2.
+Desde el 2026-10-21 el orden lo marca la hoja de ruta de §8.1; lo que no está en ella (§8.2) se
+elige con el usuario y se hace con las reglas de la §2.
 
-> **Componentes que faltan:** el 2026-10-20 se documentó por qué `Dock`, `Command`, `Settings`,
-> `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar` no están todavía, qué costaría cada uno
-> y su impacto en host, protocolo y clientes: ver
-> [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). Resumen: no
-> falta tamaño sino modelo; `Editor` y `Speech` siguen fuera por dependencias.
+### 8.1 Hoja de ruta (aprobada el 2026-10-21)
+
+Estado de partida verificado el 2026-10-21: 48 tests unitarios del host, la transcripción de
+conformidad y la prueba `no_window` en verde; 17 tests de Node, 14 de React y 17 de Python;
+`cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check` y el type-check de
+los ejemplos, limpios. Los "cabos sueltos" de las fases 17–27 están cerrados
+([HISTORIAL.md](HISTORIAL.md)). El repositorio ya tiene `origin`
+(<https://github.com/InDIOS/gpui-bridge>).
+
+El orden de la tabla está aprobado y se programa un hito por iteración, con revisión y parada
+entre cada uno (regla 6). **Hechos: M0–M5. Siguiente: M6.** El 2026-10-21 se agregó M4
+(subcomponentes) y los hitos siguientes pasaron a M5–M7. El 2026-10-23 se reordenó lo pendiente
+a partir de un análisis de competencia: entraron M6 (gpui-kit 0.8), M8 (cliente Go) y M9
+(`Canvas`), y la primera publicación y la tanda 3 pasaron a M7 y M10. Las entradas de
+[HISTORIAL.md](HISTORIAL.md) anteriores a cada cambio conservan la numeración vieja.
+
+| Hito | Contenido | Criterio de aceptación | Protocolo |
+|---|---|---|---|
+| **M0 — Estabilizar el repositorio** — **hecho** («Fase 28») | Lo hecho en este cambio: metadatos de publicación en los tres paquetes, enlaces al repositorio, `.gitattributes` (LF en todo el árbol), versión de Rust fijada en `rust-toolchain.toml` y en CI, `cargo fmt --check` y `clippy -D warnings` en CI, `--locked` en los comandos de Cargo, cancelación de runs viejos. Pendiente fuera del repo: protección de rama en `main`, secretos `NPM_TOKEN`/`TWINE_*` si se publica. | CI en verde en `dev` y `main`; `pnpm pack:node` y `pnpm wheel` producen artefactos que se instalan y abren un ejemplo **fuera** del repositorio. | sin cambios |
+| **M1 — Ventanas** — **hecho** («Fase 28») | Ocultar y mostrar ventanas sin cerrarlas, posición inicial, tamaño mínimo, eventos de foco y de redimensionado de ventana. | `PROTOCOL.md` §3 actualizado, transcripción propia en `conformance/`, ejemplo en `examples/windows.ts` y prueba en ventana real. | sí: extiende `window` (§3); compatible hacia atrás si los campos son opcionales |
+| **M2 — Componentes, tanda 1** — **hecho** («Fase 29») | `Tree`, `Diff`, `Carousel` ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §9). | Props validadas (árboles y patch incluidos), selección/expansión reaplicadas al reconstruir, transcripción, ejemplo y ventana real; clientes Node, React y Python en el mismo cambio. | no: props nuevas, sin subir `PROTOCOL_VERSION` |
+| **M3 — Componentes, tanda 2** — **hecho** («Fase 30») | `Sidebar`, `Chart` (`Line`, `Bar`, `Pie`), con `xTicks`/`yTicks` para el número de etiquetas de cada eje. | Lo anterior más una prueba con series de 1000 puntos y árbol profundo. | no |
+| **M4 — Subcomponentes: `Tab` dentro de `Tabs`** (piloto) — **hecho** («Fase 31») | Nodo `Tab` (`value`, `label`, `disabled`) cuyos hijos van dentro de la pestaña, con el patrón de `Form`/`Field`; un `Tabs` con hijos `Tab` los usa e ignora `tabs`, sin hijos funciona como hoy. `change` sigue saliendo de `Tabs`. Si sale bien, el mismo patrón sirve para `RadioGroup`, `Stepper`, `DescriptionList` y `Accordion`. | Pestañas hechas de nodos (icono + texto + `Badge`) que informan la elegida igual que hoy, por clic y por `simulate`; un `Button` dentro de una pestaña no la cambia; transcripción, ejemplo, los tres clientes y ventana real. | no: nodo nuevo, `tabs` sigue igual |
+| **M5 — Multiplataforma** — **hecho** («Fase 32») | El host compila y se prueba en Windows, macOS y Linux (en Linux el icono de bandeja usa `ksni`, sin GTK). Un paquete npm por plataforma (`gpui-bridge-win32-x64`, `-darwin-arm64`, `-linux-x64`, en `packages/host-<plataforma>-<arch>`) lleva el binario y es `optionalDependencies` de `gpui-bridge`, que ya no lleva binario propio; el wheel sigue llevándolo con tag por plataforma; `os`/`cpu` fuera de los dos clientes npm. CI con matriz de los tres sistemas y empaquetado por plataforma. | CI con matriz de los tres sistemas; instalar el paquete y abrir un ejemplo en cada uno (`scripts/check-package.mjs` instala tarball y wheel **fuera** del repositorio, sin `GPUI_BRIDGE_HOST`, y abre una app headless con Node y Python); relajar `os`/`cpu` de los `package.json` junto con los assets. | no |
+| **M6 — Actualizar a gpui-kit 0.8** | Subir de gpui-kit 0.7.3 (GPUI `=0.3.9`) a la 0.8 (2026-10-19) y adaptar el host a sus cambios incompatibles: variantes nuevas de `TabVariant`, Inicio/Fin y propagación en `DataTable`, rebote y rueda del scroll, `ResizeHandle::on_drag` con `&T` y el sobrepaso del easing. | El host compila con la 0.8, todos los tests en verde y `components`, `data`, `advanced` y `dashboard` se ven y se comportan como antes en ventana real (o el cambio queda documentado). | no |
+| **M7 — Primera publicación** | Docs coherentes sobre plataformas (README y §1 de este plan dicen hoy cosas distintas); el README abre con Python y presenta el proyecto como «GPUI desde cualquier lenguaje que pueda lanzar un proceso»; versión semver (0.2.0 o 1.0.0, a decidir), `CHANGELOG.md`, npm y PyPI, firma de código del host de Windows. | Instalación desde los registros, sin `GPUI_BRIDGE_HOST`, abriendo un ejemplo; `gpui-bridge-host --version` coincide con `bin/host.json`; README y plan dicen lo mismo sobre plataformas. | no: el protocolo sigue en 1 |
+| **M8 — Cliente Go** — **hecho** («Fase 37») | `packages/client-go/` escrito solo con `PROTOCOL.md` y `conformance/` (sin dependencias: `encoding/json` y `os/exec`), `examples/counter.go`, job de CI en Windows y Linux; cada hueco de la especificación que obligue a mirar el host se corrige en el mismo hito. | El cliente reproduce todas las transcripciones y abre el contador en ventana real; la lista de huecos de `PROTOCOL.md` queda cerrada. | no: es la prueba de que el protocolo basta |
+| **M9 — `Canvas`** — **hecho** («Fase 38») | Spike de un nodo con una lista de comandos de dibujo (rectángulo, línea, path, texto, imagen, colores del tema) pintada con `canvas` de GPUI, midiendo reenviar la lista frente a un parche; después, propuesta de protocolo (regla 5) y, si se aprueba, host, clientes, transcripción y ejemplo. Se hizo con alcance recortado: `rect`, `line`, `path` y `pointerDown` (`PROTOCOL.md` §20); texto, imagen y los demás eventos de puntero quedan fuera ([adr/0002-canvas.md](adr/0002-canvas.md) §6.1). | Spike con números y decisión escrita; si sigue, un ejemplo que dibuja y responde al puntero sin componentes nuevos en el host. | sí: nodo y comandos nuevos, eventos de puntero con coordenadas locales |
+| **M10 — Tanda 3 y cierre de calidad** | `Command` y `Settings` (cinco tipos de campo), repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro, `benchmarks/tree.mjs` repetido con el host release y la latencia de aplicar 1k/10k/50k nodos en el README. | Lo de M2 más `change` con `value: {key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | no: nodos nuevos; `value` ya admite objetos (como `sort`), sin campo `data` |
+| **M11 — Teclado en el host** | Opción (c) de M10 paso 4: parada de Tab y flechas que pone el host en `Slider`, `Rating`, `Tabs` y `Pagination` («Fase 43»). El rol y el valor los da el host, y el `a11y` del cliente solo nombra la parada. `Select`, `Calendar` y `Accordion`, fuera. | Los cuatro se alcanzan con Tab, se mueven con flechas y Narrator lee el valor nuevo. | no: `PROTOCOL_VERSION` sigue en 1 |
+| **M12 — `Dock`** | Spike y ADR antes de programar ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §10: quién posee el layout, identidad de paneles, contenido, persistencia); después, protocolo aprobado (regla 5), host, clientes, transcripción y ejemplo. Separado de M10 el 2026-10-25: cambia el modelo, no es un componente más. | ADR con la decisión; si sigue, paneles con contenido del cliente que el usuario arrastra sin que el `setProps` y el layout se pisen. | probablemente sí (operación de layout), a decidir en el ADR |
+
+> **Estado (2026-10-21):** **M0 y M1 hechos** ([HISTORIAL.md](HISTORIAL.md), «Fase 28»): CI en
+> verde en los tres jobs y ventanas verificadas en ventana real. **M2 hecho** («Fase 29»):
+> protocolo, host, los tres clientes, `conformance/advanced.txt`, ejemplo, 52+19+16+19 tests en
+> verde y prueba en ventana real (selección y expansión del árbol, selección de líneas del diff y
+> carrusel con flechas y puntos). **M3 hecho** («Fase 30»): `Sidebar` y `Chart` (con `xTicks` y
+> `yTicks` para las etiquetas de los ejes), 58+21+17+21 tests en verde y prueba en ventana real
+> con una serie de 1000 puntos y un árbol de 10 niveles. **M4 hecho** («Fase 31»): `Tab` dentro de
+> `Tabs` (con `value` obligatoria, hijos después del `label`, `class` del chip y `a11y.label` para
+> la pestaña sin `label`), 58+22+18+22 tests en verde, `conformance/data.txt` ampliado, los ejemplos
+> `components.ts` y `data.ts`, y la comprobación visual del usuario. **M5 hecho** («Fase 32»):
+> host compilable en los tres sistemas, un paquete npm por plataforma con el binario dentro,
+> wheel con tag por plataforma, CI con matriz de tres sistemas (host en los tres, clientes en
+> Windows y Linux) y empaquetado por plataforma con la prueba de instalar y abrir headless.
+> M6 a M10 sin empezar. Proteger `main` queda fuera de M0, para cuando el repositorio sea
+> público. La comprobación visual en ventana real de macOS y Linux sigue pendiente: no hay
+> máquinas de esas plataformas en el entorno, así que M5 se cierra con la verificación de CI
+> (decisión del usuario).
+
+Por qué este orden: M0 deja el repositorio publicable y reproducible; M1 cierra el hueco más
+grande del **núcleo** (la semántica de ventanas) antes de sumar superficie de componentes; M2 y
+M3 son incrementales y de riesgo bajo; M4 va antes de M5 y de la publicación porque agrega API pública en los
+clientes y conviene que entre en la primera release; M5 va **antes** de la publicación porque
+publicar solo Windows desperdicia la primera release.
+
+Orden de lo pendiente (2026-10-23): gpuix (React/Solid con napi) y gpui-shell (QuickJS, de los
+autores de gpui-kit) ya cubren JS dentro del proceso, y no hay bindings de GPUI para Python ni
+para otros lenguajes. Lo que diferencia al proyecto es el protocolo neutral, así que:
+M6 va antes de M7 para que la primera release no nazca atrasada respecto de gpui-kit; M7 publica
+con ese mensaje (Python primero); M8 demuestra con un cliente que no es JS que el protocolo basta,
+y eso vale más que sumar componentes; M9 sube el techo de lo que el cliente puede dibujar, más que
+`Dock`/`Command`/`Settings`; M10 es lo último porque necesita un lector de pantalla real y una
+medición fina que hoy no están en el entorno.
+
+Cada hito se trabaja como las fases anteriores: protocolo + host + los tres clientes +
+`PROTOCOL.md` + `conformance/` + `HISTORIAL.md` en el mismo commit, prueba en ventana real de lo
+que se dibuja o se toca, y parada para revisión antes del siguiente.
+
+### 8.2 Backlog detallado (catálogo, sin orden acordado)
+
+Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 decide el orden.
+
+> **Componentes que faltan:** el 2026-10-20 se documentó por qué faltaban `Dock`, `Command`,
+> `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar`, qué costaría cada uno y su
+> impacto en host, protocolo y clientes: ver
+> [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). `Tree`,
+> `Diff` y `Carousel` (M2), `Sidebar` y `Chart` (M3) y `Command` y `Settings` (M10) ya están;
+> quedan `Dock` (M12) y `List`. `Editor` y `Speech` siguen fuera por dependencias.
 
 - Componentes: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"):
   Basic (`Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`,
@@ -256,11 +334,11 @@ Sin orden acordado para el resto; se eligen con el usuario y se hacen con las re
   `OtpInput`, `Form`, `Field`), Layout (`GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`,
   `Resizable`) y Advanced (`Calendar`), con `Accordion` y el redimensionado dentro de lo que el
   árbol puede expresar. Lo que queda se detalla en
-  [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` son los
-  siguientes por relación valor/coste; después `Sidebar` y `Chart`; `List`, `Command` y
-  `Settings` según necesidad; `Dock` solo con un ADR. El editor de código (pide `tree-sitter`,
+  [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` (**hecho**,
+  M2), `Sidebar` y `Chart` (**hecho**, M3) y `Command` y `Settings` (**hecho**, M10); `Dock` en M12 (con
+  un ADR); `List` según necesidad. El editor de código (pide `tree-sitter`,
   que engorda el host), markdown (`TextView`) y el selector de color siguen pendientes.
-- Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana.
+- Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana. **Hecho el 2026-10-21** (M1, HISTORIAL.md, «Fase 28»).
 - Rendimiento: redibujar solo los nodos que cambiaron (atajo de la fase 22). Medido el 2026-10-19 (HISTORIAL.md, "Medición"): el transporte no es el cuello de botella, el host aplica ~25 µs por nodo y cualquier animación satura un núcleo; el `batch` de operaciones no hace falta. **Hecho el 2026-10-20** (HISTORIAL.md, "Extra — Rendimiento: redibujado incremental"): un nodo con `animate-*` se dibuja en una vista propia, los cuadros van a lo sumo a 60 por segundo y el texto no se realoca por cuadro; la ventana en reposo sigue sin gastar CPU. Lo que queda: GPUI marca como sucios también los ancestros de la vista que se notifica, así que la ventana sigue recorriendo el árbol en cada cuadro (~54 ms por cuadro con 20 000 nodos en debug); con `VirtualList` el recorrido es de las filas visibles.
 - Imágenes remotas: no se agrega HTTP al host (la decodificación pesa un orden de magnitud más que el transporte). El cliente baja el archivo y manda una ruta —lo más barato— o los bytes en una línea si hace falta. **Hecho el 2026-10-20** (HISTORIAL.md, "Extra — Imágenes por bytes"): `Image.data` acepta base64 estándar; el host lo decodifica una vez a un archivo por nodo (mismos formatos y animaciones que `src`) y lo borra con el nodo o con el árbol. `src` sigue siendo lo más barato para archivos locales.
 - Accesibilidad: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"): todo nodo acepta `a11y` (`id`, `role`, `label`, `description`, `keyshortcuts` y el estado ARIA: `checked`, `selected`, `expanded`, `disabled`, `value`, `min`/`max`/`step`, `level`, `orientation`), validado y aplicado a la tecnología asistiva; la raíz de la ventana se informa como `window` con su título, que era el aviso de GPUI. Lo que queda: un repaso de lo que anuncia un lector de pantalla real (no hay uno en el entorno de pruebas) y roles automáticos más finos en los componentes que no dejan ponerlos desde fuera.
