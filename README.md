@@ -75,7 +75,7 @@ window on Windows so far. Protocol version 1.
   `Tab` inside `Tabs`, `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus
   `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
   `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
-  `Dock`, `Command`, `Settings` and `List` are not mapped yet.
+  `Dock` and `List` are not mapped yet.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
   readers through AccessKit; the window root and the controls name themselves too.
