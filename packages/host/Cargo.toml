@@ -8,7 +8,7 @@ base64 = "0.22"
 chrono = "0.4"
 env_logger = "0.11.11"
 futures = "0.3"
-gpui-kit = "0.8"
+gpui-kit = "0.8.1"
 image = { version = "0.25", default-features = false }
 log = "0.4.34"
 serde = { version = "1.0.229", features = ["derive"] }

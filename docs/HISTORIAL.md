@@ -1748,3 +1748,23 @@ Quedan tres caminos para decidir: (a) dejarlo documentado, (b) parchear gpui-com
 
 **Para repetir con el lector:** las filas 7, 9 (llegando con Tab), 10 (solo los nombres, en el
 modo de exploración de Narrator), 13 y 15 (con flechas).
+
+**Segunda pasada (2026-10-26).** El usuario repitió esas filas y se oía lo mismo. Hice un
+recorrido con Tab (`SendKeys`) y leí `FocusedElement` de UIA en cada paso. Al llegar al `Input`,
+el foco de UIA quedaba en la **ventana**, y GPUI dejaba en el log «focused element has no
+accessibility node (it has an id but no role)». La causa está en gpui-component 0.8.0: el rol de
+campo de texto va en el marco del `Input`, pero el foco lo toma el elemento de texto de dentro,
+que no tiene rol. Por eso Narrator decía «Components region» (fila 7) y no leía la búsqueda de
+`Command` (filas 11 y 13), aunque el foco del teclado sí estaba ahí. **gpui-kit 0.8.1** traslada
+la accesibilidad del `Input` a ese elemento interior (`InputAccessibility`). Subí a la 0.8.1
+(`gpui-pre` 0.3.10), y el host pide ahora `gpui-kit = "0.8.1"`. Trae un cambio incompatible:
+`Keystroke::parse`/`unparse` piden el sistema operativo. `keys::OS` lo resuelve en un único
+sitio, y los nombres de los modificadores no cambian (`win-` en Windows, `cmd-` en macOS,
+`super-` en Linux). Con la 0.8.1, Tab sobre el campo da «Edit | Your name», y al abrir el diálogo
+de `command` el foco de UIA cae en «Search...». La 0.8.1 no cambia el resto: siguen sin parada
+de Tab `Slider`, `Rating`, `Accordion`, `Tabs`, `Select` y `Pagination`, y siguen sin nombre las
+entradas de `Command` y las flechas de `Pagination`.
+
+**Decisión del usuario:** camino (a). Los límites de gpui-component quedan documentados en
+§16 y no se toca su código. La viabilidad de (c) queda anotada en el informe para decidir más
+adelante.

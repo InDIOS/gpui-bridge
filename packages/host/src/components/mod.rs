@@ -128,7 +128,13 @@ pub fn double_clicked(tree: &Tree, id: NodeId) {
 
 /// A key pressed while the node (or something inside it) has the focus.
 pub fn key_down(tree: &Tree, id: NodeId, keystroke: &gpui_kit::Keystroke) {
-    emit(tree, id, "keyDown", Some(keystroke.unparse().into()), None);
+    emit(
+        tree,
+        id,
+        "keyDown",
+        Some(keystroke.unparse(crate::keys::OS).into()),
+        None,
+    );
 }
 
 /// A checkbox or switch click: synced mode keeps the new state in the host, controlled mode
