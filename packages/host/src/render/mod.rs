@@ -901,7 +901,15 @@ impl RenderCx<'_> {
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
-        // (only when the client asked for one).
+        // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
+        // still reads as what it is; a Slider reports itself, so a wrapper would repeat it.
+        let accessibility = match node.node_type {
+            NodeType::Slider => None,
+            NodeType::Rating | NodeType::Pagination => {
+                Some(keyboard::spec(self.tree, node, accessibility))
+            }
+            _ => accessibility,
+        };
         match accessibility {
             Some(spec)
                 if !matches!(

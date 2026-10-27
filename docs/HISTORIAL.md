@@ -1818,3 +1818,20 @@ se queda con Tab y Mayús+Tab (no sale con el teclado); es de gpui-component y n
   la recorta por fuera. Ahora es una sombra `inset` de 2px con `ring`. No mueve el layout.
 - Capturas de `forms`, `components` y `data`, con y sin foco: `w-64` sigue dando el ancho del
   `Slider`, la barra de `Tabs` sigue ocupando todo el ancho y el anillo se ve entero.
+
+**Tercera vuelta (2026-10-27).** Narrator lee `Rating`, `Pages` y las pestañas, pero no el
+`Slider` de `forms`. gpui-kit 0.8.1 ya informa el `Slider` como slider (con valor y acciones de
+subir y bajar), pero sin nombre y sin parada de Tab. Por eso dentro de la parada «Volume» había
+otro slider sin nombre. Un oyente de eventos de UIA lo confirmó: en cada flecha llegaban dos
+cambios de valor, el de «Volume» y el del nodo sin nombre.
+- `slider::build` le pasa el `a11y.label` del cliente (`accessibility_label`). Ahora los dos nodos
+  se llaman «Volume».
+- Un `Rating` o `Pagination` deshabilitado no tiene parada y se quedaba sin rol, porque el ejemplo
+  ya solo da `label`. Ahora usa el mismo `keyboard::spec` (probado: slider «Rating», 3, sin foco).
+  Un `Slider` deshabilitado no lleva envoltorio, porque ya se informa solo.
+
+**Pendiente:** que el usuario confirme con Narrator que «Volume» se lee. Si sigue sin leerse con
+los dos nodos nombrados, el problema es el nodo repetido. El host no puede quitarlo: está en un
+`Div` privado de gpui-kit y GPUI no tiene `aria-hidden`. Las salidas serían aceptar el doble anuncio
+o parchear gpui-component (la opción b de M10).
+

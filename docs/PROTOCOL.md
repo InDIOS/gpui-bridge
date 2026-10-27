@@ -807,6 +807,8 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   Rating), `spinbutton` (Pagination) or the chosen `tab` (Tabs) — so their `a11y` only gives the
   `id`, `label`, `description` and `keyshortcuts`; its `role` and value are ignored. A `Tabs`
   reads as its chosen tab, and its `a11y.label` becomes the description.
+  Without a stop (`disabled`) they read the same way. gpui-kit already reports a `Slider` as a
+  slider, so its `a11y.label` names that one too.
 - The other components keep gpui-component's own keyboard behaviour: `Accordion` and `Calendar`
   take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own navigation
   still reads their `a11y`).
