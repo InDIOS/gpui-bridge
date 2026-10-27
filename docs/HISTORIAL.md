@@ -1830,8 +1830,11 @@ cambios de valor, el de «Volume» y el del nodo sin nombre.
   ya solo da `label`. Ahora usa el mismo `keyboard::spec` (probado: slider «Rating», 3, sin foco).
   Un `Slider` deshabilitado no lleva envoltorio, porque ya se informa solo.
 
-**Pendiente:** que el usuario confirme con Narrator que «Volume» se lee. Si sigue sin leerse con
-los dos nodos nombrados, el problema es el nodo repetido. El host no puede quitarlo: está en un
-`Div` privado de gpui-kit y GPUI no tiene `aria-hidden`. Las salidas serían aceptar el doble anuncio
-o parchear gpui-component (la opción b de M10).
+**Cuarta vuelta (2026-10-27).** Narrator lee «Volume» una sola vez. En `components`, a veces su
+recuadro se quedaba alrededor de la ventana y no seguía al Tab. La causa era una flecha pulsada con
+el foco en un botón de `Pagination` (o en la `×` de una pestaña). La flecha subía hasta la parada,
+que cambiaba la página. gpui-kit rehacía los botones y el foco caía a la ventana.
+- La parada solo toma teclas cuando el foco es suyo (`is_focused`). Probado con UIA: una flecha
+  sobre el botón «1» deja la página en 1, y sobre la parada «Pages» la pasa a 2. El usuario
+  confirmó con Narrator que ya va bien.
 

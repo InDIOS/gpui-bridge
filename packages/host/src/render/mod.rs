@@ -987,13 +987,19 @@ impl RenderCx<'_> {
             inset: true,
         };
         let session = self.session.clone();
+        let own = handle.clone();
         let stop = a11y::apply(
             &spec,
             id,
             wrapper.rounded(self.theme.radius).track_focus(handle),
         )
         .focus(move |style| style.shadow(vec![ring]))
-        .on_key_down(move |event: &KeyDownEvent, _, cx| {
+        .on_key_down(move |event: &KeyDownEvent, window, cx| {
+            // A key bubbling from a focused button inside (Pagination's, a Tab's) is that button's:
+            // taking it would rebuild the buttons and drop the focus to the window.
+            if !own.is_focused(window) {
+                return;
+            }
             let taken = session.update(cx, |session, cx| {
                 let taken = keyboard::key_down(&mut session.tree, id, &event.keystroke);
                 if taken {
