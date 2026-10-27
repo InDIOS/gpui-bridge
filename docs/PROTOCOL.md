@@ -734,8 +734,9 @@ after the row instead, at its own size (a close button). Its `class` styles the 
 `Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click: it does not choose the
 tab.
 
-The bar is a `tablist` and every chip a `tab` already: the `a11y` of a `Tabs` only names the bar
-(its `label` goes on a `group` around it, unless it asks for another role). The nodes of a chip
+The bar is a `tablist` and every chip a `tab` already. The host wraps the bar in one Tab stop that
+reads as the chosen tab and moves with the arrows (section 16); the `a11y.label` of a `Tabs`
+becomes that stop's description. The nodes of a chip
 are not the chip itself: the tab is announced as a tab, with the `a11y.label` of the `Tab` node,
 or with its `label` when there is none. Three cases are the client's own
 mistake and the host only draws around them: a `Tab` outside a `Tabs` is not drawn, a child of a
@@ -796,11 +797,18 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   themselves as best they can (a `Checkbox`'s label, for example) and take `a11y` for the rest.
 - Do not repeat the role a component already reports: an `Input` is a text field named by its
   `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
-  that has no label of its own (a `Slider`, a `Select`, a `RadioGroup`, a `Progress`), give
-  `a11y` the `group` role and a `label`.
-- Keyboard reach depends on gpui-component: `Slider`, `Rating`, `Accordion`, `Tabs`, `Select`,
-  `Pagination` and `Calendar` take no Tab stop and no keys, so a keyboard-only user cannot reach
-  them (a screen reader's own navigation still reads their `a11y`).
+  that has no label of its own (a `Select`, a `RadioGroup`, a `Progress`), give `a11y` the
+  `group` role and a `label`.
+- The host gives `Slider`, `Rating`, `Tabs` and `Pagination` a Tab stop (none when `disabled`)
+  and keys: ←/↓ and →/↑ move one `step` (one star, one page, the previous or next enabled tab),
+  Home and End go to the first and last. A key sends the same `change` a click would, in both
+  synced and controlled modes. The stop reports its own role and value — `slider` (Slider,
+  Rating), `spinbutton` (Pagination) or the chosen `tab` (Tabs) — so their `a11y` only gives the
+  `id`, `label`, `description` and `keyshortcuts`; its `role` and value are ignored. A `Tabs`
+  reads as its chosen tab, and its `a11y.label` becomes the description.
+- The other components keep gpui-component's own keyboard behaviour: `Accordion` and `Calendar`
+  take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own navigation
+  still reads their `a11y`).
 
 ## 17. Basic, Form, Layout and Advanced components
 

@@ -277,7 +277,8 @@ a partir de un análisis de competencia: entraron M6 (gpui-kit 0.8), M8 (cliente
 | **M8 — Cliente Go** — **hecho** («Fase 37») | `packages/client-go/` escrito solo con `PROTOCOL.md` y `conformance/` (sin dependencias: `encoding/json` y `os/exec`), `examples/counter.go`, job de CI en Windows y Linux; cada hueco de la especificación que obligue a mirar el host se corrige en el mismo hito. | El cliente reproduce todas las transcripciones y abre el contador en ventana real; la lista de huecos de `PROTOCOL.md` queda cerrada. | no: es la prueba de que el protocolo basta |
 | **M9 — `Canvas`** — **hecho** («Fase 38») | Spike de un nodo con una lista de comandos de dibujo (rectángulo, línea, path, texto, imagen, colores del tema) pintada con `canvas` de GPUI, midiendo reenviar la lista frente a un parche; después, propuesta de protocolo (regla 5) y, si se aprueba, host, clientes, transcripción y ejemplo. Se hizo con alcance recortado: `rect`, `line`, `path` y `pointerDown` (`PROTOCOL.md` §20); texto, imagen y los demás eventos de puntero quedan fuera ([adr/0002-canvas.md](adr/0002-canvas.md) §6.1). | Spike con números y decisión escrita; si sigue, un ejemplo que dibuja y responde al puntero sin componentes nuevos en el host. | sí: nodo y comandos nuevos, eventos de puntero con coordenadas locales |
 | **M10 — Tanda 3 y cierre de calidad** | `Command` y `Settings` (cinco tipos de campo), repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro, `benchmarks/tree.mjs` repetido con el host release y la latencia de aplicar 1k/10k/50k nodos en el README. | Lo de M2 más `change` con `value: {key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | no: nodos nuevos; `value` ya admite objetos (como `sort`), sin campo `data` |
-| **M11 — `Dock`** | Spike y ADR antes de programar ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §10: quién posee el layout, identidad de paneles, contenido, persistencia); después, protocolo aprobado (regla 5), host, clientes, transcripción y ejemplo. Separado de M10 el 2026-10-25: cambia el modelo, no es un componente más. | ADR con la decisión; si sigue, paneles con contenido del cliente que el usuario arrastra sin que el `setProps` y el layout se pisen. | probablemente sí (operación de layout), a decidir en el ADR |
+| **M11 — Teclado en el host** | Opción (c) de M10 paso 4: parada de Tab y flechas que pone el host en `Slider`, `Rating`, `Tabs` y `Pagination` («Fase 43»). El rol y el valor los da el host, y el `a11y` del cliente solo nombra la parada. `Select`, `Calendar` y `Accordion`, fuera. | Los cuatro se alcanzan con Tab, se mueven con flechas y Narrator lee el valor nuevo. | no: `PROTOCOL_VERSION` sigue en 1 |
+| **M12 — `Dock`** | Spike y ADR antes de programar ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §10: quién posee el layout, identidad de paneles, contenido, persistencia); después, protocolo aprobado (regla 5), host, clientes, transcripción y ejemplo. Separado de M10 el 2026-10-25: cambia el modelo, no es un componente más. | ADR con la decisión; si sigue, paneles con contenido del cliente que el usuario arrastra sin que el `setProps` y el layout se pisen. | probablemente sí (operación de layout), a decidir en el ADR |
 
 > **Estado (2026-10-21):** **M0 y M1 hechos** ([HISTORIAL.md](HISTORIAL.md), «Fase 28»): CI en
 > verde en los tres jobs y ventanas verificadas en ventana real. **M2 hecho** («Fase 29»):
@@ -325,7 +326,7 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
 > impacto en host, protocolo y clientes: ver
 > [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). `Tree`,
 > `Diff` y `Carousel` (M2), `Sidebar` y `Chart` (M3) y `Command` y `Settings` (M10) ya están;
-> quedan `Dock` (M11) y `List`. `Editor` y `Speech` siguen fuera por dependencias.
+> quedan `Dock` (M12) y `List`. `Editor` y `Speech` siguen fuera por dependencias.
 
 - Componentes: **hecho el 2026-10-20** (HISTORIAL.md, "Accesibilidad y componentes de gpui-kit"):
   Basic (`Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`,
@@ -334,7 +335,7 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
   `Resizable`) y Advanced (`Calendar`), con `Accordion` y el redimensionado dentro de lo que el
   árbol puede expresar. Lo que queda se detalla en
   [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` (**hecho**,
-  M2), `Sidebar` y `Chart` (**hecho**, M3) y `Command` y `Settings` (**hecho**, M10); `Dock` en M11 (con
+  M2), `Sidebar` y `Chart` (**hecho**, M3) y `Command` y `Settings` (**hecho**, M10); `Dock` en M12 (con
   un ADR); `List` según necesidad. El editor de código (pide `tree-sitter`,
   que engorda el host), markdown (`TextView`) y el selector de color siguen pendientes.
 - Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana. **Hecho el 2026-10-21** (M1, HISTORIAL.md, «Fase 28»).

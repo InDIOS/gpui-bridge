@@ -1771,3 +1771,41 @@ adelante.
 
 **Tercera pasada (2026-10-26).** El usuario repitió con Narrator las filas 7, 11 y 13 sobre la
 0.8.1 y ya se oyen bien. Con esto se cierra el paso 4 y **M10 queda cerrado**.
+
+### Fase 43 — M11: teclado en el host para `Slider`, `Rating`, `Tabs` y `Pagination` (2026-10-27)
+
+Es la opción (c) de «Fase 42». El usuario la eligió antes de `Dock`, que pasa a M12. De los siete
+componentes sin teclado entran cuatro: los que se mueven con flechas sobre un valor en un rango.
+Fuera: `Select` (abrir su lista depende de las partes internas de gpui-component), `Calendar`
+(moverse día a día en la cuadrícula) y `Accordion` (una parada por encabezado), además de
+RePág/AvPág.
+
+- **Sin cambio de protocolo.** Cada cambio de valor de esos componentes ya pasaba por el host
+  (`value_chosen`, `prop_chosen` para `page`). `components/keyboard.rs` traduce la tecla a la misma
+  elección que un clic, así que los modos sincronizado y controlado se comportan igual.
+  `PROTOCOL_VERSION` sigue en 1 y los cuatro clientes no cambian.
+- **La parada es el envoltorio con tamaño** (como `component_a11y`). Tiene el foco, el nodo de
+  accesibilidad y el anillo del tema (`ring`, como sombra: no mueve el layout). Lleva el foco y el
+  rol en el mismo elemento, que es la lección de la 0.8.1. Toma las teclas en la fase de burbuja y
+  solo detiene las que usa, así un `div` padre con `keyDown` las sigue viendo. Un componente
+  `disabled` no tiene parada.
+- **El rol y el valor los pone el host** (decisión del usuario): `slider` para `Slider` y `Rating`,
+  `spinbutton` para `Pagination` y la pestaña elegida (`tab`, `selected`) para `Tabs`. Del `a11y`
+  del cliente quedan `id`, `label`, `description` y `keyshortcuts`. §15 y §16 lo dicen. Los
+  ejemplos ya no ponen `role: "group"` en el `Slider` ni mantienen a mano el `a11y.value` del
+  `Rating`.
+- **Pruebas:** `keyboard::tests`: el paso, el recorte al rango, Inicio/Fin y las pestañas
+  deshabilitadas que se saltan. Ventana real con SendKeys y UIA `FocusedElement` +
+  `RangeValuePattern`:
+  - `components`: Tab llega a «Rating» (Slider, 3 [0..5]), «Pages» (Spinner, 1 [1..12]) y
+    «Files» (TabItem, seleccionada). Las flechas cambian el valor que lee UIA (Rating 3→4→3→2,
+    Fin 5, Inicio 0; Pages 1→2→3, Fin 12; Files→Changes, saltando la pestaña deshabilitada).
+  - `forms`: «Volume» (Slider, 40). El ejemplo es controlado y redondea a múltiplos de 10, así que
+    → vuelve a 40, y Fin/Inicio dan 100/0. Es lo esperado.
+  - Ningún pánico ni aviso de foco sin nodo de accesibilidad en el log.
+
+**Visto de paso:** los botones de página de `Pagination` y el `Select` (ComboBox) de gpui-kit
+0.8.1 ya son paradas de Tab, al contrario de lo que anotaba «Fase 42». El área de texto de `forms`
+se queda con Tab y Mayús+Tab (no sale con el teclado); es de gpui-component y no se tocó.
+
+**Pendiente:** la pasada del usuario con Narrator. UIA da los nombres y valores, no lo que se oye.

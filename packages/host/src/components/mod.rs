@@ -15,6 +15,7 @@ pub mod checkbox;
 pub mod command;
 pub mod diff;
 pub mod input;
+pub mod keyboard;
 pub mod layout;
 pub mod menu;
 pub mod otp;

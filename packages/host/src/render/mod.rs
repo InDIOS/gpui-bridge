@@ -30,8 +30,8 @@ use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, canvas, checkbox, layout, menu, radio, settings, sidebar,
-    switch, tabs, tree,
+    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, radio, settings,
+    sidebar, switch, tabs, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -301,7 +301,8 @@ impl RootView {
             .copied()
             .filter(|&id| {
                 tree.node(id).is_some_and(|node| {
-                    node.node_type == NodeType::Div && node.events.contains("keyDown")
+                    (node.node_type == NodeType::Div && node.events.contains("keyDown"))
+                        || keyboard::takes_stop(node)
                 })
             })
             .collect();
@@ -828,6 +829,11 @@ impl RenderCx<'_> {
         }
 
         let accessibility = a11y::of(node);
+        if keyboard::takes_stop(node)
+            && let Some(handle) = self.focusables.get(&id).cloned()
+        {
+            return self.keyboard_stop(id, node, &classes, &handle, accessibility);
+        }
         let element = match node.node_type {
             NodeType::Div => self.div_node(id, node, &classes),
             NodeType::MenuBar => self.menu_bar_node(id, node, &classes),
@@ -940,6 +946,59 @@ impl RenderCx<'_> {
         classes: &[Class],
     ) -> AnyElement {
         self.component_a11y(id, element, classes, None)
+    }
+
+    /// A component `keyboard` gives a Tab stop: the stop is its sized wrapper (as in
+    /// `component_a11y`) and carries the accessibility node, so the reader follows the focus.
+    fn keyboard_stop(
+        &mut self,
+        id: NodeId,
+        node: &Node,
+        classes: &[Class],
+        handle: &FocusHandle,
+        client: Option<a11y::A11y>,
+    ) -> AnyElement {
+        let element = match node.node_type {
+            NodeType::Slider => self.slider_node(id, node, &[]),
+            NodeType::Tabs => self.tabs_node(id, node, &[], None),
+            NodeType::Rating => self.component(id, basic::rating(id, node, self.session), &[]),
+            _ => self.component(id, basic::pagination(id, node, self.session), &[]),
+        };
+        let spec = keyboard::spec(self.tree, node, client);
+        let wrapper = if self.in_control {
+            div().occlude()
+        } else {
+            div()
+        };
+        let ring = BoxShadow {
+            color: self.theme.ring.alpha(0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(3.),
+            inset: false,
+        };
+        let session = self.session.clone();
+        let stop = a11y::apply(
+            &spec,
+            id,
+            wrapper.rounded(self.theme.radius).track_focus(handle),
+        )
+        .focus(move |style| style.shadow(vec![ring]))
+        .on_key_down(move |event: &KeyDownEvent, _, cx| {
+            let taken = session.update(cx, |session, cx| {
+                let taken = keyboard::key_down(&mut session.tree, id, &event.keystroke);
+                if taken {
+                    cx.notify();
+                }
+                taken
+            });
+            if taken {
+                cx.stop_propagation();
+            }
+        });
+        self.style(id, stop, classes, false)
+            .child(element)
+            .into_any_element()
     }
 
     /// `component` for a node whose `a11y` goes on the same sized wrapper. The general

@@ -20,15 +20,10 @@ const onChange = <T>(apply: (value: T) => void) => ({ value }: { value: T }) => 
   app.commit();
 };
 
-const starsA11y = () => ({ role: "slider" as const, label: "Rating", value: String(state.stars), min: 0, max: 5 });
-const stars = app.rating({ value: state.stars, max: 5, a11y: starsA11y() }).on(
-  "change",
-  onChange<number>((value) => {
-    state.stars = value;
-    // The reader reads `a11y.value`, not the stars: keep it in step.
-    stars.set({ a11y: starsA11y() });
-  }),
-);
+// The host reports a Rating as a slider with its value, so `a11y` only names it.
+const stars = app
+  .rating({ value: state.stars, max: 5, a11y: { label: "Rating" } })
+  .on("change", onChange<number>((value) => (state.stars = value)));
 
 const pages = app
   .pagination({ page: state.page, total: 12, a11y: { label: "Pages" } })

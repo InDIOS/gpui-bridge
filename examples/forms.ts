@@ -53,7 +53,7 @@ const country = app
   });
 
 const volumeLabel = app.text({ content: `Volume: ${state.volume}`, class: "text-sm font-medium" });
-const volume = app.slider({ min: 0, max: 100, step: 1, value: state.volume, controlled: true, class: "w-64", a11y: { role: "group", label: "Volume" } });
+const volume = app.slider({ min: 0, max: 100, step: 1, value: state.volume, controlled: true, class: "w-64", a11y: { label: "Volume" } });
 volume.on("change", ({ value }) => {
   // Controlled: the app snaps it to multiples of 10 and confirms that.
   state.volume = Math.round(value / 10) * 10;
