@@ -1768,3 +1768,6 @@ entradas de `Command` y las flechas de `Pagination`.
 **Decisión del usuario:** camino (a). Los límites de gpui-component quedan documentados en
 §16 y no se toca su código. La viabilidad de (c) queda anotada en el informe para decidir más
 adelante.
+
+**Tercera pasada (2026-10-26).** El usuario repitió con Narrator las filas 7, 11 y 13 sobre la
+0.8.1 y ya se oyen bien. Con esto se cierra el paso 4 y **M10 queda cerrado**.
