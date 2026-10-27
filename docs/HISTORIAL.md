@@ -1836,5 +1836,5 @@ el foco en un botón de `Pagination` (o en la `×` de una pestaña). La flecha s
 que cambiaba la página. gpui-kit rehacía los botones y el foco caía a la ventana.
 - La parada solo toma teclas cuando el foco es suyo (`is_focused`). Probado con UIA: una flecha
   sobre el botón «1» deja la página en 1, y sobre la parada «Pages» la pasa a 2. El usuario
-  confirmó con Narrator que ya va bien.
+  confirmó con Narrator que ya va bien. Con esto **M11 queda cerrado**.
 
