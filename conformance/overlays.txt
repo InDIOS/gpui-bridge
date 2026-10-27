@@ -39,3 +39,81 @@
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
+# Section 24: overlays (AlertDialog, Sheet, Popover, HoverCard).
+> {"op":"create","id":60,"type":"AlertDialog","props":{"open":true,"title":"Delete 3 files?","description":"This cannot be undone.","icon":"circle-alert","okText":"Delete","cancelText":"Cancel"},"events":["ok","cancel"]}
+> {"op":"create","id":61,"type":"text","props":{"content":"3 files"}}
+> {"op":"create","id":62,"type":"Sheet","props":{"open":true,"side":"left","title":"Filters","size":320},"events":["close"]}
+> {"op":"create","id":63,"type":"Input","props":{"value":"*.png"}}
+> {"op":"create","id":64,"type":"Popover","props":{"anchor":"bottom-right","arrow":true},"events":["change"]}
+> {"op":"create","id":65,"type":"Button","props":{"label":"Sort"}}
+> {"op":"create","id":66,"type":"text","props":{"content":"By name"}}
+> {"op":"create","id":67,"type":"HoverCard","props":{"openDelay":300,"closeDelay":200},"events":["change"]}
+> {"op":"create","id":68,"type":"Button","props":{"label":"Info"}}
+> {"op":"create","id":69,"type":"text","props":{"content":"Hovered"}}
+> {"op":"append","parent":1,"child":60}
+> {"op":"append","parent":60,"child":61}
+> {"op":"append","parent":1,"child":62}
+> {"op":"append","parent":62,"child":63}
+> {"op":"append","parent":1,"child":64}
+> {"op":"append","parent":64,"child":65}
+> {"op":"append","parent":64,"child":66}
+> {"op":"append","parent":1,"child":67}
+> {"op":"append","parent":67,"child":68}
+> {"op":"append","parent":67,"child":69}
+> {"op":"commit"}
+# Answering the alert closes it (open becomes false), so answering again is an error.
+> {"op":"simulate","id":60,"event":"ok"}
+< {"type":"event","id":60,"event":"ok"}
+> {"op":"simulate","id":60,"event":"cancel"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# The client opens it again; Cancel (also Escape) answers cancel.
+> {"op":"setProps","id":60,"props":{"open":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":60,"event":"cancel"}
+< {"type":"event","id":60,"event":"cancel"}
+# Closing the sheet reports it once.
+> {"op":"simulate","id":62,"event":"close"}
+< {"type":"event","id":62,"event":"close"}
+> {"op":"simulate","id":62,"event":"close"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# A popover keeps its open state, as a checkbox keeps `checked`.
+> {"op":"simulate","id":64,"event":"change"}
+< {"type":"event","id":64,"event":"change","checked":true}
+> {"op":"simulate","id":64,"event":"change"}
+< {"type":"event","id":64,"event":"change","checked":false}
+# The client can open it too, and nothing is reported: `change` is the user's.
+> {"op":"setProps","id":64,"props":{"open":true}}
+> {"op":"commit"}
+# Each node takes only its own events.
+> {"op":"simulate","id":60,"event":"close"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":62,"event":"ok"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":64,"event":"ok"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# A `HoverCard` has no `simulate`: its `change` comes from the mouse alone.
+> {"op":"simulate","id":67,"event":"change"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Invalid props.
+> {"op":"create","id":70,"type":"Sheet","props":{"open":true,"side":"middle"}}
+> {"op":"create","id":71,"type":"Popover","props":{"open":true,"anchor":"center"}}
+> {"op":"create","id":72,"type":"AlertDialog","props":{"open":true,"icon":"no-such-icon"}}
+> {"op":"create","id":73,"type":"Sheet","props":{"size":0}}
+> {"op":"create","id":74,"type":"HoverCard","props":{"openDelay":-1}}
+> {"op":"create","id":75,"type":"AlertDialog","props":{"description":7}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# A delay too large to represent is accepted: `from_millis` saturates instead of panicking.
+> {"op":"create","id":76,"type":"HoverCard","props":{"openDelay":1e300,"closeDelay":1e300}}
+> {"op":"commit"}
+# Without children they draw nothing: the first child is the trigger.
+> {"op":"create","id":77,"type":"Popover"}
+> {"op":"create","id":78,"type":"HoverCard"}
+> {"op":"append","parent":1,"child":77}
+> {"op":"append","parent":1,"child":78}
+> {"op":"commit"}

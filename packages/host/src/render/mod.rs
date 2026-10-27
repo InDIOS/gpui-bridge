@@ -30,8 +30,8 @@ use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
-    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, radio, settings,
-    sidebar, switch, tabs, toggle, tree,
+    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, overlays, radio,
+    settings, sidebar, switch, tabs, toggle, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -98,8 +98,10 @@ pub struct RootView {
     focus: FocusHandle,
     /// Divs with `keyDown`, which can take the focus.
     focusables: HashMap<NodeId, FocusHandle>,
-    /// The Dialog node shown in gpui-component's dialog layer, if any.
+    /// The Dialog or AlertDialog node shown in gpui-component's dialog layer, if any.
     open_dialog: Option<NodeId>,
+    /// The Sheet node shown in gpui-component's sheet layer, if any.
+    open_sheet: Option<NodeId>,
     /// Last window state reported to the client, so `focus`/`blur` and friends are only sent on
     /// changes. `None` until the first observer call, which primes it (see `track_window`).
     window_active: Option<bool>,
@@ -155,6 +157,7 @@ impl RootView {
             focus: cx.focus_handle(),
             focusables: HashMap::new(),
             open_dialog: None,
+            open_sheet: None,
             window_active: None,
             window_visible: None,
             window_bounds: None,
@@ -344,7 +347,7 @@ impl RootView {
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
-            this.sync_dialog_and_focus(window, cx)
+            this.sync_overlays_and_focus(window, cx)
         });
     }
 
@@ -365,26 +368,45 @@ impl RootView {
         }
     }
 
-    /// Opens or closes the Dialog the tree asks for, then applies a pending `focus` (after the
-    /// dialog, so a field inside it can take the focus).
-    fn sync_dialog_and_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens or closes the Dialog, AlertDialog and Sheet the tree asks for, then applies a pending
+    /// `focus` (after them, so a field inside one can take the focus).
+    fn sync_overlays_and_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tree = &self.session.read(cx).tree;
         let members = self
             .root(tree)
             .map(|root| tree.subtree(root))
             .unwrap_or_default();
         let focus_request = tree.focus_request().filter(|id| members.contains(id));
-        // One Dialog at a time: the open one with the lowest id.
+        let open_of = |types: &[NodeType], id: NodeId| {
+            tree.node(id).is_some_and(|node| {
+                types.contains(&node.node_type)
+                    && node.props.get("open") == Some(&Value::Bool(true))
+            })
+        };
+        // One dialog layer per window: an open AlertDialog wins over a Dialog, then the lowest id
+        // (PROTOCOL.md section 24), so an alert confirms on top of the dialog that opened it.
         let wanted_dialog = members
             .iter()
             .copied()
-            .filter(|&id| {
-                tree.node(id).is_some_and(|node| {
-                    node.node_type == NodeType::Dialog
-                        && node.props.get("open") == Some(&Value::Bool(true))
-                })
-            })
+            .filter(|&id| open_of(&[NodeType::AlertDialog, NodeType::Dialog], id))
+            .min_by_key(|&id| {
+                let alert = tree
+                    .node(id)
+                    .is_some_and(|node| node.node_type == NodeType::AlertDialog);
+                (!alert, id)
+            });
+        let alert = wanted_dialog.is_some_and(|id| {
+            tree.node(id)
+                .is_some_and(|node| node.node_type == NodeType::AlertDialog)
+        });
+        // One sheet per window: the open one with the lowest id.
+        let wanted_sheet = members
+            .iter()
+            .copied()
+            .filter(|&id| open_of(&[NodeType::Sheet], id))
             .min();
+        // Both layers are read above: from here on the tree is not borrowed again, so the window
+        // (and the app it borrows) can be used mutably.
         if self.open_dialog != wanted_dialog {
             // Forgotten first, so closing it from here is not reported as the user's answer.
             if self.open_dialog.take().is_some() {
@@ -392,7 +414,19 @@ impl RootView {
             }
             if let Some(id) = wanted_dialog {
                 self.open_dialog = Some(id);
-                dialog::open(id, &self.session, window, cx);
+                match alert {
+                    true => dialog::open_alert(id, &self.session, window, cx),
+                    false => dialog::open(id, &self.session, window, cx),
+                }
+            }
+        }
+        if self.open_sheet != wanted_sheet {
+            if self.open_sheet.take().is_some() {
+                window.close_sheet(cx);
+            }
+            if let Some(id) = wanted_sheet {
+                self.open_sheet = Some(id);
+                sheet::open(id, &self.session, window, cx);
             }
         }
         if let Some(id) = focus_request {
@@ -551,6 +585,7 @@ impl RootView {
 }
 
 mod dialog;
+mod sheet;
 
 /// One animation frame every 60th of a second, at most: a spinner or a fade does not need more, and
 /// GPUI asks for the next frame as fast as the loop allows when a frame is cheap.
@@ -859,7 +894,10 @@ impl RenderCx<'_> {
             NodeType::Table => self.table_node(id, node, &classes),
             NodeType::VirtualList => self.virtual_list_node(id, node, &classes),
             // Drawn in gpui-component's dialog layer (`dialog::open`), not where it sits in the tree.
-            NodeType::Dialog => div().into_any_element(),
+            NodeType::Dialog | NodeType::AlertDialog => div().into_any_element(),
+            // Drawn in gpui-component's sheet layer (`sheet::open`), not where it sits either.
+            NodeType::Sheet => div().into_any_element(),
+            NodeType::Popover | NodeType::HoverCard => self.overlay_node(id, node, &classes),
             NodeType::RadioGroup => self.radio_group_node(id, node, &classes),
             NodeType::Select => self.select_node(id, node, &classes),
             NodeType::Slider => self.slider_node(id, node, &classes),
@@ -920,6 +958,8 @@ impl RenderCx<'_> {
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // The overlays ignore the node's `a11y` (PROTOCOL.md section 24): in a `Popover`/`HoverCard`
+        // the trigger child carries its own, and an `AlertDialog`/`Sheet` is named by its title.
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
         // still reads as what it is; a Slider reports itself, and so do a Clipboard (a named
@@ -944,6 +984,10 @@ impl RenderCx<'_> {
                         | NodeType::Sidebar
                         | NodeType::Chart
                         | NodeType::Canvas
+                        | NodeType::AlertDialog
+                        | NodeType::Sheet
+                        | NodeType::Popover
+                        | NodeType::HoverCard
                 ) =>
             {
                 a11y::wrap(&spec, id, element)
@@ -1061,6 +1105,25 @@ impl RenderCx<'_> {
                 .child(element)
                 .into_any_element(),
         }
+    }
+
+    /// A `Popover` or a `HoverCard`: the first child is the trigger and the rest the panel, so the
+    /// node draws where it sits. `class` styles the trigger's slot, not the panel (PROTOCOL.md
+    /// section 24).
+    fn overlay_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let children = self.children(node);
+        let trigger = styles::apply(StyleRefinement::default(), classes, self.theme);
+        let element = match node.node_type {
+            NodeType::Popover => {
+                overlays::popover(id, node, children, trigger, self.session).into_any_element()
+            }
+            _ => overlays::hover_card(id, node, children, trigger, self.session).into_any_element(),
+        };
+        // No classes go on a wrapper here: they are the trigger's slot, and a wrapper would keep a
+        // `w-full` trigger from filling the space its parent gives it.
+        // shortcut: the slot takes static classes only (`hover:` and `transition` need the element
+        // itself, which a `StyleRefinement` is not); upgrade if a client wants a moving trigger slot.
+        element
     }
 
     fn badge_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {

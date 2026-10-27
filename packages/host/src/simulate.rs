@@ -154,7 +154,9 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         ) | (NodeType::Div, "doubleClick")
             | (NodeType::Div | NodeType::Input, "keyDown")
             | (NodeType::Div, "drop")
-            | (NodeType::Dialog, "ok" | "cancel")
+            | (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel")
+            | (NodeType::Sheet, "close")
+            | (NodeType::Popover, "change")
             | (
                 NodeType::Checkbox | NodeType::Switch | NodeType::Toggle,
                 "change"
@@ -267,15 +269,31 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             components::clicked(tree, id);
             components::double_clicked(tree, id);
         }
-        // Answering the open Dialog: OK, or Cancel (also Escape, the X and a click outside).
-        (NodeType::Dialog, "ok" | "cancel") => {
+        // Answering the open Dialog or AlertDialog: OK, or Cancel (also Escape, the X and a click
+        // outside on a Dialog).
+        (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel") => {
             if node.props.get("open") != Some(&Value::Bool(true)) {
                 return Err(fail(
                     ErrorCode::InvalidOperation,
-                    format!("Dialog {id} is not open"),
+                    format!("{} {id} is not open", node_type.name()),
                 ));
             }
             components::dialog_answered(tree, id, &sim.event);
+        }
+        // The user closed the open panel with its X, Escape or a click on the overlay.
+        (NodeType::Sheet, "close") => {
+            if node.props.get("open") != Some(&Value::Bool(true)) {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("{} {id} is not open", node_type.name()),
+                ));
+            }
+            components::overlays::sheet_closed(tree, id);
+        }
+        // The user opened or closed the popover: the state is kept, and reported, as a checkbox's.
+        (NodeType::Popover, "change") => {
+            let open = node.props.get("open") == Some(&Value::Bool(true));
+            components::overlays::open_changed(tree, id, !open);
         }
         (NodeType::Div, "drop") => {
             let paths = sim

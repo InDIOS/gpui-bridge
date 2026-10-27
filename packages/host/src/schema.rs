@@ -16,6 +16,8 @@ pub enum PropKind {
     Menus,
     /// A finite number.
     Number,
+    /// A finite number from 0.
+    NonNegative,
     /// A finite number above 0.
     Positive,
     /// Standard base64 (an `Image`'s bytes); the value is decoded when the op is applied, so a
@@ -77,6 +79,7 @@ impl PropKind {
             | Self::CommandSections
             | Self::SettingsPages => self.check(value).is_ok(),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
+            Self::NonNegative => value.as_f64().is_some_and(|n| n.is_finite() && n >= 0.),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
             Self::Index => value.is_u64(),
@@ -134,6 +137,7 @@ impl PropKind {
             Self::Options => "a list of options".into(),
             Self::Number => "a number".into(),
             Self::Positive => "a number above 0".into(),
+            Self::NonNegative => "a number from 0".into(),
             Self::Base64 => "a base64-encoded string".into(),
             Self::Index => "a whole number from 0".into(),
             Self::Columns => "a list of columns".into(),
@@ -222,7 +226,27 @@ pub enum NodeType {
     Shimmer,
     InputGroup,
     Clipboard,
+    // Overlays (PROTOCOL.md section 24).
+    AlertDialog,
+    Sheet,
+    Popover,
+    HoverCard,
 }
+
+/// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
+const ANCHORS: &[&str] = &[
+    "top-left",
+    "top-center",
+    "top-right",
+    "left-center",
+    "right-center",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+];
+
+/// The edge a `Sheet` slides in from.
+const SIDES: &[&str] = &["left", "right", "top", "bottom"];
 
 impl NodeType {
     pub fn parse(name: &str) -> Option<Self> {
@@ -283,6 +307,10 @@ impl NodeType {
             "Shimmer" => Some(Self::Shimmer),
             "InputGroup" => Some(Self::InputGroup),
             "Clipboard" => Some(Self::Clipboard),
+            "AlertDialog" => Some(Self::AlertDialog),
+            "Sheet" => Some(Self::Sheet),
+            "Popover" => Some(Self::Popover),
+            "HoverCard" => Some(Self::HoverCard),
             _ => None,
         }
     }
@@ -312,9 +340,18 @@ impl NodeType {
                 Self::Div | Self::Button | Self::Toggle | Self::DropdownButton | Self::Clipboard,
                 "tooltip",
             ) => Some(Str),
-            (Self::Dialog, "open") => Some(Bool),
+            (Self::Dialog | Self::AlertDialog, "open") => Some(Bool),
             (Self::Dialog, "title" | "okText" | "cancelText") => Some(Str),
             (Self::Dialog, "width") => Some(Positive),
+            (Self::AlertDialog, "title" | "description" | "okText" | "cancelText") => Some(Str),
+            (Self::AlertDialog, "icon") => Some(Icon),
+            (Self::Sheet, "open") => Some(Bool),
+            (Self::Sheet, "side") => Some(OneOf(SIDES)),
+            (Self::Sheet, "title") => Some(Str),
+            (Self::Sheet, "size") => Some(Positive),
+            (Self::Popover, "open" | "arrow") => Some(Bool),
+            (Self::Popover | Self::HoverCard, "anchor") => Some(OneOf(ANCHORS)),
+            (Self::HoverCard, "openDelay" | "closeDelay") => Some(NonNegative),
             (Self::VirtualList, "rowHeight") => Some(Positive),
             (Self::Table, "columns") => Some(Columns),
             (Self::Table, "rows") => Some(Rows),
@@ -555,6 +592,10 @@ impl NodeType {
             Self::Shimmer => "Shimmer",
             Self::InputGroup => "InputGroup",
             Self::Clipboard => "Clipboard",
+            Self::AlertDialog => "AlertDialog",
+            Self::Sheet => "Sheet",
+            Self::Popover => "Popover",
+            Self::HoverCard => "HoverCard",
         }
     }
 }
@@ -618,6 +659,10 @@ pub const ALL: &[NodeType] = &[
     NodeType::Shimmer,
     NodeType::InputGroup,
     NodeType::Clipboard,
+    NodeType::AlertDialog,
+    NodeType::Sheet,
+    NodeType::Popover,
+    NodeType::HoverCard,
 ];
 
 #[cfg(test)]

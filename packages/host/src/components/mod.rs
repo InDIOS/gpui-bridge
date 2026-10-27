@@ -19,6 +19,7 @@ pub mod keyboard;
 pub mod layout;
 pub mod menu;
 pub mod otp;
+pub mod overlays;
 pub mod radio;
 pub mod select;
 pub mod settings;

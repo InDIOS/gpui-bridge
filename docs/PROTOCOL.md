@@ -216,12 +216,16 @@ Rules:
 | `Shimmer`  | `content`, `duration`, `spread`, `reverse`, `once`, `class`  | —                  |
 | `InputGroup` | `value`, `placeholder`, `prefix`, `suffix`, `prefixIcon`, `suffixIcon`, `disabled`, `readonly`, `invalid`, `controlled`, `class` | `change`, `submit` |
 | `Clipboard` | `value`, `tooltip`, `class`                                 | `copied`           |
+| `AlertDialog` | `open`, `title`, `description`, `icon`, `okText`, `cancelText`, `class` | `ok`, `cancel` |
+| `Sheet`    | `open`, `side` (`left`, `right`, `top`, `bottom`), `title`, `size`, `class` | `close` |
+| `Popover`  | `open`, `anchor` (eight corners), `arrow`, `class`           | `change`           |
+| `HoverCard` | `openDelay`, `closeDelay`, `anchor` (eight corners), `class` | `change`           |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
-`Carousel`) in section 18, `Sidebar` and `Chart` in section 19 and the simple components of
+`Carousel`) in section 18, `Sidebar` and `Chart` in section 19, the simple components of
 section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
-`Clipboard`).
+`Clipboard`) and the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -239,7 +243,8 @@ section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
   size and color unless `class` sets them (`size-4`, `text-muted-foreground`). `name` is
   one of: `a-large-small`, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `asterisk`, `ban`, `battery-charging`, `battery-full`, `battery-low`, `battery-medium`, `battery-warning`, `battery`, `bell`, `book-open`, `bot`, `building-2`, `calendar`, `case-sensitive`, `chart-pie`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-up-down`, `circle-alert`, `circle-check`, `circle-user`, `circle-x`, `close`, `copy`, `cpu`, `dash`, `delete`, `ellipsis-vertical`, `ellipsis`, `external-link`, `eye-off`, `eye`, `file-text`, `file`, `folder-closed`, `folder-open`, `folder`, `frame`, `gallery-vertical-end`, `github`, `globe`, `hard-drive`, `heart-off`, `heart`, `inbox`, `info`, `inspector`, `layout-dashboard`, `loader-circle`, `loader`, `map`, `maximize`, `memory-stick`, `menu`, `mic`, `minimize`, `minus`, `moon`, `network`, `palette`, `panel-bottom-open`, `panel-bottom`, `panel-left-close`, `panel-left-open`, `panel-left`, `panel-right-close`, `panel-right-open`, `panel-right`, `pause`, `play`, `plus`, `redo-2`, `redo`, `refresh-cw`, `replace`, `resize-corner`, `rotate-cw`, `search`, `settings-2`, `settings`, `sort-ascending`, `sort-descending`, `square-terminal`, `square`, `star-fill`, `star-off`, `star`, `sun`, `thumbs-down`, `thumbs-up`, `triangle-alert`, `undo-2`, `undo`, `user`, `window-close`, `window-maximize`, `window-minimize`, `window-restore`. Any other name is `invalid_props`.
 - `contextMenu` and `MenuBar` are described in section 10; `Dialog` and `tooltip` in section 14;
-  `VirtualList`, `Table` and `Tabs` in section 15.
+  `AlertDialog`, `Sheet`, `Popover` and `HoverCard` in section 24; `VirtualList`, `Table` and
+  `Tabs` in section 15.
 - **Form controls.** `Switch` works like `Checkbox` (`change` carries `checked`).
   `RadioGroup` and `Select` take `options`, a list of `{"value": "...", "label": "...",
   "disabled": true?}` that `setProps` replaces whole; `value` is the selected option's
@@ -1270,3 +1275,66 @@ calls send two events.
 `unknown_type` to them and nothing else changes.
 
 The transcript in `conformance/simple.txt` is the reference for their props and events.
+
+## 24. Overlays
+
+Four nodes over the contents of a window: a confirmation, a side panel, and the two panels a
+trigger opens.
+
+```json
+{"op":"create","id":60,"type":"AlertDialog","props":{"open":true,"title":"Delete 3 files?","description":"This cannot be undone.","icon":"circle-alert","okText":"Delete","cancelText":"Cancel"},"events":["ok","cancel"]}
+{"op":"create","id":62,"type":"Sheet","props":{"open":true,"side":"left","title":"Filters","size":320},"events":["close"]}
+{"op":"create","id":64,"type":"Popover","props":{"anchor":"bottom-right","arrow":true},"events":["change"]}
+{"op":"create","id":67,"type":"HoverCard","props":{"openDelay":300,"closeDelay":200},"events":["change"]}
+```
+
+- **AlertDialog** — a confirmation in the dialog layer of section 14: `open` (default `false`),
+  `title`, `description`, `icon` (a bundled icon, as in `Empty`) and `okText` (default `OK`).
+  `cancelText` is what adds the Cancel button, as in a `Dialog`. Its children are the body, under
+  the description, and `class` styles it. `ok`, `cancel` (also Escape) are opt-in events that
+  close it and set `open` to `false` in the host, as with a `Dialog`; there is no X and no
+  dismiss-by-click, so neither cancels. An open `AlertDialog` shows over an open `Dialog`, and
+  closing it brings the `Dialog` back, with its contents as they were: that is how a confirmation
+  is put on top of another dialog. The two share one layer, so a window still shows one dialog at
+  a time (the open `AlertDialog` wins; among equals, the lowest id).
+- **Sheet** — a panel that slides in from `side` (`right` by default; `left`, `top`, `bottom`):
+  `open`, `title` and `size` in pixels (default 350; the width on the sides, the height above and
+  below). Its children are the scrollable body and `class` styles it. Closing it with its X,
+  Escape or a click on the dimmed background sends `close` and sets `open` to `false`; closing it
+  with `open: false` sends nothing. The panel is resizable by its edge (the crate's default) and
+  its overlay and close-on-overlay behaviour are not props. One sheet per window: the open one
+  with the lowest id.
+- **Popover** — a panel anchored to its **first child**, the trigger; the rest of the children are
+  the panel. `open` (default `false`) lives in the host and is synchronized like a `Checkbox`'s
+  `checked`: the user opening or closing it (a click on the trigger, Enter or Space with the focus
+  in it, Escape, a click outside) sends `change` with `checked` and updates `open`, and a
+  `setProps` with another `open` wins. `anchor` (default `top-left`) names where the panel goes:
+  `top-*` opens below the trigger and `bottom-*` above it, aligned left, centre or right;
+  `left-center` and `right-center` open to the sides. `arrow` draws a triangle pointing at the
+  trigger. `class` styles the **trigger's slot**, not the panel: put `w-full` there for a trigger
+  that fills the space its parent gives it, and style the panel with the nodes inside it. Only the
+  static `class` utilities reach that slot (`hover:` and `transition` need the element itself, so
+  they do not). The trigger keeps its own `click`, and that click does not bubble up; a disabled
+  or loading `Button` does not open the popover. For the keyboard to open it the trigger must be
+  focusable (`Button`, `Input`): a `Text` or a plain `div` trigger is mouse-only.
+- **HoverCard** — the same shape as a `Popover`, opened and closed by the mouse alone: the first
+  child is the trigger. `openDelay` and `closeDelay` are milliseconds (600 and 300 by default) and
+  `anchor` (default `top-center`) works as in a `Popover`. It has no `open` prop — the host does
+  not open or close it, and there is no `simulate` for it — its `change` with `checked` comes from
+  a real hover only. It does not take the focus, so neither the keyboard nor a screen reader
+  reaches it: do not put information there that is nowhere else.
+
+Without children these two draw nothing (the first child is the trigger) and the host warns once on
+stderr; with one child they still open an empty panel with the crate's padding.
+
+The `a11y` of the node itself is ignored by the four: an `AlertDialog` and a `Sheet` read their
+`title`, and in a `Popover`/`HoverCard` the reader reads the `a11y` of the trigger child.
+
+`simulate` covers `ok`/`cancel` on an open `AlertDialog` (as on a `Dialog`), `close` on an open
+`Sheet`, and `change` on a `Popover` (which toggles `open`, as a click does). A `HoverCard` has
+none: its `change` only comes from the mouse in a real window.
+
+`PROTOCOL_VERSION` stays at 1: the four are new node types, so an older host answers `unknown_type`
+to them.
+
+The transcript in `conformance/overlays.txt` is the reference for their props and events.
