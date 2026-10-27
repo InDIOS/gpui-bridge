@@ -214,6 +214,14 @@ pub enum NodeType {
     Command,
     // Settings pages (PROTOCOL.md section 22).
     Settings,
+    // Simple components (PROTOCOL.md section 23).
+    Toggle,
+    DropdownButton,
+    Label,
+    Empty,
+    Shimmer,
+    InputGroup,
+    Clipboard,
 }
 
 impl NodeType {
@@ -268,6 +276,13 @@ impl NodeType {
             "Canvas" => Some(Self::Canvas),
             "Command" => Some(Self::Command),
             "Settings" => Some(Self::Settings),
+            "Toggle" => Some(Self::Toggle),
+            "DropdownButton" => Some(Self::DropdownButton),
+            "Label" => Some(Self::Label),
+            "Empty" => Some(Self::Empty),
+            "Shimmer" => Some(Self::Shimmer),
+            "InputGroup" => Some(Self::InputGroup),
+            "Clipboard" => Some(Self::Clipboard),
             _ => None,
         }
     }
@@ -280,10 +295,12 @@ impl NodeType {
             (_, "a11y") => Some(Accessibility),
             (Self::Text, "content") => Some(Str),
             (Self::Button, "label") => Some(Str),
-            (Self::Button, "variant") => Some(OneOf(&["primary", "secondary", "ghost", "danger"])),
+            (Self::Button | Self::DropdownButton, "variant") => {
+                Some(OneOf(&["primary", "secondary", "ghost", "danger"]))
+            }
             (Self::Input | Self::Textarea, "value" | "placeholder") => Some(Str),
-            (Self::Checkbox | Self::Switch, "label") => Some(Str),
-            (Self::Checkbox | Self::Switch, "checked") => Some(Bool),
+            (Self::Checkbox | Self::Switch | Self::Toggle, "label") => Some(Str),
+            (Self::Checkbox | Self::Switch | Self::Toggle, "checked") => Some(Bool),
             (Self::RadioGroup | Self::Select, "options") => Some(Options),
             (Self::RadioGroup | Self::Select, "value") => Some(Str),
             (Self::RadioGroup, "direction") => Some(OneOf(&["vertical", "horizontal"])),
@@ -291,7 +308,7 @@ impl NodeType {
             (Self::Select, "searchable") => Some(Bool),
             (Self::Slider, "value" | "min" | "max") => Some(Number),
             (Self::Slider, "step") => Some(Positive),
-            (Self::Div | Self::Button, "tooltip") => Some(Str),
+            (Self::Div | Self::Button | Self::Toggle | Self::Clipboard, "tooltip") => Some(Str),
             (Self::Dialog, "open") => Some(Bool),
             (Self::Dialog, "title" | "okText" | "cancelText") => Some(Str),
             (Self::Dialog, "width") => Some(Positive),
@@ -399,6 +416,22 @@ impl NodeType {
             (Self::Command, "items") => Some(CommandSections),
             (Self::Command, "placeholder") => Some(Str),
             (Self::Settings, "pages") => Some(SettingsPages),
+            // Simple components (PROTOCOL.md section 23).
+            (Self::Toggle | Self::DropdownButton | Self::Empty, "icon") => Some(Icon),
+            (Self::Toggle, "variant") => Some(OneOf(&["ghost", "outline"])),
+            (Self::DropdownButton, "items") => Some(Menu),
+            (Self::DropdownButton, "outline") => Some(Bool),
+            (Self::DropdownButton, "menuLabel") => Some(Str),
+            (Self::Label, "content" | "secondary" | "highlight") => Some(Str),
+            (Self::Label, "masked") => Some(Bool),
+            (Self::Empty, "title" | "description") => Some(Str),
+            (Self::Shimmer, "content") => Some(Str),
+            (Self::Shimmer, "duration" | "spread") => Some(Number),
+            (Self::Shimmer, "reverse" | "once") => Some(Bool),
+            (Self::InputGroup, "value" | "placeholder" | "prefix" | "suffix") => Some(Str),
+            (Self::InputGroup, "prefixIcon" | "suffixIcon") => Some(Icon),
+            (Self::InputGroup, "readonly" | "invalid") => Some(Bool),
+            (Self::Clipboard, "value") => Some(Str),
             (
                 Self::Input
                 | Self::Checkbox
@@ -416,7 +449,9 @@ impl NodeType {
                 | Self::Calendar
                 | Self::Tree
                 | Self::Carousel
-                | Self::Sidebar,
+                | Self::Sidebar
+                | Self::Toggle
+                | Self::InputGroup,
                 "controlled",
             ) => Some(Bool),
             (
@@ -434,7 +469,10 @@ impl NodeType {
                 | Self::Stepper
                 | Self::NumberInput
                 | Self::OtpInput
-                | Self::Calendar,
+                | Self::Calendar
+                | Self::Toggle
+                | Self::DropdownButton
+                | Self::InputGroup,
                 "disabled",
             ) => Some(Bool),
             _ => None,
@@ -507,6 +545,13 @@ impl NodeType {
             Self::Canvas => "Canvas",
             Self::Command => "Command",
             Self::Settings => "Settings",
+            Self::Toggle => "Toggle",
+            Self::DropdownButton => "DropdownButton",
+            Self::Label => "Label",
+            Self::Empty => "Empty",
+            Self::Shimmer => "Shimmer",
+            Self::InputGroup => "InputGroup",
+            Self::Clipboard => "Clipboard",
         }
     }
 }
@@ -563,6 +608,13 @@ pub const ALL: &[NodeType] = &[
     NodeType::Canvas,
     NodeType::Command,
     NodeType::Settings,
+    NodeType::Toggle,
+    NodeType::DropdownButton,
+    NodeType::Label,
+    NodeType::Empty,
+    NodeType::Shimmer,
+    NodeType::InputGroup,
+    NodeType::Clipboard,
 ];
 
 #[cfg(test)]

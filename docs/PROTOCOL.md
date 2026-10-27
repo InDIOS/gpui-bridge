@@ -209,10 +209,19 @@ Rules:
 | `Canvas`   | `commands`, `class` | `pointerDown` |
 | `Command`  | `items`, `placeholder`, `class` | `confirm` |
 | `Settings` | `pages`, `class` | `change` |
+| `Toggle`   | `checked`, `label`, `icon`, `variant` (`ghost`, `outline`), `tooltip`, `disabled`, `controlled`, `class` | `change` |
+| `DropdownButton` | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `outline`, `items`, `menuLabel`, `disabled`, `class` | `click`, `menu` |
+| `Label`    | `content`, `secondary`, `masked`, `highlight`, `class`       | —                  |
+| `Empty`    | `icon`, `title`, `description`, `class`                      | —                  |
+| `Shimmer`  | `content`, `duration`, `spread`, `reverse`, `once`, `class`  | —                  |
+| `InputGroup` | `value`, `placeholder`, `prefix`, `suffix`, `prefixIcon`, `suffixIcon`, `disabled`, `readonly`, `invalid`, `controlled`, `class` | `change`, `submit` |
+| `Clipboard` | `value`, `tooltip`, `class`                                 | `copied`           |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
-`Carousel`) in section 18, and `Sidebar` and `Chart` in section 19.
+`Carousel`) in section 18, `Sidebar` and `Chart` in section 19 and the simple components of
+section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
+`Clipboard`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -283,6 +292,7 @@ and Advanced groups are described in section 17; the data components (`Tree`, `D
 {"type":"event","id":5,"event":"submit","value":"current text"}
 {"type":"event","id":9,"event":"menu","value":"copy"}
 {"type":"event","id":11,"event":"change","value":7.5}
+{"type":"event","id":15,"event":"copied","value":"https://example.com"}
 {"type":"event","id":13,"event":"sort","value":{"column":"name","direction":"asc"}}
 {"type":"windowClosed","id":2}
 {"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
@@ -795,6 +805,11 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
   themselves as best they can (a `Checkbox`'s label, for example) and take `a11y` for the rest.
+- Two of section 23's components already report a button of their own: a `Toggle` takes its name
+  from `tooltip`, and a `Clipboard` from `a11y.label` (or its `tooltip`), so the host does not
+  wrap a `Clipboard` at all — its `role` is ignored. Name a `Toggle` with its `tooltip` or its
+  `a11y.label`, not both. An `InputGroup` is a group: `a11y.label` names the box around the
+  field, and the field inside reads from its `placeholder`.
 - Do not repeat the role a component already reports: an `Input` is a text field named by its
   `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
   that has no label of its own (a `Select`, a `RadioGroup`, a `Progress`), give `a11y` the
@@ -809,9 +824,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   reads as its chosen tab, and its `a11y.label` becomes the description.
   Without a stop (`disabled`) they read the same way. gpui-kit already reports a `Slider` as a
   slider, so its `a11y.label` names that one too.
-- The other components keep gpui-component's own keyboard behaviour: `Accordion` and `Calendar`
-  take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own navigation
-  still reads their `a11y`).
+- The other components keep gpui-component's own keyboard behaviour: `Accordion`, `Calendar` and
+  `Toggle` take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own
+  navigation still reads their `a11y`).
 
 ## 17. Basic, Form, Layout and Advanced components
 
@@ -1192,3 +1207,62 @@ Left out: custom field elements, reset buttons, group footers and group variants
 `unknown_type` to it and nothing else changes.
 
 The transcript in `conformance/settings.txt` is the reference for its props and events.
+
+## 23. Simple components
+
+Seven small nodes: a toggle button, a split button with a menu, a rich text label, an empty
+state, loading text, a framed text field and a copy button.
+
+```json
+{"op":"create","id":40,"type":"Empty","props":{"icon":"folder-open","title":"No files","description":"Drop a file here"}}
+{"op":"create","id":41,"type":"Button","props":{"label":"Choose a file"}}
+{"op":"append","parent":40,"child":41}
+{"op":"create","id":42,"type":"Toggle","props":{"label":"Bold","icon":"asterisk","variant":"outline","checked":false},"events":["change"]}
+{"op":"create","id":43,"type":"DropdownButton","props":{"label":"Save","variant":"primary","items":[{"id":"save-as","label":"Save as"},{"id":"discard","label":"Discard","disabled":true}]},"events":["click","menu"]}
+{"op":"create","id":44,"type":"InputGroup","props":{"value":"example.com","prefix":"https://","suffixIcon":"check"},"events":["submit"]}
+{"op":"create","id":45,"type":"Label","props":{"content":"Total","secondary":"(12)","highlight":"12"}}
+{"op":"create","id":46,"type":"Shimmer","props":{"content":"Loading...","duration":2}}
+{"op":"create","id":47,"type":"Clipboard","props":{"value":"https://example.com","a11y":{"label":"Copy the address"}},"events":["copied"]}
+```
+
+- **Toggle** — a button that stays pressed: `checked`, `label`, `icon` and a `tooltip` that also
+  names it for a screen reader; `variant` is `ghost` (default) or `outline`. Its children are
+  drawn after `label`/`icon`. A click sends `change` with `checked`, and the synced and
+  controlled modes of section 5 apply, as with `Checkbox`. It takes no Tab stop.
+- **DropdownButton** — an action and its menu in one control: a `Button` half (`label`, `icon`,
+  `variant`, `outline`, `tooltip`) and a caret that opens `items`, a menu list in the format of
+  section 10 (`menuLabel` names the caret for a screen reader). A click on the left half sends
+  `click`; choosing an item sends `menu` with its `id`. It takes no children.
+- **Label** — `content` with an optional `secondary` text after it (muted) and `masked` (dots
+  instead of characters); `highlight` marks **every** occurrence of that substring, ignoring
+  case.
+- **Empty** — a centered empty state: a dashed frame whose header is `icon` (in a muted box),
+  `title` and `description`, with the children in a content slot under it (usually a `Button`).
+  It fills the box it is given (`flex-1`, `min-w-0`), so size its parent or give it `class`.
+- **Shimmer** — `content` with a moving highlight: `duration` in seconds (default 2), `spread`
+  (the highlight's half-width, 0.3 by default), `reverse` and `once`. It animates on its own —
+  no `animate-*` class — and shows the text still when the system asks for reduced motion. The
+  crate clamps `spread` to 0.05–1 and a negative `duration` to 1 ms.
+- **InputGroup** — a framed text field: `value` (applied like an `Input`'s), `placeholder`,
+  `prefix`/`prefixIcon` on the left and `suffix`/`suffixIcon` on the right (text and a bundled
+  icon; a side with neither adds nothing), `readonly`, `invalid`, `disabled` and `controlled`.
+  `change` and `submit` work as in an `Input`. The sides are text and an icon only: a button
+  inside the frame is not part of this node.
+- **Clipboard** — a small icon button that copies `value`. A click copies it and sends `copied`
+  with that text; the icon turns into a check for two seconds, and a second click in that window
+  does nothing. `tooltip` is a hint and `a11y.label` names the button (its own default name is a
+  translated "Copy").
+
+The `items` of a `DropdownButton` are the menu list of section 10, submenus included, and a
+disabled or unknown item behaves as it does there.
+
+`simulate` covers the actions: `change` on a `Toggle`, `change` and `submit` on an `InputGroup`,
+`click` and `menu` on a `DropdownButton`, and `copied` on a `Clipboard`. Without a window
+(`--no-window`) nothing is copied: the event is reported and the system clipboard is not touched,
+as with `readClipboard` and the native dialogs. `simulate copied` has no two-second wait, so two
+calls send two events.
+
+`PROTOCOL_VERSION` stays at 1: the seven are new node types, so an older host answers
+`unknown_type` to them and nothing else changes.
+
+The transcript in `conformance/simple.txt` is the reference for their props and events.

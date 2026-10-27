@@ -148,13 +148,21 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
 
     let known = matches!(
         (node_type, sim.event.as_str()),
-        (NodeType::Div | NodeType::Button, "click")
-            | (NodeType::Div, "doubleClick")
+        (
+            NodeType::Div | NodeType::Button | NodeType::DropdownButton,
+            "click"
+        ) | (NodeType::Div, "doubleClick")
             | (NodeType::Div | NodeType::Input, "keyDown")
             | (NodeType::Div, "drop")
             | (NodeType::Dialog, "ok" | "cancel")
-            | (NodeType::Checkbox | NodeType::Switch, "change")
-            | (NodeType::Input | NodeType::NumberInput, "change" | "submit")
+            | (
+                NodeType::Checkbox | NodeType::Switch | NodeType::Toggle,
+                "change"
+            )
+            | (
+                NodeType::Input | NodeType::NumberInput | NodeType::InputGroup,
+                "change" | "submit"
+            )
             | (NodeType::OtpInput, "change")
             | (
                 NodeType::Textarea
@@ -174,8 +182,12 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Diff, "change")
             | (NodeType::Carousel, "change")
             | (NodeType::Sidebar, "change")
-            | (NodeType::Div | NodeType::MenuBar, "menu")
+            | (
+                NodeType::Div | NodeType::MenuBar | NodeType::DropdownButton,
+                "menu"
+            )
             | (NodeType::Alert, "close")
+            | (NodeType::Clipboard, "copied")
             | (NodeType::Canvas, "pointerDown")
             | (NodeType::Command, "confirm")
             | (NodeType::Settings, "change")
@@ -203,7 +215,10 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 .collect(),
             _ => node
                 .props
-                .get("contextMenu")
+                .get(match node_type {
+                    NodeType::DropdownButton => "items",
+                    _ => "contextMenu",
+                })
                 .into_iter()
                 .collect::<Vec<_>>(),
         };
@@ -224,8 +239,19 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         };
     }
     match (node_type, sim.event.as_str()) {
-        (NodeType::Div | NodeType::Button, "click") => components::clicked(tree, id),
+        (NodeType::Div | NodeType::Button | NodeType::DropdownButton, "click") => {
+            components::clicked(tree, id)
+        }
         (NodeType::Alert, "close") => components::alert_closed(tree, id),
+        // The clipboard is not touched here (there is no window): the event is reported as it is.
+        (NodeType::Clipboard, "copied") => {
+            let value = node
+                .props
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            components::copied(tree, id, value.to_owned())
+        }
         (NodeType::Canvas, "pointerDown") => {
             let coord = |key| sim.value.as_ref()?.get(key)?.as_f64();
             let (Some(x), Some(y)) = (coord("x"), coord("y")) else {
@@ -276,12 +302,16 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 .ok_or_else(|| fail(ErrorCode::InvalidJson, format!("Invalid key '{keys}'")))?;
             components::key_down(tree, id, &keystroke);
         }
-        (NodeType::Checkbox | NodeType::Switch, "change") => {
+        (NodeType::Checkbox | NodeType::Switch | NodeType::Toggle, "change") => {
             components::checkbox_clicked(tree, id, !checked);
         }
         // The controlled revert needs the window's InputState; only the report is simulated.
         (
-            NodeType::Input | NodeType::Textarea | NodeType::NumberInput | NodeType::OtpInput,
+            NodeType::Input
+            | NodeType::Textarea
+            | NodeType::NumberInput
+            | NodeType::OtpInput
+            | NodeType::InputGroup,
             "change",
         ) => {
             components::input_edited(tree, id, &text()?);
@@ -644,7 +674,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 components::settings::changed(tree, id, path, value.clone());
             }
         }
-        (NodeType::Input | NodeType::NumberInput, "submit") => {
+        (NodeType::Input | NodeType::NumberInput | NodeType::InputGroup, "submit") => {
             components::input_submitted(tree, id, text()?)
         }
         _ => unreachable!("checked by `known`"),

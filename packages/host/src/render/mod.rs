@@ -31,7 +31,7 @@ use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::{
     self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, radio, settings,
-    sidebar, switch, tabs, tree,
+    sidebar, switch, tabs, toggle, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -49,6 +49,8 @@ pub struct RootView {
     textareas: HashMap<NodeId, InputSlot<TextareaMode>>,
     /// Number inputs share the text machinery; only the element differs.
     numbers: HashMap<NodeId, InputSlot<InputMode>>,
+    /// An `InputGroup` owns the state of its text control, like an `Input`.
+    groups: HashMap<NodeId, InputSlot<InputMode>>,
     selects: HashMap<NodeId, SelectSlot>,
     sliders: HashMap<NodeId, SliderSlot>,
     tables: HashMap<NodeId, TableSlot>,
@@ -126,6 +128,7 @@ impl RootView {
             inputs: HashMap::new(),
             textareas: HashMap::new(),
             numbers: HashMap::new(),
+            groups: HashMap::new(),
             selects: HashMap::new(),
             sliders: HashMap::new(),
             tables: HashMap::new(),
@@ -278,6 +281,7 @@ impl RootView {
         let inputs = input::snapshot(tree, NodeType::Input, &members, writes);
         let textareas = input::snapshot(tree, NodeType::Textarea, &members, writes);
         let numbers = input::snapshot(tree, NodeType::NumberInput, &members, writes);
+        let groups = input::snapshot(tree, NodeType::InputGroup, &members, writes);
         let otps = otp::snapshot(tree, &members);
         let calendars = calendar::snapshot(tree, &members);
         let selects = select::snapshot(tree, &members);
@@ -326,6 +330,7 @@ impl RootView {
         input::sync(&mut self.inputs, inputs, &self.session, window, cx);
         input::sync(&mut self.textareas, textareas, &self.session, window, cx);
         input::sync(&mut self.numbers, numbers, &self.session, window, cx);
+        input::sync(&mut self.groups, groups, &self.session, window, cx);
         otp::sync(&mut self.otps, otps, &self.session, window, cx);
         calendar::sync(&mut self.calendars, calendars, &self.session, window, cx);
         select::sync(&mut self.selects, selects, &self.session, window, cx);
@@ -397,6 +402,8 @@ impl RootView {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.numbers.get(&id) {
                 slot.focus(window, cx);
+            } else if let Some(slot) = self.groups.get(&id) {
+                slot.focus(window, cx);
             } else if let Some(slot) = self.otps.get(&id) {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.calendars.get(&id) {
@@ -441,6 +448,7 @@ impl RootView {
             sliders: &self.sliders,
             tables: &self.tables,
             numbers: &self.numbers,
+            groups: &self.groups,
             otps: &self.otps,
             calendars: &self.calendars,
             trees: &self.trees,
@@ -758,6 +766,7 @@ struct RenderCx<'a> {
     sliders: &'a HashMap<NodeId, SliderSlot>,
     tables: &'a HashMap<NodeId, TableSlot>,
     numbers: &'a HashMap<NodeId, InputSlot<InputMode>>,
+    groups: &'a HashMap<NodeId, InputSlot<InputMode>>,
     otps: &'a HashMap<NodeId, OtpSlot>,
     calendars: &'a HashMap<NodeId, CalendarSlot>,
     trees: &'a HashMap<NodeId, tree::TreeSlot>,
@@ -843,6 +852,7 @@ impl RenderCx<'_> {
             NodeType::Button => self.button_node(id, node, &classes),
             NodeType::Checkbox => self.checkbox_node(id, node, &classes),
             NodeType::Switch => self.switch_node(id, node, &classes),
+            NodeType::Toggle => self.toggle_node(id, node, &classes),
             NodeType::Tabs => self.tabs_node(id, node, &classes, accessibility.as_ref()),
             // Drawn by its `Tabs`: on its own a `Tab` is not a chip (PROTOCOL.md section 15).
             NodeType::Tab => div().into_any_element(),
@@ -856,6 +866,7 @@ impl RenderCx<'_> {
             NodeType::Textarea => self.textarea_node(id, node, &classes),
             NodeType::Input => self.input_node(id, node, &classes),
             NodeType::NumberInput => self.number_input_node(id, node, &classes),
+            NodeType::InputGroup => self.input_group_node(id, node, &classes),
             NodeType::OtpInput => self.otp_input_node(id, node, &classes),
             NodeType::Alert => self.component(id, basic::alert(id, node, self.session), &classes),
             NodeType::Badge => self.badge_node(id, node, &classes),
@@ -893,6 +904,15 @@ impl RenderCx<'_> {
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Command => self.command_node(id, node, &classes),
+            NodeType::Label => self.component(id, basic::label(node), &classes),
+            NodeType::Empty => self.empty_node(id, node, &classes),
+            NodeType::Shimmer => self.component(id, basic::shimmer(id, node), &classes),
+            NodeType::DropdownButton => {
+                self.component(id, button::dropdown(id, node, self.session), &classes)
+            }
+            NodeType::Clipboard => {
+                self.component(id, button::clipboard(id, node, self.session), &classes)
+            }
             NodeType::Settings => {
                 let element = settings::build(id, node, self.session);
                 self.component_a11y(id, element, &classes, accessibility.as_ref())
@@ -902,9 +922,10 @@ impl RenderCx<'_> {
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
-        // still reads as what it is; a Slider reports itself, so a wrapper would repeat it.
+        // still reads as what it is; a Slider reports itself, and so does a Clipboard (a named
+        // button), so a wrapper would repeat them.
         let accessibility = match node.node_type {
-            NodeType::Slider => None,
+            NodeType::Slider | NodeType::Clipboard => None,
             NodeType::Rating | NodeType::Pagination => {
                 Some(keyboard::spec(self.tree, node, accessibility))
             }
@@ -1059,6 +1080,12 @@ impl RenderCx<'_> {
         let children = self.children(node);
         let content = div().flex().flex_col().children(children);
         self.component(id, basic::collapsible(id, node).content(content), classes)
+    }
+
+    // `Empty` splits into a header (props) and a content slot, which holds the children.
+    fn empty_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let content = self.children(node);
+        self.component(id, basic::empty(node, content), classes)
     }
 
     fn number_input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -1401,6 +1428,12 @@ impl RenderCx<'_> {
         self.blocking(id, switch, classes)
     }
 
+    fn toggle_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let children = self.children(node);
+        let toggle = toggle::build(id, node, self.session).children(children);
+        self.blocking(id, toggle, classes)
+    }
+
     /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`. Its `a11y`
     /// goes on a sized wrapper, so the bar still fills the width its parent gives it.
     fn tabs_node(
@@ -1529,6 +1562,13 @@ impl RenderCx<'_> {
     fn slider_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.sliders.get(&id) {
             Some(slot) => self.blocking(id, slider::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn input_group_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.groups.get(&id) {
+            Some(slot) => self.blocking(id, input::build_group(id, node, slot), classes),
             None => div().into_any_element(),
         }
     }

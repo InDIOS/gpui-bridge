@@ -27,6 +27,7 @@ pub mod slider;
 pub mod switch;
 pub mod table;
 pub mod tabs;
+pub mod toggle;
 pub mod tree;
 
 use gpui_kit::{App, Entity};
@@ -101,6 +102,12 @@ pub fn clicked(tree: &Tree, id: NodeId) {
 /// The user closed an `Alert` with `closable`.
 pub fn alert_closed(tree: &Tree, id: NodeId) {
     emit(tree, id, "close", None, None);
+}
+
+/// The user copied a `Clipboard`'s value. In `--no-window` the system clipboard is not touched
+/// (as with `readClipboard` and the native dialogs).
+pub fn copied(tree: &Tree, id: NodeId, value: String) {
+    emit(tree, id, "copied", Some(value.into()), None);
 }
 
 /// The user answered an open Dialog (`ok` or `cancel`): it closes, like a synced control.

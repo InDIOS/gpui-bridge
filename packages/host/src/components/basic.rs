@@ -4,15 +4,22 @@
 //! They are stateless except where a user choice is reported (`Rating`, `Pagination`, `Stepper`),
 //! which work like the other choices: the host keeps the value unless the node is `controlled`.
 
+use std::time::Duration;
+
 use gpui_kit::component::Icon;
 use gpui_kit::component::alert::{Alert, AlertVariant};
 use gpui_kit::component::avatar::Avatar;
 use gpui_kit::component::badge::Badge;
 use gpui_kit::component::collapsible::Collapsible;
+use gpui_kit::component::empty::{
+    Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyMediaVariant, EmptyTitle,
+};
 use gpui_kit::component::kbd::Kbd;
+use gpui_kit::component::label::Label;
 use gpui_kit::component::pagination::Pagination;
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::rating::Rating;
+use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::skeleton::Skeleton;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::stepper::{Stepper, StepperItem};
@@ -28,7 +35,7 @@ use crate::protocol::NodeId;
 use crate::tree::Node;
 
 /// An icon by its bundled name.
-fn icon(node: &Node, key: &str) -> Option<Icon> {
+pub fn icon(node: &Node, key: &str) -> Option<Icon> {
     prop_str(node, key).map(|name| Icon::default().path(icon_path(name)))
 }
 
@@ -255,4 +262,61 @@ pub fn stepper(id: NodeId, node: &Node, session: &Entity<Session>) -> Stepper {
             }
         });
     })
+}
+
+// Simple presentational components (PROTOCOL.md section 23): label, empty, shimmer.
+
+/// Props: `content`, `secondary`, `masked`, `highlight`. With `highlight`, every occurrence of
+/// the substring is highlighted, case-insensitively.
+pub fn label(node: &Node) -> Label {
+    let label = Label::new(prop_str(node, "content").unwrap_or("").to_owned())
+        .masked(prop_bool(node, "masked"));
+    let label = match prop_str(node, "secondary") {
+        Some(secondary) => label.secondary(secondary.to_owned()),
+        None => label,
+    };
+    match prop_str(node, "highlight") {
+        Some(highlight) => label.highlights(highlight.to_owned()),
+        None => label,
+    }
+}
+
+/// Props: `icon`, `title`, `description`; `content` is the children (an action, usually), which
+/// go in the component's content slot.
+pub fn empty(node: &Node, content: Vec<AnyElement>) -> Empty {
+    let mut header = EmptyHeader::new();
+    if let Some(icon) = icon(node, "icon") {
+        header = header.media(
+            EmptyMedia::new()
+                .with_variant(EmptyMediaVariant::Icon)
+                .child(icon),
+        );
+    }
+    if let Some(title) = prop_str(node, "title") {
+        header = header.title(EmptyTitle::new().child(SharedString::from(title.to_owned())));
+    }
+    if let Some(description) = prop_str(node, "description") {
+        header = header
+            .description(EmptyDescription::new().child(SharedString::from(description.to_owned())));
+    }
+    Empty::new()
+        .header(header)
+        .content(EmptyContent::new().children(content))
+}
+
+/// Props: `content`, `duration` (seconds, default 2), `spread` (default 0.3), `reverse`, `once`.
+/// It animates on its own, without an `animate-*` class; the crate clamps `spread` to 0.05–1 and
+/// a negative `duration` to 1 ms.
+pub fn shimmer(id: NodeId, node: &Node) -> ShimmerText {
+    let mut shimmer = ShimmerText::new(prop_str(node, "content").unwrap_or("").to_owned())
+        .id(("node", id))
+        .reverse(prop_bool(node, "reverse"))
+        .once(prop_bool(node, "once"));
+    if let Some(duration) = prop_f32(node, "duration") {
+        shimmer = shimmer.duration(Duration::from_secs_f32(duration.max(0.)));
+    }
+    if let Some(spread) = prop_f32(node, "spread") {
+        shimmer = shimmer.spread(spread);
+    }
+    shimmer
 }

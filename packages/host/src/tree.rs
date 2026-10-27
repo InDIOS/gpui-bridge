@@ -472,8 +472,10 @@ impl Tree {
                 node_type
                     .check_required(&props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
-                if matches!(node_type, NodeType::Input | NodeType::Textarea)
-                    && props.get("value").is_some_and(|v| !v.is_null())
+                if matches!(
+                    node_type,
+                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                ) && props.get("value").is_some_and(|v| !v.is_null())
                 {
                     self.value_writes.push(id);
                 }
@@ -539,8 +541,10 @@ impl Tree {
                         .check_required(&props)
                         .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 }
-                if matches!(node_type, NodeType::Input | NodeType::Textarea)
-                    && props.contains_key("value")
+                if matches!(
+                    node_type,
+                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                ) && props.contains_key("value")
                 {
                     self.value_writes.push(id);
                 }
