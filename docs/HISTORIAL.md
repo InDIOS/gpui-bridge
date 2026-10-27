@@ -1838,3 +1838,83 @@ que cambiaba la página. gpui-kit rehacía los botones y el foco caía a la vent
   sobre el botón «1» deja la página en 1, y sobre la parada «Pages» la pasa a 2. El usuario
   confirmó con Narrator que ya va bien. Con esto **M11 queda cerrado**.
 
+### Fase 44 — M12: los siete componentes simples (2026-10-27)
+
+La tanda «S» de componentes sueltos: `Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`,
+`InputGroup` y `Clipboard`. El usuario aprobó antes de programar (regla 5) la propuesta de
+`DECISIONES-M12.md` con sus recomendaciones (A1, B1, C con los extras de la tabla, D1: no versionar
+ese archivo y borrarlo al cerrar). Cuatro commits, de menor a mayor riesgo, como en M10 y M11:
+paso 0 (plan y aprobación), paso 1 (host, protocolo y conformidad), paso 2 (los cuatro clientes),
+paso 3 (ejemplo y cierre). Los siete entraron en un solo hito porque ninguno agrega dependencias.
+
+- **Sin cambio de protocolo.** Son siete tipos de nodo nuevos (`PROTOCOL.md` §5 y §23), así que un
+  host anterior contesta `unknown_type` a ellos y nada más cambia: `PROTOCOL_VERSION` sigue en 1.
+- **Dónde vive cada uno.** `Label`, `Empty` y `Shimmer` en `components/basic.rs`, presentacionales
+  y sin estado (`Shimmer` es `ShimmerText` con `.id(("node", id))`); `Toggle` en
+  `components/toggle.rs`, copiando la forma de `switch.rs`: el `checked` vive en el árbol y un clic
+  lo cambia (`checkbox_clicked`), con los modos sincronizado y controlado de `Checkbox`;
+  `DropdownButton` y `Clipboard` en `components/button.rs`; `InputGroup` en `components/input.rs`.
+- **`Empty` (decisión A1).** La cabecera va por props (`icon` en un recuadro, `title`,
+  `description`) y los hijos son el contenido —la acción, normalmente un `Button`—, que el host
+  mete en `EmptyContent`. Los subnodos `EmptyHeader`/`EmptyContent` quedan para cuando haga falta
+  media rica; A1 es aditivo.
+- **`DropdownButton` reusa lo que ya había.** La mitad izquierda es un `Button` de
+  `button::build` (label, variante, tooltip y `click`) y el menú sale de `menu::builder`, con
+  `items` validado por `menu::check_items` y `simulate menu` resuelto por `menu::find_item`, igual
+  que `contextMenu`; solo hubo que decirle a `simulate` que los items de este tipo están en `items`
+  y no en `contextMenu`. El caret se nombra con `menuLabel` (`menu_accessibility_label`) y el
+  `tooltip` va a la mitad izquierda (lo declaró la revisión del usuario).
+- **`InputGroup` es el cuarto tipo con slot de texto** (B1). Un `HashMap<NodeId,
+  InputSlot<InputMode>>` más en la vista, su `snapshot`/`sync`/`focus` junto a los de
+  `Input`/`Textarea`/`NumberInput`, y `input::build_group` envolviendo `input::build`. El prefijo y
+  el sufijo son texto e icono: un `InputGroupAddon` por lado, con el icono antes o después del
+  texto según el lado, y ninguno si ese lado no tiene nada. `change` y `submit` pasan por el mismo
+  camino que un `Input`. También hubo que sumar el tipo a la lista de `tree.rs` que anota las
+  escrituras de `value` por commit (sin eso, el `value` del cliente nunca llegaba al `InputState`).
+- **`Clipboard` copia con el portapapeles de GPUI** (el mismo de la acción `writeClipboard`) y
+  avisa con `copied` y el texto copiado. En `--no-window` el evento se emite y no se toca el
+  portapapeles; `simulate copied` no tiene la espera de 2 s del componente, así que dos llamadas
+  seguidas mandan dos eventos.
+- **Dos trampas del crate, cerradas en la revisión del usuario (2026-10-27).** Un `duration` de
+  `Shimmer` finito pero mayor que lo que cabe en un `Duration` (`1e20`, que el esquema acepta como
+  número) mataba el host: ahora usa `try_from_secs_f32` y, si no cabe, deja el valor por defecto.
+  Y `Label.highlights` mezcla en la 0.8.1 los desplazamientos del texto en minúsculas con los del
+  original, así que un carácter que cambia de longitud al bajarlo de caja (el signo kelvin `K`,
+  `İ`) lo hacía paniquear: el host descarta el resaltado en ese caso y §23 lo dice. Los dos llevan
+  test unitario.
+- **Accesibilidad: tres nodos se nombran solos.** `Slider` ya estaba en la lista de excepción del
+  envoltorio; se sumaron `Clipboard` (informa un botón cuyo nombre sale de `a11y.label` o del
+  `tooltip`) y `InputGroup` (el `a11y.label` va al `aria_label` del crate). El motivo del
+  `InputGroup` se vio en el volcado UIA: con el envoltorio general quedaban **dos** grupos, uno sin
+  nombre dentro del otro. `Toggle` no tiene nombre propio en el crate, así que va por el camino
+  general y se llama por su `tooltip`. §16 y §23 lo dicen, y avisan de no dar `tooltip` y
+  `a11y.label` a la vez en un `Toggle`.
+- **Pruebas.** Host: 70 unitarios (los de siempre, los siete tipos en `ALL` y dos de los arreglos
+  de la revisión) y las 26 transcripciones de `conformance/` —con `conformance/simple.txt` nueva:
+  props, los dos modos de
+  `Toggle` e `InputGroup`, `click`/`menu` del `DropdownButton`, `copied` repetido, el `Empty` con
+  su `Button` hijo y doce props inválidas— y `no_window`. `cargo fmt --check` y `clippy` limpios.
+  Clientes: un test nuevo por cliente (24 en Node, 22 en React, 24 en Python, Go verde con dos
+  líneas nuevas en su test de conformidad).
+- **Ventana real:** `examples/simple.ts` con el host de depuración. Volcado del árbol UIA de la
+  ventana (como en M10, con `UIAutomationClient`):
+  - `Button 'Bold text' toggle=Off` — el `Toggle` se anuncia **una vez**, sin duplicado.
+  - `Button 'Save'` y `Button 'Save options'` — las dos mitades del `DropdownButton`.
+  - `Group 'Address'` → `Edit 'host' value='example.com'` — el grupo se nombra y el campo se lee
+    por su `placeholder`.
+  - `Button 'Copy the address'` — el `Clipboard`, una sola vez.
+  - `Group 'No files'` y `Button 'Choose a file'` — el `Empty` y su acción.
+  Sin avisos en stderr (ni clases desconocidas ni props rechazadas). El usuario vio la ventana y
+  **pasó Narrator: lee todo**.
+- **Tamaño del host release:** 19.454.464 B antes → **19.719.168 B** después, +264 KB (+0,26 MB),
+  muy por debajo del ~1 MB que la hoja de ruta marca para parar y revisar.
+- **Fuera, a propósito:** `InputGroupButton` y un `Textarea` dentro del grupo, `ToggleGroup`, media
+  rica en `Empty`, el resaltado por prefijo de `Label` y la parada de Tab en
+  `Toggle`/`Checkbox`/`Switch` (es un hito propio, como anotó M11).
+
+**Visto de paso:** un `NumberInput` nunca recibe su `value` impuesto: `tree.rs` solo anota
+escrituras de texto para `Input` y `Textarea` (y ahora `InputGroup`), así que el `value` de un
+`NumberInput` se queda sin aplicar en la ventana. Es de M10 y no se tocó aquí; queda como tarea
+aparte.
+
+

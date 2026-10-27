@@ -834,7 +834,9 @@ mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speec
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
 binary. `Dock` and `List` keep their own delegates and state machines
 and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
-`Chart` in section 19, `Command` in section 21 and `Settings` in section 22.
+`Chart` in section 19, `Command` in section 21, `Settings` in section 22 and the simple
+components (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
+`Clipboard`) in section 23.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends

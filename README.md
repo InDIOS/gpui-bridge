@@ -73,7 +73,9 @@ window on Windows so far. Protocol version 1.
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
   `Tab` inside `Tabs`, `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus
-  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
+  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (line, bar and pie), `Command`,
+  `Settings` (typed field pages) and the simple ones: `Toggle`, `DropdownButton`, `Label`,
+  `Empty`, `Shimmer`, `InputGroup` (a text field with a prefix and a suffix) and `Clipboard`.
   `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
   `Dock` and `List` are not mapped yet.
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
@@ -170,6 +172,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `canvas.ts` | A `Canvas` drawn with `rect`, `line` and `path`; each press adds a square where it happened |
 | `command.ts` | A `Command` palette inline and inside a `Dialog`; confirming an entry shows its id |
 | `settings.ts` | `Settings` with two pages and the five field types; each change shows its key and value |
+| `simple.ts` | The seven simple components: a toggle, a split button with a menu, a highlighted label, an empty state with its action, loading text, a framed text field and a copy button |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).
