@@ -275,10 +275,28 @@ pub fn label(node: &Node) -> Label {
         Some(secondary) => label.secondary(secondary.to_owned()),
         None => label,
     };
-    match prop_str(node, "highlight") {
+    match highlight(node) {
         Some(highlight) => label.highlights(highlight.to_owned()),
         None => label,
     }
+}
+
+/// `highlight`, unless a character of the label or of `highlight` changes its UTF-8 length when
+/// lowercased (the Kelvin sign `K` becomes `k`, three bytes to one).
+/// shortcut: gpui-component 0.8.1 mixes offsets of the lowercased and the original text and
+/// panics then, so the highlight is dropped; remove this when upstream fixes `highlight_ranges`.
+fn highlight(node: &Node) -> Option<&str> {
+    let keeps_len = |key| {
+        prop_str(node, key).is_none_or(|text| {
+            text.chars()
+                .all(|c| c.to_lowercase().map(char::len_utf8).sum::<usize>() == c.len_utf8())
+        })
+    };
+    prop_str(node, "highlight").filter(|_| {
+        ["content", "secondary", "highlight"]
+            .into_iter()
+            .all(keeps_len)
+    })
 }
 
 /// Props: `icon`, `title`, `description`; `content` is the children (an action, usually), which
@@ -306,17 +324,57 @@ pub fn empty(node: &Node, content: Vec<AnyElement>) -> Empty {
 
 /// Props: `content`, `duration` (seconds, default 2), `spread` (default 0.3), `reverse`, `once`.
 /// It animates on its own, without an `animate-*` class; the crate clamps `spread` to 0.05–1 and
-/// a negative `duration` to 1 ms.
+/// a negative `duration` to 1 ms. A `duration` too big for a `Duration` keeps the default.
 pub fn shimmer(id: NodeId, node: &Node) -> ShimmerText {
     let mut shimmer = ShimmerText::new(prop_str(node, "content").unwrap_or("").to_owned())
         .id(("node", id))
         .reverse(prop_bool(node, "reverse"))
         .once(prop_bool(node, "once"));
-    if let Some(duration) = prop_f32(node, "duration") {
-        shimmer = shimmer.duration(Duration::from_secs_f32(duration.max(0.)));
+    // `from_secs_f32` would panic on 1e20, which the schema accepts as a finite number.
+    if let Some(duration) =
+        prop_f32(node, "duration").and_then(|secs| Duration::try_from_secs_f32(secs.max(0.)).ok())
+    {
+        shimmer = shimmer.duration(duration);
     }
     if let Some(spread) = prop_f32(node, "spread") {
         shimmer = shimmer.spread(spread);
     }
     shimmer
+}
+
+#[cfg(test)]
+mod tests {
+    // Not `super::*`: gpui's own `test` attribute would shadow the standard one.
+    use super::{highlight, shimmer};
+    use crate::schema::NodeType;
+    use crate::tree::Node;
+    use serde_json::{Value, json};
+
+    fn node(node_type: NodeType, props: Value) -> Node {
+        Node {
+            node_type,
+            props: props.as_object().cloned().unwrap_or_default(),
+            events: Default::default(),
+            children: vec![],
+            parent: None,
+        }
+    }
+
+    #[test]
+    fn a_highlight_that_would_panic_the_crate_is_dropped() {
+        let label = |props| highlight(&node(NodeType::Label, props)).is_some();
+        assert!(label(json!({"content": "Ünïcode Σ", "highlight": "σ"})));
+        assert!(!label(json!({"content": "\u{212A}a", "highlight": "a"})));
+        // The total length is kept (İ grows, Å shrinks), but the offsets still drift.
+        assert!(!label(
+            json!({"content": "x", "secondary": "İ\u{212B}", "highlight": "x"})
+        ));
+        assert!(!label(json!({"content": "x", "highlight": "\u{2126}"})));
+    }
+
+    #[test]
+    fn a_huge_shimmer_duration_does_not_panic() {
+        shimmer(1, &node(NodeType::Shimmer, json!({"duration": 1e20})));
+        shimmer(1, &node(NodeType::Shimmer, json!({"duration": 1e300})));
+    }
 }

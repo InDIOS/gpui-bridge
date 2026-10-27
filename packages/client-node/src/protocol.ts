@@ -935,6 +935,8 @@ export interface DropdownButtonProps {
   items?: MenuItem[];
   /** The name a screen reader reads for the caret; default: a translated "More options". */
   menuLabel?: string;
+  /** A hint on the left half. */
+  tooltip?: string;
   class?: string;
 }
 

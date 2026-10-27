@@ -308,7 +308,10 @@ impl NodeType {
             (Self::Select, "searchable") => Some(Bool),
             (Self::Slider, "value" | "min" | "max") => Some(Number),
             (Self::Slider, "step") => Some(Positive),
-            (Self::Div | Self::Button | Self::Toggle | Self::Clipboard, "tooltip") => Some(Str),
+            (
+                Self::Div | Self::Button | Self::Toggle | Self::DropdownButton | Self::Clipboard,
+                "tooltip",
+            ) => Some(Str),
             (Self::Dialog, "open") => Some(Bool),
             (Self::Dialog, "title" | "okText" | "cancelText") => Some(Str),
             (Self::Dialog, "width") => Some(Positive),

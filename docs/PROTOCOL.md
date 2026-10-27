@@ -210,7 +210,7 @@ Rules:
 | `Command`  | `items`, `placeholder`, `class` | `confirm` |
 | `Settings` | `pages`, `class` | `change` |
 | `Toggle`   | `checked`, `label`, `icon`, `variant` (`ghost`, `outline`), `tooltip`, `disabled`, `controlled`, `class` | `change` |
-| `DropdownButton` | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `outline`, `items`, `menuLabel`, `disabled`, `class` | `click`, `menu` |
+| `DropdownButton` | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `outline`, `items`, `menuLabel`, `tooltip`, `disabled`, `class` | `click`, `menu` |
 | `Label`    | `content`, `secondary`, `masked`, `highlight`, `class`       | —                  |
 | `Empty`    | `icon`, `title`, `description`, `class`                      | —                  |
 | `Shimmer`  | `content`, `duration`, `spread`, `reverse`, `once`, `class`  | —                  |
@@ -1234,14 +1234,16 @@ state, loading text, a framed text field and a copy button.
   `click`; choosing an item sends `menu` with its `id`. It takes no children.
 - **Label** — `content` with an optional `secondary` text after it (muted) and `masked` (dots
   instead of characters); `highlight` marks **every** occurrence of that substring, ignoring
-  case.
+  case. It is not drawn when a character of the texts changes its UTF-8 length when lowercased
+  (such as the Kelvin sign `K` or `İ`): gpui-component would crash on it.
 - **Empty** — a centered empty state: a dashed frame whose header is `icon` (in a muted box),
   `title` and `description`, with the children in a content slot under it (usually a `Button`).
   It fills the box it is given (`flex-1`, `min-w-0`), so size its parent or give it `class`.
 - **Shimmer** — `content` with a moving highlight: `duration` in seconds (default 2), `spread`
   (the highlight's half-width, 0.3 by default), `reverse` and `once`. It animates on its own —
   no `animate-*` class — and shows the text still when the system asks for reduced motion. The
-  crate clamps `spread` to 0.05–1 and a negative `duration` to 1 ms.
+  crate clamps `spread` to 0.05–1 and a negative `duration` to 1 ms; a `duration` too large to
+  represent keeps the default.
 - **InputGroup** — a framed text field: `value` (applied like an `Input`'s), `placeholder`,
   `prefix`/`prefixIcon` on the left and `suffix`/`suffixIcon` on the right (text and a bundled
   icon; a side with neither adds nothing), `readonly`, `invalid`, `disabled` and `controlled`.

@@ -216,11 +216,10 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Input" || type === "RadioGroup" || type === "Select" || type === "Slider" || type === "Tabs") wire.controlled = props.value !== undefined;
   if (type === "Rating" || type === "Stepper" || type === "Calendar") wire.controlled = props.value !== undefined;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
-  if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
+  if (type === "NumberInput" || type === "OtpInput" || type === "InputGroup") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
   if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch" || type === "Toggle") wire.controlled = props.checked !== undefined;
-  if (type === "InputGroup") wire.controlled = props.value !== undefined;
   return { wire, handlers };
 }
 

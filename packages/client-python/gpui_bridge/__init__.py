@@ -444,8 +444,8 @@ class App:
         return self._create("Toggle", props)
 
     def dropdown_button(self, **props) -> Node:
-        """An action with a menu: `label`, `icon`, `variant`, `outline`, `disabled`, `items` (a
-        menu list) and `menuLabel`. `click` is the left half; `menu` passes the chosen item's id."""
+        """An action with a menu: `label`, `icon`, `variant`, `outline`, `tooltip`, `disabled`,
+        `items` (a menu list) and `menuLabel`. `click` is the left half; `menu` passes the chosen item's id."""
         return self._create("DropdownButton", props)
 
     def label(self, **props) -> Node:
