@@ -805,11 +805,10 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
   themselves as best they can (a `Checkbox`'s label, for example) and take `a11y` for the rest.
-- Two of section 23's components already report a button of their own: a `Toggle` takes its name
-  from `tooltip`, and a `Clipboard` from `a11y.label` (or its `tooltip`), so the host does not
-  wrap a `Clipboard` at all — its `role` is ignored. Name a `Toggle` with its `tooltip` or its
-  `a11y.label`, not both. An `InputGroup` is a group: `a11y.label` names the box around the
-  field, and the field inside reads from its `placeholder`.
+- Some of section 23's components keep the accessibility node the crate builds, so the host does
+  not wrap them and their `role` is ignored: a `Toggle` names itself with its `tooltip` (give it a
+  `tooltip` or an `a11y.label`, not both), a `Clipboard` with `a11y.label` or its `tooltip`, and
+  an `InputGroup` with `a11y.label` — the field inside reads from its `placeholder`.
 - Do not repeat the role a component already reports: an `Input` is a text field named by its
   `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
   that has no label of its own (a `Select`, a `RadioGroup`, a `Progress`), give `a11y` the
@@ -1246,8 +1245,9 @@ state, loading text, a framed text field and a copy button.
 - **InputGroup** — a framed text field: `value` (applied like an `Input`'s), `placeholder`,
   `prefix`/`prefixIcon` on the left and `suffix`/`suffixIcon` on the right (text and a bundled
   icon; a side with neither adds nothing), `readonly`, `invalid`, `disabled` and `controlled`.
-  `change` and `submit` work as in an `Input`. The sides are text and an icon only: a button
-  inside the frame is not part of this node.
+  `change` and `submit` work as in an `Input`, and `a11y.label` names the group (its `role` is
+  ignored). The sides are text and an icon only: a button inside the frame is not part of this
+  node.
 - **Clipboard** — a small icon button that copies `value`. A click copies it and sends `copied`
   with that text; the icon turns into a check for two seconds, and a second click in that window
   does nothing. `tooltip` is a hint and `a11y.label` names the button (its own default name is a

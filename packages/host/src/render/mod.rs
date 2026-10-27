@@ -922,10 +922,10 @@ impl RenderCx<'_> {
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
-        // still reads as what it is; a Slider reports itself, and so does a Clipboard (a named
-        // button), so a wrapper would repeat them.
+        // still reads as what it is; a Slider reports itself, and so do a Clipboard (a named
+        // button) and an InputGroup (a named group), so a wrapper would repeat them.
         let accessibility = match node.node_type {
-            NodeType::Slider | NodeType::Clipboard => None,
+            NodeType::Slider | NodeType::Clipboard | NodeType::InputGroup => None,
             NodeType::Rating | NodeType::Pagination => {
                 Some(keyboard::spec(self.tree, node, accessibility))
             }

@@ -13,6 +13,7 @@ use gpui_kit::*;
 
 use super::{basic, input_edited, input_submitted, prop_bool, prop_str};
 use crate::Session;
+use crate::a11y;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
 use crate::tree::{Node, Tree};
@@ -164,12 +165,16 @@ pub fn build(node: &Node, slot: &InputSlot<InputMode>) -> Input {
 
 /// Props like `Input`, plus `prefix`/`prefixIcon` and `suffix`/`suffixIcon` (text and an icon on
 /// either side of the frame), `readonly` and `invalid`. Events: `change`, `submit`.
+/// `a11y.label` names the group itself, so the host does not wrap it (see `node_raw`).
 pub fn build_group(id: NodeId, node: &Node, slot: &InputSlot<InputMode>) -> InputGroup {
     let mut group = InputGroup::new(("node", id))
         .input(build(node, slot))
         .disabled(prop_bool(node, "disabled"))
         .readonly(prop_bool(node, "readonly"))
         .invalid(prop_bool(node, "invalid"));
+    if let Some(label) = a11y::of(node).and_then(|spec| spec.label) {
+        group = group.aria_label(label);
+    }
     // A side reads icon then text on the left, text then icon on the right; with neither it adds
     // no addon at all.
     for (text_key, icon_key, align, icon_first) in [
