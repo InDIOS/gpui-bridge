@@ -469,6 +469,8 @@ impl Tree {
                 })?;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                crate::components::check_form_value(node_type, None, &props)
+                    .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 node_type
                     .check_required(&props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
@@ -535,6 +537,13 @@ impl Tree {
                     .node_type;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                // Against the whole node: `range: true` alone must not leave a single date behind.
+                crate::components::check_form_value(
+                    node_type,
+                    Some(&self.nodes[&id].props),
+                    &props,
+                )
+                .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 // Only when the op touches it: a `Tab` keeps the `value` it was created with.
                 if props.contains_key("value") {
                     node_type

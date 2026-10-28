@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::components;
-use crate::protocol::{ErrorCode, HostMessage, NodeId, ProtocolError};
+use crate::protocol::{ErrorCode, HostMessage, NodeId, Props, ProtocolError};
 use crate::schema::NodeType;
 use crate::transport;
 use crate::tree::Tree;
@@ -179,6 +179,13 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 "change"
             )
             | (NodeType::Calendar, "change")
+            | (
+                NodeType::DatePicker
+                    | NodeType::TimeField
+                    | NodeType::ColorPicker
+                    | NodeType::Combobox,
+                "change"
+            )
             | (NodeType::Table, "change" | "doubleClick" | "sort")
             | (NodeType::Tree, "change" | "expand" | "collapse")
             | (NodeType::Diff, "change")
@@ -694,6 +701,55 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         }
         (NodeType::Input | NodeType::NumberInput | NodeType::InputGroup, "submit") => {
             components::input_submitted(tree, id, text()?)
+        }
+        // A date, time or color: it must fit the node as `setProps` would; the current one does nothing.
+        (NodeType::DatePicker | NodeType::TimeField | NodeType::ColorPicker, "change") => {
+            let value = match &sim.value {
+                Some(value @ Value::String(_)) => value.clone(),
+                // `null` (or no value) clears; a TimeField has no empty state.
+                None if node_type != NodeType::TimeField => Value::Null,
+                _ => {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        format!("'change' on node {id} needs a string 'value'"),
+                    ));
+                }
+            };
+            let op = Props::from_iter([("value".to_owned(), value.clone())]);
+            components::check_form_value(node_type, Some(&node.props), &op)
+                .map_err(|err| fail(ErrorCode::InvalidOperation, err))?;
+            if node.props.get("value").unwrap_or(&Value::Null) != &value {
+                components::value_chosen(tree, id, value);
+            }
+        }
+        // A Combobox's whole selection: every value must be one of its options.
+        (NodeType::Combobox, "change") => {
+            let value = match &sim.value {
+                Some(value @ Value::Array(list)) if list.iter().all(Value::is_string) => {
+                    value.clone()
+                }
+                _ => {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        format!("'change' on node {id} needs a list of strings as 'value'"),
+                    ));
+                }
+            };
+            let options = components::options(node, "options");
+            let unknown = value.as_array().into_iter().flatten().find(|chosen| {
+                !options
+                    .iter()
+                    .any(|(option, ..)| chosen.as_str() == Some(option.as_str()))
+            });
+            if let Some(unknown) = unknown {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no option {unknown}"),
+                ));
+            }
+            if node.props.get("value") != Some(&value) {
+                components::value_chosen(tree, id, value);
+            }
         }
         _ => unreachable!("checked by `known`"),
     }

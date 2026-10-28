@@ -220,12 +220,18 @@ Rules:
 | `Sheet`    | `open`, `side` (`left`, `right`, `top`, `bottom`), `title`, `size`, `class` | `close` |
 | `Popover`  | `open`, `anchor` (eight corners), `arrow`, `class`           | `change`           |
 | `HoverCard` | `openDelay`, `closeDelay`, `anchor` (eight corners), `class` | `change`           |
+| `DatePicker` | `value` (`YYYY-MM-DD`, or `YYYY-MM-DD/YYYY-MM-DD` with `range`), `range`, `placeholder`, `disabled`, `controlled`, `class` | `change` |
+| `TimeField` | `value` (`HH:MM`, or `HH:MM:SS` with `seconds`), `seconds`, `disabled`, `controlled`, `class` | `change` |
+| `ColorPicker` | `value` (`#RRGGBB` or `#RRGGBBAA`), `palette`, `controlled`, `class` | `change` |
+| `Combobox` | `options`, `value` (a list of option values), `placeholder`, `searchable`, `disabled`, `controlled`, `class` | `change` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
 `Carousel`) in section 18, `Sidebar` and `Chart` in section 19, the simple components of
 section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
-`Clipboard`) and the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`).
+`Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
+and the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
+`Combobox`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -1338,3 +1344,55 @@ none: its `change` only comes from the mouse in a real window.
 to them.
 
 The transcript in `conformance/overlays.txt` is the reference for their props and events.
+
+## 25. Form controls with state
+
+Four form controls that keep what the user picks in the host, like `Select` and `Calendar`: the
+value lives in the node's `value` and every change the user makes is reported with `change`.
+
+```json
+{"op":"create","id":70,"type":"DatePicker","props":{"value":"2024-08-03","placeholder":"Pick a day"},"events":["change"]}
+{"op":"create","id":71,"type":"DatePicker","props":{"range":true,"value":"2024-08-01/2024-08-15"},"events":["change"]}
+{"op":"create","id":72,"type":"TimeField","props":{"value":"09:30"},"events":["change"]}
+{"op":"create","id":73,"type":"ColorPicker","props":{"value":"#3366ff","palette":["#ff0000","#00ff00"]},"events":["change"]}
+{"op":"create","id":74,"type":"Combobox","props":{"options":[{"value":"rs","label":"Rust"},{"value":"go","label":"Go"}],"value":["rs"],"searchable":true},"events":["change"]}
+```
+
+- **DatePicker** — a field that opens a calendar. `value` is a day, `YYYY-MM-DD`; with
+  `range: true` it is an ISO 8601 interval, `YYYY-MM-DD/YYYY-MM-DD`, with the start not after the
+  end. A range is reported once both ends are picked. The field has a clear button, which sends
+  `change` with `value: null`. `placeholder` shows while it is empty.
+- **TimeField** — a time typed by segments (hours, minutes, seconds). `value` is `HH:MM` (24 hours);
+  with `seconds: true` it is `HH:MM:SS`. It has no empty state: without `value` it shows `00:00`,
+  and the user cannot clear it.
+- **ColorPicker** — a field with a swatch and the hex value that opens a palette, hue, saturation,
+  lightness and alpha sliders and a hex box. `value` is `#RRGGBB` or `#RRGGBBAA` (the `#` is
+  required, any case); the host reports `#RRGGBB` in capitals, and `#RRGGBBAA` when the color is
+  translucent. `palette` is a list of colors in the same form, shown first. Clearing it sends
+  `value: null`. It has no `disabled`: gpui-component cannot disable its color pickers.
+- **Combobox** — a list that picks several options: `options` as in a `Select`, `value` the list of
+  chosen option values. Each toggle (adding or removing one) sends `change` with the whole list;
+  values that are not among the options are not shown. `searchable` adds a search box and
+  `placeholder` shows while nothing is chosen. For a single choice with search, use a `Select`
+  with `searchable`.
+
+`range` and `seconds` fix the form of `value`, so a `value` is checked against the node as the
+operation leaves it: `setProps` with `range: true` on a node whose `value` is a single day is
+`invalid_props` (send the new `value` with it). A `value` that does not fit (`2024-02-30`, an
+inverted range, `24:00`, `3366ff`), an empty string, or a `palette` color that is not hex is
+`invalid_props` and the operation is not applied. Unlike `Calendar`, which shows no day for a
+date it cannot read, these four reject it.
+
+Like a `Select`, the four have two modes (section 5): by default the host keeps the new value and
+reports it; with `controlled: true` it only reports it and keeps showing the client's `value` until
+a `setProps` confirms it.
+
+`simulate` covers `change` on the four, with the `value` the user would pick: a string for the first
+three (`null` clears a `DatePicker` or a `ColorPicker`), and a list of strings for a `Combobox`. A
+value that does not fit the node or an unknown option is `invalid_operation`; a value of the wrong
+type is `invalid_json`. The value the node already has sends nothing, as in section 5.
+
+`PROTOCOL_VERSION` stays at 1: the four are new node types, so an older host answers `unknown_type`
+to them.
+
+The transcript in `conformance/form-state.txt` is the reference for their props and events.

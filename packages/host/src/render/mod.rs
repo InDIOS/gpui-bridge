@@ -22,13 +22,17 @@ use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
 use crate::components::carousel::{self, CarouselSlot};
 use crate::components::chart::{self, ChartSlot};
+use crate::components::color_picker::{self, ColorPickerSlot};
+use crate::components::combobox::{self, ComboboxSlot};
 use crate::components::command::{self, CommandSlot};
+use crate::components::date_picker::{self, DatePickerSlot};
 use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
 use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
+use crate::components::time_field::{self, TimeFieldSlot};
 use crate::components::{
     self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, overlays, radio,
     settings, sidebar, switch, tabs, toggle, tree,
@@ -53,6 +57,11 @@ pub struct RootView {
     groups: HashMap<NodeId, InputSlot<InputMode>>,
     selects: HashMap<NodeId, SelectSlot>,
     sliders: HashMap<NodeId, SliderSlot>,
+    /// One per DatePicker / TimeField / ColorPicker / Combobox: their state keeps the chosen value.
+    date_pickers: HashMap<NodeId, DatePickerSlot>,
+    time_fields: HashMap<NodeId, TimeFieldSlot>,
+    color_pickers: HashMap<NodeId, ColorPickerSlot>,
+    combos: HashMap<NodeId, ComboboxSlot>,
     tables: HashMap<NodeId, TableSlot>,
     /// One per OtpInput and per Calendar: their state keeps what the user typed or chose.
     otps: HashMap<NodeId, OtpSlot>,
@@ -136,6 +145,10 @@ impl RootView {
             tables: HashMap::new(),
             otps: HashMap::new(),
             calendars: HashMap::new(),
+            date_pickers: HashMap::new(),
+            time_fields: HashMap::new(),
+            color_pickers: HashMap::new(),
+            combos: HashMap::new(),
             trees: HashMap::new(),
             diffs: HashMap::new(),
             carousels: HashMap::new(),
@@ -288,6 +301,10 @@ impl RootView {
         let otps = otp::snapshot(tree, &members);
         let calendars = calendar::snapshot(tree, &members);
         let selects = select::snapshot(tree, &members);
+        let date_pickers = date_picker::snapshot(tree, &members);
+        let time_fields = time_field::snapshot(tree, &members);
+        let color_pickers = color_picker::snapshot(tree, &members);
+        let combos = combobox::snapshot(tree, &members);
         let sliders = slider::snapshot(tree, &members);
         let tables = table::snapshot(tree, &members);
         let trees = tree::snapshot(tree, &members);
@@ -337,6 +354,28 @@ impl RootView {
         otp::sync(&mut self.otps, otps, &self.session, window, cx);
         calendar::sync(&mut self.calendars, calendars, &self.session, window, cx);
         select::sync(&mut self.selects, selects, &self.session, window, cx);
+        date_picker::sync(
+            &mut self.date_pickers,
+            date_pickers,
+            &self.session,
+            window,
+            cx,
+        );
+        time_field::sync(
+            &mut self.time_fields,
+            time_fields,
+            &self.session,
+            window,
+            cx,
+        );
+        color_picker::sync(
+            &mut self.color_pickers,
+            color_pickers,
+            &self.session,
+            window,
+            cx,
+        );
+        combobox::sync(&mut self.combos, combos, &self.session, window, cx);
         slider::sync(&mut self.sliders, sliders, &self.session, window, cx);
         table::sync(&mut self.tables, tables, &self.session, window, cx);
         tree::sync(&mut self.trees, trees, &self.session, cx);
@@ -485,6 +524,10 @@ impl RootView {
             groups: &self.groups,
             otps: &self.otps,
             calendars: &self.calendars,
+            date_pickers: &self.date_pickers,
+            time_fields: &self.time_fields,
+            color_pickers: &self.color_pickers,
+            combos: &self.combos,
             trees: &self.trees,
             diffs: &self.diffs,
             carousels: &self.carousels,
@@ -804,6 +847,10 @@ struct RenderCx<'a> {
     groups: &'a HashMap<NodeId, InputSlot<InputMode>>,
     otps: &'a HashMap<NodeId, OtpSlot>,
     calendars: &'a HashMap<NodeId, CalendarSlot>,
+    date_pickers: &'a HashMap<NodeId, DatePickerSlot>,
+    time_fields: &'a HashMap<NodeId, TimeFieldSlot>,
+    color_pickers: &'a HashMap<NodeId, ColorPickerSlot>,
+    combos: &'a HashMap<NodeId, ComboboxSlot>,
     trees: &'a HashMap<NodeId, tree::TreeSlot>,
     diffs: &'a HashMap<NodeId, DiffSlot>,
     carousels: &'a HashMap<NodeId, CarouselSlot>,
@@ -935,6 +982,10 @@ impl RenderCx<'_> {
             NodeType::Toolbar => self.toolbar_node(id, node, &classes),
             NodeType::Resizable => self.resizable_node(id, node, &classes),
             NodeType::Calendar => self.calendar_node(id, node, &classes),
+            NodeType::DatePicker => self.date_picker_node(id, node, &classes),
+            NodeType::TimeField => self.time_field_node(id, node, &classes),
+            NodeType::ColorPicker => self.color_picker_node(id, node, &classes),
+            NodeType::Combobox => self.combobox_node(id, node, &classes),
             NodeType::Tree => self.tree_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Diff => self.diff_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
@@ -1625,6 +1676,34 @@ impl RenderCx<'_> {
     fn slider_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.sliders.get(&id) {
             Some(slot) => self.blocking(id, slider::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn date_picker_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.date_pickers.get(&id) {
+            Some(slot) => self.blocking(id, date_picker::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn time_field_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.time_fields.get(&id) {
+            Some(slot) => self.blocking(id, time_field::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn color_picker_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.color_pickers.get(&id) {
+            Some(slot) => self.blocking(id, color_picker::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn combobox_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.combos.get(&id) {
+            Some(slot) => self.blocking(id, combobox::build(node, slot), classes),
             None => div().into_any_element(),
         }
     }

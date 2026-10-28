@@ -53,6 +53,8 @@ pub enum PropKind {
     CommandSections,
     /// A Settings' `pages`: pages of groups of typed fields (PROTOCOL.md section 22).
     SettingsPages,
+    /// A list of plain strings (`Combobox`'s `value`, `ColorPicker`'s `palette`).
+    StringList,
 }
 
 impl PropKind {
@@ -78,6 +80,9 @@ impl PropKind {
             | Self::Commands
             | Self::CommandSections
             | Self::SettingsPages => self.check(value).is_ok(),
+            Self::StringList => value
+                .as_array()
+                .is_some_and(|arr| arr.iter().all(Value::is_string)),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
             Self::NonNegative => value.as_f64().is_some_and(|n| n.is_finite() && n >= 0.),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
@@ -153,6 +158,7 @@ impl PropKind {
             Self::Commands => "a list of canvas command objects".into(),
             Self::CommandSections => "a list of command sections".into(),
             Self::SettingsPages => "a list of settings pages".into(),
+            Self::StringList => "a list of strings".into(),
         }
     }
 }
@@ -231,6 +237,11 @@ pub enum NodeType {
     Sheet,
     Popover,
     HoverCard,
+    // Form components with state (PROTOCOL.md section 25).
+    DatePicker,
+    TimeField,
+    ColorPicker,
+    Combobox,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -311,6 +322,10 @@ impl NodeType {
             "Sheet" => Some(Self::Sheet),
             "Popover" => Some(Self::Popover),
             "HoverCard" => Some(Self::HoverCard),
+            "DatePicker" => Some(Self::DatePicker),
+            "TimeField" => Some(Self::TimeField),
+            "ColorPicker" => Some(Self::ColorPicker),
+            "Combobox" => Some(Self::Combobox),
             _ => None,
         }
     }
@@ -414,6 +429,19 @@ impl NodeType {
             (Self::Form, "direction") => Some(OneOf(&["vertical", "horizontal"])),
             (Self::Field, "label" | "description") => Some(Str),
             (Self::Field, "required") => Some(Bool),
+            // Form components with state (PROTOCOL.md section 25).
+            (Self::DatePicker, "value" | "placeholder") => Some(Str),
+            (Self::DatePicker, "range" | "disabled" | "controlled") => Some(Bool),
+            (Self::TimeField, "value") => Some(Str),
+            (Self::TimeField, "seconds" | "disabled" | "controlled") => Some(Bool),
+            (Self::ColorPicker, "value") => Some(Str),
+            (Self::ColorPicker, "palette") => Some(StringList),
+            // No `disabled`: neither of the crate's color pickers can be disabled.
+            (Self::ColorPicker, "controlled") => Some(Bool),
+            (Self::Combobox, "options") => Some(Options),
+            (Self::Combobox, "value") => Some(StringList),
+            (Self::Combobox, "placeholder") => Some(Str),
+            (Self::Combobox, "searchable" | "disabled" | "controlled") => Some(Bool),
             // Layout components.
             (Self::GroupBox, "title") => Some(Str),
             (Self::GroupBox, "variant") => Some(OneOf(&["normal", "fill", "outline"])),
@@ -596,6 +624,10 @@ impl NodeType {
             Self::Sheet => "Sheet",
             Self::Popover => "Popover",
             Self::HoverCard => "HoverCard",
+            Self::DatePicker => "DatePicker",
+            Self::TimeField => "TimeField",
+            Self::ColorPicker => "ColorPicker",
+            Self::Combobox => "Combobox",
         }
     }
 }
@@ -663,6 +695,10 @@ pub const ALL: &[NodeType] = &[
     NodeType::Sheet,
     NodeType::Popover,
     NodeType::HoverCard,
+    NodeType::DatePicker,
+    NodeType::TimeField,
+    NodeType::ColorPicker,
+    NodeType::Combobox,
 ];
 
 #[cfg(test)]
