@@ -1390,7 +1390,8 @@ a `setProps` confirms it.
 `simulate` covers `change` on the four, with the `value` the user would pick: a string for the first
 three (`null` clears a `DatePicker` or a `ColorPicker`), and a list of strings for a `Combobox`. A
 value that does not fit the node or an unknown option is `invalid_operation`; a value of the wrong
-type is `invalid_json`. The value the node already has sends nothing, as in section 5.
+type is `invalid_json`. The value the node already has sends nothing, as in section 5, and so does
+a `Combobox` list that adds a disabled option (removing one is allowed: the clear button does it).
 
 `PROTOCOL_VERSION` stays at 1: the four are new node types, so an older host answers `unknown_type`
 to them.

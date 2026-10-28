@@ -747,7 +747,15 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                     format!("Node {id} has no option {unknown}"),
                 ));
             }
-            if node.props.get("value") != Some(&value) {
+            // A disabled option cannot be added (the clear button can still remove it).
+            let has = |list: Option<&Value>, option: &str| {
+                list.and_then(Value::as_array)
+                    .is_some_and(|list| list.iter().any(|v| v.as_str() == Some(option)))
+            };
+            let adds_disabled = options.iter().any(|(option, _, disabled)| {
+                *disabled && has(Some(&value), option) && !has(node.props.get("value"), option)
+            });
+            if !adds_disabled && node.props.get("value") != Some(&value) {
                 components::value_chosen(tree, id, value);
             }
         }

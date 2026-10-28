@@ -93,7 +93,7 @@ const notes = app.textarea({ placeholder: "Notes (several lines)", class: "w-96 
 });
 
 // M14: form controls with state. Each keeps its value in the host and reports `change`; the
-// summary line shows the value the host keeps. `tags` is controlled: the app keeps at most three
+// summary line shows the value the host keeps. `tags` is controlled: the app keeps at most two
 // and confirms them, so the host shows only what the app accepted.
 const day = app
   .datePicker({ value: state.day, placeholder: "Pick a day", a11y: { label: "Pick a day" } })
@@ -133,8 +133,8 @@ const tags = app
     a11y: { label: "Languages" },
   })
   .on("change", ({ value }) => {
-    // Controlled: the app keeps at most three languages and confirms that.
-    state.tags = value.slice(0, 3);
+    // Controlled: the app keeps at most two languages and confirms that.
+    state.tags = value.slice(0, 2);
     tags.set({ value: state.tags });
     show();
     app.commit();

@@ -26,6 +26,8 @@
 < {"type":"event","id":5,"event":"change","value":["rs","go"]}
 > {"op":"simulate","id":5,"event":"change","value":["go"]}
 < {"type":"event","id":5,"event":"change","value":["go"]}
+# A disabled option cannot be added: nothing is sent.
+> {"op":"simulate","id":5,"event":"change","value":["go","py"]}
 # Controlled: the host reports the request but keeps the client's value, so asking again reports again.
 > {"op":"setProps","id":3,"props":{"controlled":true,"value":"09:30"}}
 > {"op":"setProps","id":5,"props":{"controlled":true}}
