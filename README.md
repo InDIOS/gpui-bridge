@@ -68,7 +68,8 @@ window on Windows so far. Protocol version 1.
 ## What it has
 
 - **Nodes:** `div`, `text`, `Button`, `Input`, `Textarea`, `Checkbox`, `Switch`,
-  `RadioGroup`, `Select`, `Slider`, `Icon` (Lucide), `Image` (a file path or bytes), `MenuBar`, `Dialog`,
+  `RadioGroup`, `Select`, `Slider`, `Icon` (Lucide), `Image` (a file path or bytes), `MenuBar`,
+  `Dialog`, `AlertDialog`, `Sheet`, `Popover`, `HoverCard`,
   `VirtualList`, `Table`, `Tabs`, and most of gpui-kit's Basic, Form and Layout groups:
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
@@ -173,6 +174,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `command.ts` | A `Command` palette inline and inside a `Dialog`; confirming an entry shows its id |
 | `settings.ts` | `Settings` with two pages and the five field types; each change shows its key and value |
 | `simple.ts` | The seven simple components: a toggle, a split button with a menu, a highlighted label, an empty state with its action, loading text, a framed text field and a copy button |
+| `popups.ts` | The four overlays: a confirmation on top of a dialog (and the dialog back), a filters panel from either side, a menu anchored to a full-width trigger and a card on hover |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).

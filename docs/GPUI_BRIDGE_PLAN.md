@@ -279,7 +279,7 @@ a partir de un análisis de competencia: entraron M6 (gpui-kit 0.8), M8 (cliente
 | **M10 — Tanda 3 y cierre de calidad** | `Command` y `Settings` (cinco tipos de campo), repaso con un lector de pantalla real, recorrido de 20 000 nodos por cuadro, `benchmarks/tree.mjs` repetido con el host release y la latencia de aplicar 1k/10k/50k nodos en el README. | Lo de M2 más `change` con `value: {key, value}`; informe de lo que anuncia el lector y del coste por cuadro. | no: nodos nuevos; `value` ya admite objetos (como `sort`), sin campo `data` |
 | **M11 — Teclado en el host** | Opción (c) de M10 paso 4: parada de Tab y flechas que pone el host en `Slider`, `Rating`, `Tabs` y `Pagination` («Fase 43»). El rol y el valor los da el host, y el `a11y` del cliente solo nombra la parada. `Select`, `Calendar` y `Accordion`, fuera. | Los cuatro se alcanzan con Tab, se mueven con flechas y Narrator lee el valor nuevo. | no: `PROTOCOL_VERSION` sigue en 1 |
 | **M12 — Componentes simples** — **hecho** (2026-10-27, «Fase 44») | `Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup` y `Clipboard`: props planas o hijos; el único estado en el host es el de `Toggle` y el de `InputGroup`, con los patrones de `Checkbox` e `Input`. Agregado el 2026-10-27, con M13–M15, a partir de la lista de gpui-kit.com contrastada con gpui-component 0.8.1 (ninguno agrega dependencias). Los cuatro clientes, `PROTOCOL.md` §23 y `conformance/simple.txt`. | Lo de M2, más el tamaño del host release medido antes y después: 19.454.464 B → **19.719.168 B** (+264 KB, por debajo del umbral de ~1 MB), ventana real con volcado UIA y pasada del usuario con Narrator. | no: nodos nuevos |
-| **M13 — Superposiciones** | `AlertDialog`, `Sheet`, `Popover` y `HoverCard`, con el contenido como hijos (patrón de `Dialog`/`Collapsible`). | Lo de M12, más abrir y cerrar por clic, Escape y `setProps` sin que el host y el cliente se pisen. | no: nodos nuevos |
+| **M13 — Superposiciones** — **hecho** (2026-10-27, «Fase 45») | `AlertDialog`, `Sheet`, `Popover` y `HoverCard`, con el contenido como hijos (patrón de `Dialog`/`Collapsible`); `AlertDialog` como nodo propio (D1) y el primer hijo como disparador de los otros dos (D4). Los cuatro clientes, `PROTOCOL.md` §24 y `conformance/overlays.txt` ampliada. | Lo de M12, más abrir y cerrar por clic, Escape y `setProps` sin que el host y el cliente se pisen: 19.719.168 B → **19.821.056 B** (+101.888 B) y ventana real repasada por el usuario; la pasada del lector de pantalla queda pendiente. | no: nodos nuevos |
 | **M14 — Formulario con estado** | `DatePicker`, `TimeField`, `ColorPicker` y `Combobox`, con el patrón slot de `Select`/`Calendar`; la closure `render_trigger` de `Combobox` se sustituye por datos. | Lo de M12, más modo `controlled`, `invalid_props` para valores imposibles y teclado en ventana real. | no: nodos nuevos |
 | **M15 — Chat y listas** | `Bubble`, `Message`, `Marker`, `MessageScroller` (técnica de `VirtualList`, sin `ListDelegate`), `Attachment`, `Questionnaire` (si su máquina de estados no cabe en props, vuelve a la cola) y, al final, `List`: `ListDelegate` genérico sobre los hijos con selección, teclado, búsqueda (`query`), carga incremental (`loadMore`) y secciones. | Lo de M12, más un ejemplo de chat con 10 000 mensajes sin retraso perceptible y `List` con 10 000 filas, árbol profundo y teclado. | no: nodos nuevos |
 | **M16 — `Dock`** | Spike y ADR antes de programar ([GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) §10: quién posee el layout, identidad de paneles, contenido, persistencia); después, protocolo aprobado (regla 5), host, clientes, transcripción y ejemplo. Separado de M10 el 2026-10-25: cambia el modelo, no es un componente más. Pasó de M12 a M16 el 2026-10-27. | ADR con la decisión; si sigue, paneles con contenido del cliente que el usuario arrastra sin que el `setProps` y el layout se pisen. | probablemente sí (operación de layout), a decidir en el ADR |
@@ -329,8 +329,9 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
 > `Settings`, `Tree`, `List`, `Carousel`, `Diff`, `Chart` y `Sidebar`, qué costaría cada uno y su
 > impacto en host, protocolo y clientes: ver
 > [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md) (con el plan por tandas). `Tree`,
-> `Diff` y `Carousel` (M2), `Sidebar` y `Chart` (M3), `Command` y `Settings` (M10) y los siete
-> simples (M12) ya están; los demás de gpui-kit.com (con `List`) van en M13–M15 y `Dock` en M16.
+> `Diff` y `Carousel` (M2), `Sidebar` y `Chart` (M3), `Command` y `Settings` (M10), los siete
+> simples (M12) y las cuatro superposiciones (M13) ya están; los demás de gpui-kit.com (con
+> `List`) van en M14–M15 y `Dock` en M16.
 > En cola, sin hito: `TextView` (enlaza el parser de `markdown`, medir antes), y `Editor` y
 > `Speech` (dependencias).
 
@@ -341,9 +342,9 @@ Los puntos de abajo son el detalle de lo que falta; la hoja de ruta de §8.1 dec
   `Resizable`) y Advanced (`Calendar`), con `Accordion` y el redimensionado dentro de lo que el
   árbol puede expresar. Lo que queda se detalla en
   [GPUI_BRIDGE_COMPONENTS.md](GPUI_BRIDGE_COMPONENTS.md): `Tree`, `Diff` y `Carousel` (**hecho**,
-  M2), `Sidebar` y `Chart` (**hecho**, M3), `Command` y `Settings` (**hecho**, M10) y los siete
-  simples (**hecho**, M12); el
-  selector de color, `List` y el resto de gpui-kit.com en M13–M15; `Dock` en M16 (con un
+  M2), `Sidebar` y `Chart` (**hecho**, M3), `Command` y `Settings` (**hecho**, M10), los siete
+  simples (**hecho**, M12) y las cuatro superposiciones (**hecho**, M13); el
+  selector de color, `List` y el resto de gpui-kit.com en M14–M15; `Dock` en M16 (con un
   ADR). En cola: markdown (`TextView`), el editor de código (pide `tree-sitter`, que engorda
   el host) y `Speech`.
 - Ventanas: ocultar y mostrar ventanas sin cerrarlas, posición inicial y tamaño mínimo, eventos de foco y redimensionado de ventana. **Hecho el 2026-10-21** (M1, HISTORIAL.md, «Fase 28»).

@@ -1918,3 +1918,72 @@ escrituras de texto para `Input` y `Textarea` (y ahora `InputGroup`), así que e
 aparte.
 
 
+### Fase 45 — M13: las cuatro superposiciones (2026-10-27)
+
+Las cuatro superposiciones de gpui-kit: `AlertDialog`, `Sheet`, `Popover` y `HoverCard`. El usuario
+aprobó antes de programar (regla 5) la propuesta de `DECISIONES-M13.md` con sus siete decisiones
+(D1–D7, sin cambios). Tres pasos más el cierre, y la revisión del usuario sobre el ejemplo:
+`e18ffa5` (host, `PROTOCOL.md` §24 y `conformance/overlays.txt`), `b1ce660` (los cuatro clientes),
+`28cd758` (`examples/popups.ts`), `a0fb559` (la revisión del ejemplo) y este cierre.
+
+- **Sin cambio de protocolo.** Son cuatro tipos de nodo nuevos (`PROTOCOL.md` §5 y §24), así que un
+  host anterior contesta `unknown_type` a ellos: `PROTOCOL_VERSION` sigue en 1.
+- **Dónde vive cada uno.** `AlertDialog` y `Sheet` son capas de la ventana, como `Dialog` (§14):
+  `render/dialog.rs` ganó la variante de alerta (`open_alert_dialog`, con `title`, `description`,
+  `icon`, `okText`, `cancelText` y `confirm()` solo cuando hay `cancelText`) y comparte el cuerpo con
+  `Dialog`; `render/sheet.rs` es nuevo (`open_sheet_at(Placement)`, `title`/`size`/`on_close`) y
+  `render/mod.rs` guarda `open_sheet` junto a `open_dialog`. `Popover` y `HoverCard` viven en
+  `components/overlays.rs` y se dibujan donde están: el primer hijo es el disparador y el resto el
+  panel (`ParentElement`), con el `open` de `Popover` sincronizado como el `checked` de un
+  `Checkbox`.
+- **D1 — `AlertDialog` como nodo propio** y no un `variant` de `Dialog`: el crate ya trae la
+  variante, un host viejo contesta `unknown_type` en vez de dibujar un diálogo normal en silencio, y
+  el costo fue ~15 líneas de `schema.rs` más compartir `render/dialog.rs`.
+- **D6 — la alerta gana al diálogo.** Una capa de diálogos por ventana, como en §14, pero ahora
+  gana una alerta abierta y, entre iguales, el id más bajo (una línea en el filtro de
+  `sync_dialog_and_focus`, `render/mod.rs`). Al cerrarla, el `Dialog` de debajo vuelve **con su
+  texto intacto** —los slots viven en `RootView` por id de nodo—, que es el uso típico: confirmar
+  encima de un diálogo. Comprobado en ventana real.
+- **D2 — `change` con `checked` en los dos sentidos** en `Popover` (abrir y cerrar). Sin el sentido
+  «abrir», la copia de `open` del cliente quedaría desfasada cuando el usuario lo abre.
+- **D3 — `HoverCard` sin `open` y sin `simulate`**, porque `gpui_base::HoverCard` no tiene modo
+  controlado: solo `on_open_change` y los dos retardos. Su `change` sale únicamente del ratón en
+  ventana real.
+- **Retardos a prueba de números enormes.** `Duration::from_millis(ms.max(0.) as u64)`, que satura
+  en vez de entrar en pánico, con test unitario (`1e300`). Es la trampa que M12 encontró en
+  `Shimmer` con `from_secs_f32`; aquí no se repitió.
+- **Dos trampas del crate, resueltas y documentadas.** `Popover::trigger` exige
+  `Selectable + IntoElement`, así que el host envuelve el primer hijo en un `Trigger(AnyElement)`
+  mínimo cuyo `Selectable` no pinta nada: el disparador conserva su aspecto y sigue siendo el mismo
+  elemento. Y en estos dos nodos `Styled` es la **superficie del panel** mientras `trigger_style`
+  es el **hueco del disparador** (D5): `class` va ahí, por eso un `w-full` ocupa el hueco; solo
+  llegan las utilidades estáticas, porque `hover:` y `transition` necesitan el elemento mismo. §24
+  lo dice en esos términos.
+- **Sin hijos y con un solo hijo.** Un `Popover` o `HoverCard` sin hijos no dibuja nada y el host
+  avisa una vez por stderr; con un solo hijo, el crate abre una caja vacía con relleno (se
+  documenta, sin aviso).
+- **Accesibilidad (§24).** Los cuatro ignoran el `a11y` del nodo: en `AlertDialog`/`Sheet` el nombre
+  sale del `title` y el cuerpo lo estilan los hijos; en `Popover`/`HoverCard` el lector lee el
+  `a11y` del hijo disparador. El foco entra en el contenido de los tres primeros (el `Popover` lo
+  lleva a su contenido); `HoverCard` no mueve el foco. Con teclado, un `Popover` solo se abre si el
+  disparador es enfocable (`Button`, `Input`): un `Text` o un `div` son solo ratón.
+- **Pruebas.** Host: 72 unitarios (los dos nuevos son los ocho `anchor` y el retardo enorme), las 26
+  transcripciones de `conformance/` —con `overlays.txt` ampliada con §24: props de los cuatro, los
+  `simulate` (incluido el `invalid_operation` de repetir y el de un evento ajeno), un `Popover` con
+  `open:false` que no avisa, seis props inválidas y un retardo enorme que se acepta— y `no_window`.
+  `cargo fmt --check` y `clippy` limpios. Clientes: un test nuevo por cliente («the overlays…»), 25
+  en Node, 23 en React, 25 en Python y Go en verde.
+- **Ventana real:** `examples/popups.ts`, con el host de depuración, repasada por el usuario contra
+  la lista de §10: la confirmación encima del diálogo y el diálogo de vuelta con su texto, el panel
+  desde los dos lados con su `size`, el menú anclado con flecha y un disparador `w-full`, la
+  tarjeta con sus retardos, y Escape y Tab en las tres primeras: **todo bien**. **Falta la pasada
+  del lector** (Narrator): es lo único del criterio de aceptación que queda sin cerrar, y se prueba
+  como en M11/M12.
+- **Tamaño del host release:** 19.719.168 B antes → **19.821.056 B** después, +101.888 B (+0,10 MB),
+  muy por debajo del ~1 MB que la hoja de ruta marca para parar y revisar.
+- **Fuera, a propósito:** apilar diálogos de verdad (una capa por ventana), un `Popover` en una
+  posición fija sin disparador, un `Sheet` con pie de botones propio, `resizable`/`overlay`/
+  `overlayClosable` del `Sheet` como props y `controlled` en `Popover` (el modo sincronizado ya
+  avisa en los dos sentidos y el cliente puede cerrar con `open:false`).
+
+
