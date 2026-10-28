@@ -1976,9 +1976,9 @@ aprobó antes de programar (regla 5) la propuesta de `DECISIONES-M13.md` con sus
 - **Ventana real:** `examples/popups.ts`, con el host de depuración, repasada por el usuario contra
   la lista de §10: la confirmación encima del diálogo y el diálogo de vuelta con su texto, el panel
   desde los dos lados con su `size`, el menú anclado con flecha y un disparador `w-full`, la
-  tarjeta con sus retardos, y Escape y Tab en las tres primeras: **todo bien**. **Falta la pasada
-  del lector** (Narrator): es lo único del criterio de aceptación que queda sin cerrar, y se prueba
-  como en M11/M12.
+  tarjeta con sus retardos, y Escape y Tab en las tres primeras: **todo bien**. **Pasada del
+  lector** (Narrator, 2026-10-28, como en M11/M12): **todo bien**; con ella el criterio de
+  aceptación queda cerrado.
 - **Tamaño del host release:** 19.719.168 B antes → **19.821.056 B** después, +101.888 B (+0,10 MB),
   muy por debajo del ~1 MB que la hoja de ruta marca para parar y revisar.
 - **Fuera, a propósito:** apilar diálogos de verdad (una capa por ventana), un `Popover` en una
