@@ -161,6 +161,46 @@ test("form controls are accepted by the host and report typed values", async () 
   assert.deepEqual(seen, [["switch", false], ["radio", "a"], ["select", "a"], ["slider", 0.3], ["notes", "1\n2"]]);
 });
 
+test("the form controls with state are accepted and report typed values", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const options = [{ value: "rs", label: "Rust" }, { value: "go", label: "Go" }, { value: "py", label: "Python", disabled: true }];
+  const day = app.datePicker({ value: "2024-08-03", placeholder: "Pick a day" }).on("change", ({ value }) => seen.push(["day", value]));
+  const range = app.datePicker({ range: true }).on("change", ({ value }) => seen.push(["range", value]));
+  const time = app.timeField({ value: "09:30" }).on("change", ({ value }) => seen.push(["time", value]));
+  const color = app
+    .colorPicker({ value: "#3366ff", palette: ["#ff0000", "#00ff0080"] })
+    .on("change", ({ value }) => seen.push(["color", value]));
+  const langs = app
+    .combobox({ options, value: ["rs"], placeholder: "Languages", searchable: true })
+    .on("change", ({ value }) => seen.push(["langs", value]));
+  app.window({ root: app.div().append(day, range, time, color, langs) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: day.id, event: "change", value: "2024-08-10" });
+  app.handleMessage({ type: "event", id: day.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: range.id, event: "change", value: "2024-08-01/2024-08-15" });
+  app.handleMessage({ type: "event", id: time.id, event: "change", value: "18:05" });
+  app.handleMessage({ type: "event", id: color.id, event: "change", value: "#FF0000" });
+  app.handleMessage({ type: "event", id: color.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: langs.id, event: "change", value: ["rs", "go"] });
+  app.handleMessage({ type: "event", id: langs.id, event: "change", value: ["go"] });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["day", "2024-08-10"],
+    ["day", null],
+    ["range", "2024-08-01/2024-08-15"],
+    ["time", "18:05"],
+    ["color", "#FF0000"],
+    ["color", null],
+    ["langs", ["rs", "go"]],
+    ["langs", ["go"]],
+  ]);
+});
+
 test("the basic, form and layout components are accepted and report their events", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

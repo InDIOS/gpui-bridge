@@ -111,3 +111,7 @@ func (a *App) AlertDialog(props Props) *Node     { return a.Create("AlertDialog"
 func (a *App) Sheet(props Props) *Node           { return a.Create("Sheet", props) }
 func (a *App) Popover(props Props) *Node         { return a.Create("Popover", props) }
 func (a *App) HoverCard(props Props) *Node       { return a.Create("HoverCard", props) }
+func (a *App) DatePicker(props Props) *Node      { return a.Create("DatePicker", props) }
+func (a *App) TimeField(props Props) *Node       { return a.Create("TimeField", props) }
+func (a *App) ColorPicker(props Props) *Node     { return a.Create("ColorPicker", props) }
+func (a *App) Combobox(props Props) *Node        { return a.Create("Combobox", props) }

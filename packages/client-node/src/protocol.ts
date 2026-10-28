@@ -66,7 +66,11 @@ export type NodeType =
   | "AlertDialog"
   | "Sheet"
   | "Popover"
-  | "HoverCard";
+  | "HoverCard"
+  | "DatePicker"
+  | "TimeField"
+  | "ColorPicker"
+  | "Combobox";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -159,7 +163,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -1069,6 +1073,57 @@ export interface HoverCardProps {
   class?: string;
 }
 
+// Form controls with state (PROTOCOL.md section 25).
+
+export interface DatePickerProps {
+  /** The chosen day, `YYYY-MM-DD`; with `range: true`, an ISO interval `YYYY-MM-DD/YYYY-MM-DD`. `null` clears it. */
+  value?: string | null;
+  /** A start-to-end range; the form of `value` is fixed by this (the picker rebuilds when it changes). */
+  range?: boolean;
+  /** Shown while the field is empty. */
+  placeholder?: string;
+  disabled?: boolean;
+  /** The host only reports picks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface TimeFieldProps {
+  /** The time shown, `HH:MM`; with `seconds: true`, `HH:MM:SS`. It has no empty state: without `value` the field shows `00:00`. */
+  value?: string;
+  /** Include seconds; the form of `value` is fixed by this (the field rebuilds when it changes). */
+  seconds?: boolean;
+  disabled?: boolean;
+  /** The host only reports edits; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ColorPickerProps {
+  /** `#RRGGBB` or `#RRGGBBAA`; the `#` is required. `null` clears it. It has no `disabled`: gpui-component cannot disable its color pickers. */
+  value?: string | null;
+  /** Colors shown first, in the same form. */
+  palette?: string[];
+  /** The host only reports picks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ComboboxProps {
+  /** The choices, as in a `Select`. */
+  options?: Option[];
+  /** The chosen options' values; always a list. */
+  value?: string[];
+  /** Shown while nothing is chosen. */
+  placeholder?: string;
+  /** A search box at the top of the list. */
+  searchable?: boolean;
+  disabled?: boolean;
+  /** The host only reports toggles; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1130,6 +1185,10 @@ export interface NodeProps {
   Sheet: SheetProps & SharedProps;
   Popover: PopoverProps & SharedProps;
   HoverCard: HoverCardProps & SharedProps;
+  DatePicker: DatePickerProps & SharedProps;
+  TimeField: TimeFieldProps & SharedProps;
+  ColorPicker: ColorPickerProps & SharedProps;
+  Combobox: ComboboxProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1214,4 +1273,12 @@ export interface NodeEvents {
   Popover: { change: { checked: boolean } };
   /** The mouse is the only way in: no `open` and no `simulate`. */
   HoverCard: { change: { checked: boolean } };
+  /** `value` is the chosen day, `null` when cleared. */
+  DatePicker: { change: { value: string | null } };
+  /** `value` is the time, `HH:MM[:SS]`; it has no empty state. */
+  TimeField: { change: { value: string } };
+  /** `value` is the color, `null` when cleared. */
+  ColorPicker: { change: { value: string | null } };
+  /** `value` is the whole selection: toggling one sends the full list. */
+  Combobox: { change: { value: string[] } };
 }

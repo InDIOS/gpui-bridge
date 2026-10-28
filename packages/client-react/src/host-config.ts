@@ -220,13 +220,14 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Table") wire.controlled = props.selected !== undefined;
   if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch" || type === "Toggle") wire.controlled = props.checked !== undefined;
+  if (type === "DatePicker" || type === "TimeField" || type === "ColorPicker" || type === "Combobox") wire.controlled = props.value !== undefined;
   return { wire, handlers };
 }
 
 /** Host event payloads become plain handler arguments. */
 function subscribe(instance: Instance, event: string): void {
   const node = instance.node as UINode<any>;
-  node.on(event, (payload: { value?: string | number | null; checked?: boolean; item?: string; key?: string; paths?: string[] }) => {
+  node.on(event, (payload: { value?: string | number | null | string[]; checked?: boolean; item?: string; key?: string; paths?: string[] }) => {
     const handler = instance.handlers.get(event);
     if (!handler) return;
     if (event === "click" || event === "ok" || event === "cancel" || event === "close") handler();
@@ -364,6 +365,14 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.popover(wire);
     case "HoverCard":
       return app.hoverCard(wire);
+    case "DatePicker":
+      return app.datePicker(wire);
+    case "TimeField":
+      return app.timeField(wire);
+    case "ColorPicker":
+      return app.colorPicker(wire);
+    case "Combobox":
+      return app.combobox(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

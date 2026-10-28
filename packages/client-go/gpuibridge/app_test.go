@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -153,6 +154,76 @@ func TestDefaultHostPath(t *testing.T) {
 	os.Setenv("GPUI_BRIDGE_HOST", "an-explicit-host")
 	if got := defaultHostPath(); got != "an-explicit-host" {
 		t.Fatalf("defaultHostPath ignored GPUI_BRIDGE_HOST: %s", got)
+	}
+}
+
+func TestFormControlsWithStateDispatchValues(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(payload any) {
+		mu.Lock()
+		seen = append(seen, payload.(map[string]any)["value"])
+		mu.Unlock()
+	}
+
+	day := app.DatePicker(Props{"value": "2024-08-03", "placeholder": "Pick a day"}).On("change", add)
+	time_ := app.TimeField(Props{"value": "09:30"}).On("change", add)
+	color := app.ColorPicker(Props{"value": "#3366ff", "palette": []any{"#ff0000", "#00ff0080"}}).On("change", add)
+	langs := app.Combobox(Props{
+		"options": []any{
+			map[string]any{"value": "rs", "label": "Rust"},
+			map[string]any{"value": "go", "label": "Go"},
+		},
+		"value": []any{"rs"}, "placeholder": "Languages", "searchable": true,
+	}).On("change", add)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(day, time_, color, langs)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// `Simulate` puts real JSON on the wire, so the `value` of a `Combobox` change
+	// arrives decoded as []interface{}: the array check that lets Combobox enter M14.
+	steps := []struct {
+		node  NodeID
+		value any
+	}{
+		{day.ID(), "2024-08-10"},
+		{day.ID(), nil}, // clearing the date
+		{time_.ID(), "18:05"},
+		{color.ID(), "#FF0000"},
+		{color.ID(), nil}, // clearing the color
+		{langs.ID(), []any{"rs", "go"}},
+		{langs.ID(), []any{"go"}},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(s.node, "change", s.value, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(steps) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(steps), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	want := []any{"2024-08-10", nil, "18:05", "#FF0000", nil, []any{"rs", "go"}, []any{"go"}}
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
 	}
 }
 

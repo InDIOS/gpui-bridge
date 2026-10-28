@@ -464,3 +464,19 @@ export const Popover = "Popover" as unknown as HostComponent<PopoverProps>;
 /** A card on hover, opened by the mouse alone; `onChange` gets the new `open`. */
 export type HoverCardProps = NodeProps["HoverCard"] & { onChange?: (checked: boolean) => void; children?: ReactNode };
 export const HoverCard = "HoverCard" as unknown as HostComponent<HoverCardProps>;
+
+/** A day picker; `onChange` gets the chosen day, `null` when cleared. */
+export type DatePickerProps = NodeProps["DatePicker"] & { onChange?: (value: string | null) => void };
+export const DatePicker = "DatePicker" as unknown as HostComponent<DatePickerProps>;
+
+/** A time typed by segments; `onChange` gets the time (`HH:MM[:SS]`). */
+export type TimeFieldProps = NodeProps["TimeField"] & { onChange?: (value: string) => void };
+export const TimeField = "TimeField" as unknown as HostComponent<TimeFieldProps>;
+
+/** A color swatch and hex box; `onChange` gets the color, `null` when cleared. */
+export type ColorPickerProps = NodeProps["ColorPicker"] & { onChange?: (value: string | null) => void };
+export const ColorPicker = "ColorPicker" as unknown as HostComponent<ColorPickerProps>;
+
+/** A list that picks several options; `onChange` gets the whole selection. */
+export type ComboboxProps = NodeProps["Combobox"] & { onChange?: (value: string[]) => void };
+export const Combobox = "Combobox" as unknown as HostComponent<ComboboxProps>;

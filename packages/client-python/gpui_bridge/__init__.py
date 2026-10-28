@@ -471,6 +471,30 @@ class App:
         """Copies `value` on click: `tooltip`. `copied` passes the text that was copied."""
         return self._create("Clipboard", props)
 
+    # Form controls with state (PROTOCOL.md section 25).
+
+    def date_picker(self, **props) -> Node:
+        """A day picker: `value` ("YYYY-MM-DD", or "YYYY-MM-DD/YYYY-MM-DD" with `range`),
+        `range`, `placeholder`, `disabled`, `controlled`. `change` passes the chosen day
+        (None when cleared)."""
+        return self._create("DatePicker", props)
+
+    def time_field(self, **props) -> Node:
+        """A time typed by segments: `value` ("HH:MM", or "HH:MM:SS" with `seconds`),
+        `seconds`, `disabled`, `controlled`. It has no empty state; `change` passes the time."""
+        return self._create("TimeField", props)
+
+    def color_picker(self, **props) -> Node:
+        """A color swatch and hex box: `value` ("#RRGGBB" or "#RRGGBBAA", `#` required),
+        `palette`, `controlled`. No `disabled`. `change` passes the color (None when cleared)."""
+        return self._create("ColorPicker", props)
+
+    def combobox(self, **props) -> Node:
+        """A list that picks several options: `options` ([{"value", "label", "disabled"}]),
+        `value` (the list of chosen values), `placeholder`, `searchable`, `disabled`,
+        `controlled`. `change` passes the whole selection."""
+        return self._create("Combobox", props)
+
     def alert_dialog(self, **props) -> Node:
         """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
         children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""

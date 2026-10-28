@@ -611,6 +611,26 @@ export class App {
     return this.create("HoverCard", props);
   }
 
+  /** A day picker: `change` with the chosen day (`null` when cleared). */
+  datePicker(props: NodeProps["DatePicker"] = {}) {
+    return this.create("DatePicker", props);
+  }
+
+  /** A time typed by segments: `change` with the time. */
+  timeField(props: NodeProps["TimeField"] = {}) {
+    return this.create("TimeField", props);
+  }
+
+  /** A color swatch and hex box: `change` with the color (`null` when cleared). */
+  colorPicker(props: NodeProps["ColorPicker"] = {}) {
+    return this.create("ColorPicker", props);
+  }
+
+  /** A list that picks several options: `change` with the whole selection. */
+  combobox(props: NodeProps["Combobox"] = {}) {
+    return this.create("Combobox", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

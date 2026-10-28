@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, AlertDialog, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, Command, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Popover, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, AlertDialog, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Popover, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -28,7 +28,7 @@ function created(sent: ClientMessage[], type: string) {
   return sent.filter((m): m is Extract<ClientMessage, { op: "create" }> => m.op === "create" && m.type === type);
 }
 
-function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
+function emit(app: App, message: { id: number; event: string; value?: string | number | null | string[] | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
 
@@ -808,6 +808,62 @@ test("the overlays render with their props and report their events", async () =>
   emit(app, { id: card.id, event: "change", checked: false });
   await app.close();
   assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
+  assert.deepEqual(errors, []);
+});
+
+test("the form controls with state render with their props and report typed values", async () => {
+  const seen: unknown[] = [];
+  const options = [
+    { value: "rs", label: "Rust" },
+    { value: "go", label: "Go" },
+    { value: "py", label: "Python", disabled: true },
+  ];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <DatePicker value="2024-08-03" placeholder="Pick a day" onChange={(value) => seen.push(["day", value])} />
+      <DatePicker range onChange={(value) => seen.push(["range", value])} />
+      <TimeField value="09:30" onChange={(value) => seen.push(["time", value])} />
+      <ColorPicker value="#3366ff" palette={["#ff0000", "#00ff0080"]} onChange={(value) => seen.push(["color", value])} />
+      <Combobox options={options} value={["rs"]} placeholder="Languages" searchable onChange={(value) => seen.push(["langs", value])} />
+    </Div>,
+  );
+  const [day, range] = created(sent, "DatePicker");
+  const [time] = created(sent, "TimeField");
+  const [color] = created(sent, "ColorPicker");
+  const [langs] = created(sent, "Combobox");
+  // Like React DOM, passing `value` makes them controlled; the wire says so.
+  assert.deepEqual(day.props, { value: "2024-08-03", placeholder: "Pick a day", controlled: true });
+  assert.deepEqual(range.props, { range: true, controlled: false });
+  assert.deepEqual(time.props, { value: "09:30", controlled: true });
+  assert.deepEqual(color.props, { value: "#3366ff", palette: ["#ff0000", "#00ff0080"], controlled: true });
+  assert.deepEqual(langs.props, {
+    options,
+    value: ["rs"],
+    placeholder: "Languages",
+    searchable: true,
+    controlled: true,
+  });
+
+  emit(app, { id: day.id, event: "change", value: "2024-08-10" });
+  emit(app, { id: day.id, event: "change", value: null });
+  emit(app, { id: range.id, event: "change", value: "2024-08-01/2024-08-15" });
+  emit(app, { id: time.id, event: "change", value: "18:05" });
+  emit(app, { id: color.id, event: "change", value: "#FF0000" });
+  emit(app, { id: color.id, event: "change", value: null });
+  emit(app, { id: langs.id, event: "change", value: ["rs", "go"] });
+  emit(app, { id: langs.id, event: "change", value: ["go"] });
+  await tick();
+  assert.deepEqual(seen, [
+    ["day", "2024-08-10"],
+    ["day", null],
+    ["range", "2024-08-01/2024-08-15"],
+    ["time", "18:05"],
+    ["color", "#FF0000"],
+    ["color", null],
+    ["langs", ["rs", "go"]],
+    ["langs", ["go"]],
+  ]);
+  await app.close();
   assert.deepEqual(errors, []);
 });
 

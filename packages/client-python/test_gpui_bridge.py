@@ -324,6 +324,54 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, [("ok",), ("close",), ("popover", True), ("card", False)])
 
+    def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        options = [
+            {"value": "rs", "label": "Rust"},
+            {"value": "go", "label": "Go"},
+            {"value": "py", "label": "Python", "disabled": True},
+        ]
+        day = app.date_picker(value="2024-08-03", placeholder="Pick a day").on("change", lambda value: seen.append(("day", value)))
+        range_ = app.date_picker(range=True).on("change", lambda value: seen.append(("range", value)))
+        time_ = app.time_field(value="09:30").on("change", lambda value: seen.append(("time", value)))
+        color = app.color_picker(value="#3366ff", palette=["#ff0000", "#00ff0080"]).on(
+            "change", lambda value: seen.append(("color", value))
+        )
+        langs = app.combobox(options=options, value=["rs"], placeholder="Languages", searchable=True).on(
+            "change", lambda value: seen.append(("langs", value))
+        )
+        app.window(root=app.div().append(day, range_, time_, color, langs))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": day.id, "event": "change", "value": "2024-08-10"})
+        app._dispatch({"type": "event", "id": day.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": range_.id, "event": "change", "value": "2024-08-01/2024-08-15"})
+        app._dispatch({"type": "event", "id": time_.id, "event": "change", "value": "18:05"})
+        app._dispatch({"type": "event", "id": color.id, "event": "change", "value": "#FF0000"})
+        app._dispatch({"type": "event", "id": color.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": langs.id, "event": "change", "value": ["rs", "go"]})
+        app._dispatch({"type": "event", "id": langs.id, "event": "change", "value": ["go"]})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("day", "2024-08-10"),
+                ("day", None),
+                ("range", "2024-08-01/2024-08-15"),
+                ("time", "18:05"),
+                ("color", "#FF0000"),
+                ("color", None),
+                ("langs", ["rs", "go"]),
+                ("langs", ["go"]),
+            ],
+        )
+
     def test_an_a11y_prop_is_validated_by_the_host(self):
         app = App(headless=True)
         errors = []
