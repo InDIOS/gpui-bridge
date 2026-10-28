@@ -1986,4 +1986,46 @@ aprobó antes de programar (regla 5) la propuesta de `DECISIONES-M13.md` con sus
   `overlayClosable` del `Sheet` como props y `controlled` en `Popover` (el modo sincronizado ya
   avisa en los dos sentidos y el cliente puede cerrar con `open:false`).
 
+### Fase 46 — M14: los cuatro controles de formulario con estado (2026-10-28)
+
+Cuatro controles de gpui-kit que guardan su valor en el host y reportan `change`: `DatePicker`,
+`TimeField`, `ColorPicker` y `Combobox`. Patrón slot de `Select`/`Calendar` (estado en el host,
+`change` sincronizado o `controlled`). `PROTOCOL_VERSION` sigue en 1.
+
+Tres pasos más el cierre, todos aprobados contra la propuesta de `DECISIONES-M14.md` (D1–D10):
+
+- **Paso 2–4 (host + protocolo + conformance):** commit `4fd5757`. Los cuatro adaptadores
+  (`components/date_picker.rs`, `time_field.rs`, `color_picker.rs`, `combobox.rs`) con `Snapshot`
+  + `sync` + `build`; validación con el nodo completo (`check_form_value` en `components/mod.rs`):
+  fecha/hora/hex contra `range`/`seconds`, `#` obligatorio, `palette` validada, separador `/` ISO 8601.
+  `ColorPicker` dibujado como `ColorSelect`, sin `disabled` (el crate no lo permite).
+  `conformance/form-state.txt` con 96 líneas (synced, controlled, `invalid_props` y `invalid_operation`
+  para valores y tipos malos). Host: 72 unitarios + 27 transcripciones + `no_window`, `fmt`/`clippy` limpios.
+  Tamaño release antes del hito: **19.821.056 B**.
+
+- **Paso 5 (cuatro clientes):** commit `967c32a`. Node (`app.datePicker()`, `timeField()`,
+  `colorPicker()`, `combobox()` + tipos y `NodeEvents`; `HostMessage` admite `value: string[]`),
+  Python (`date_picker()`, `time_field()`, `color_picker()`, `combobox()`), Go (constructores
+  idiomáticos `DatePicker`/`TimeField`/`ColorPicker`/`Combobox`; test con `Simulate` verificando
+  que el array de `change` del `Combobox` llega decodificado como `[]interface{}` —el chequeo
+  de «Abiertos» que deja entrar el `Combobox`— y conformance del cliente con las 5 líneas `create`
+  de `form-state.txt`), React (`<DatePicker>`/`<TimeField>`/`<ColorPicker>`/`<Combobox>` con
+  `controlled` automático al pasar `value`). 26 Node, 24 React, 26 Python y Go (`vet`+`gofmt`+`-race`)
+  en verde.
+
+- **Paso 6 (ejemplo):** commit `d8ac89a`. `examples/forms.ts` con los cuatro nodos; el `Combobox`
+  `controlled` (la app confirma como máximo tres). Type-check de ejemplos limpio.
+
+- **Paso 7 (ventana real + Narrator):** `pnpm dev forms` abre y se mantiene con el host de
+  depuración; el usuario comprobó visualmente los cuatro controles, el `Combobox` controlled,
+  teclado y pasó Narrator (lee etiquetas, valores y cambios): **todo bien**.
+
+- **Tamaño del host release:** **20.302.848 B** (+481.792 B, +0,48 MB, por debajo del umbral
+  de ~1 MB). `DECISIONES-M14.md` borrado.
+
+**Criterios de aceptación:** `invalid_props` para valores imposibles en los cuatro, modo
+`controlled` funcionando, `conformance/form-state.txt` verde en host y cuatro clientes,
+ejemplo con ventana real y Narrator, `HISTORIAL.md` con la fase y el tamaño, `PROTOCOL_VERSION`
+en 1.
+
 
