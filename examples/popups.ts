@@ -25,7 +25,9 @@ let note = "Remember the milk";
 let asking: "note" | "files" = "files";
 
 const noteField = app.input({ value: note });
-noteField.on("change", ({ value }) => (note = value));
+// Only Save keeps what was typed; Close drops it and the next open starts from the saved note.
+let typed = note;
+noteField.on("change", ({ value }) => (typed = value));
 
 const dialog = app
   .dialog({ open: false, title: "Edit note", okText: "Save", cancelText: "Close", width: 380 })
@@ -35,7 +37,10 @@ const dialog = app
       app.button({ label: "Delete note", variant: "danger" }).on("click", () => ask("note")),
     ),
   );
-dialog.on("ok", () => report(`Note saved as "${note}"`));
+dialog.on("ok", () => {
+  note = typed;
+  report(`Note saved as "${note}"`);
+});
 
 const alert = app
   .alertDialog({ open: false, icon: "circle-alert", okText: "Delete", cancelText: "Cancel" })
@@ -60,6 +65,8 @@ function ask(what: "note" | "files") {
 }
 
 const editNote = app.button({ label: "Edit note...", variant: "primary" }).on("click", () => {
+  typed = note;
+  noteField.set({ value: note });
   dialog.set({ open: true });
   app.commit();
 });
@@ -104,13 +111,13 @@ root.append(
 
 // The first child of a `Popover` is its trigger; the rest is the panel. `class` styles the
 // trigger's slot, so `w-full` fills the box around it (the panel itself is styled by its children).
-// A click on the trigger reports its own `click` and toggles the panel; Escape and a click outside
-// close it, and `change` says which way it went.
+// A click on the trigger toggles the panel; Escape and a click outside close it, and `change` says
+// which way it went.
 const sort = app
   .popover({ anchor: "bottom-left", arrow: true, class: "w-full" })
   .on("change", ({ checked }) => report(`Sort menu ${checked ? "open" : "closed"}`));
 sort.append(
-  app.button({ label: "Sort by..." }).on("click", () => report("Sort clicked")),
+  app.button({ label: "Sort by..." }),
   app.div({ class: "flex flex-col gap-1" }).append(
     app.button({ label: "Name" }).on("click", () => choose("name")),
     app.button({ label: "Size" }).on("click", () => choose("size")),
@@ -140,7 +147,7 @@ root.append(card);
 root.append(
   app.text({
     content:
-      "Tab and Escape reach the dialog, the panel and the popover; the card and the popover's panel are reached with the mouse.",
+      "Tab and Escape reach the dialog, the panel and the popover; the card is reached with the mouse alone.",
     class: "text-sm text-muted-foreground",
   }),
   dialog,
