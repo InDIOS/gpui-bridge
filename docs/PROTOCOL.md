@@ -818,7 +818,10 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 
 - The object is checked like any other prop: an unknown key, an unknown role or a wrong type is
   `invalid_props` (so a typo does not go silent). `null` removes it.
-- A `div` and a `text` get the accessibility node on their own element. A component (`Button`,
+- A `div` and a `text` get the accessibility node on their own element. GPUI does not pass a
+  `text`'s words to the reader, so a `text` with a `role` and no `label` is named by its
+  `content`; with the `label` role it reads like text on a page (Narrator's scan mode reads it,
+  Tab does not stop on it), which is how a conversation's messages are read. A component (`Button`,
   `Slider`…) is wrapped in one box that carries it, so the wrap only happens when `a11y` is
   set; the wrapper is a row and does not change the sizes inside.
 - A window's root is reported as a `window` with its title, so a window whose own focus has no

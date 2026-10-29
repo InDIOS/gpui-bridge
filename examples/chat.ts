@@ -11,16 +11,16 @@ const scroller = app.messageScroller({ class: "flex-1", jumpLabel: "Jump to late
 const status = app.text({ class: "text-sm text-muted-foreground" });
 const report = (line: string) => status.set({ content: line });
 
-// A `text` reaches a screen reader only through `a11y` (PROTOCOL.md section 16), so each
-// message is a group named with its sender and text.
-const said = (from: "you" | "bot", text: string) => ({ role: "group" as const, label: `${from === "you" ? "You" : "Bot"}: ${text}` });
+// A `text` reaches a screen reader only through `a11y` (PROTOCOL.md section 16): with the
+// `label` role and no `label`, its content is read like text on a page (Narrator's scan mode).
+const read = { a11y: { role: "label" as const } };
 
 function message(from: "you" | "bot", text: string) {
-  const content = app.text({ content: text });
+  const content = app.text({ content: text, ...read });
   const row = app
-    .message({ ...(from === "you" ? { alignment: "end" } : { avatarName: "Bot" }), a11y: said(from, text) })
+    .message(from === "you" ? { alignment: "end" } : { avatarName: "Bot" })
     .append(
-      app.messageHeader().append(app.text({ content: from === "you" ? "You" : "Bot" })),
+      app.messageHeader().append(app.text({ content: from === "you" ? "You" : "Bot", ...read })),
       app.bubble({ variant: from === "you" ? "filled" : "secondary" }).append(content),
     );
   scroller.append(row);
@@ -69,14 +69,11 @@ function answer(question: string) {
   setTimeout(() => {
     thinking.remove();
     const words = `You said "${question}". This answer arrives a few words at a time, and the list stays at the end while it grows unless you scroll up.`.split(" ");
-    const { row, content } = message("bot", "");
+    const { content } = message("bot", "");
     let shown = 0;
     const timer = setInterval(() => {
       content.set({ content: words.slice(0, ++shown).join(" ") });
-      if (shown === words.length) {
-        clearInterval(timer);
-        row.set({ a11y: said("bot", words.join(" ")) });
-      }
+      if (shown === words.length) clearInterval(timer);
       app.commit();
     }, 80);
     app.commit();

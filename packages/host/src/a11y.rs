@@ -222,7 +222,12 @@ fn decorate(a11y: &A11y, mut element: Stateful<Div>) -> Stateful<Div> {
     }
     // A number with a range reads as a numeric value (a slider, a spin button); anything else
     // is the plain string value.
-    match (a11y.value.as_deref(), numeric(a11y)) {
+    // AccessKit names a `label` from its value, so without one the label is the value too.
+    let value = match a11y.role {
+        Some(Role::Label) => a11y.value.as_deref().or(a11y.label.as_deref()),
+        _ => a11y.value.as_deref(),
+    };
+    match (value, numeric(a11y)) {
         (Some(_), Some(value)) => element = element.aria_numeric_value(value),
         (Some(value), None) => element = element.aria_value(value.to_owned()),
         _ => {}

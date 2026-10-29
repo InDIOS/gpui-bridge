@@ -1635,9 +1635,16 @@ impl RenderCx<'_> {
 
     fn text_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let content = self.text(id, node);
-        let element = self.style(id, div(), classes, false).child(content);
+        let element = self.style(id, div(), classes, false).child(content.clone());
         match a11y::of(node) {
-            Some(spec) => a11y::apply(&spec, id, element).into_any_element(),
+            Some(mut spec) => {
+                // GPUI's text reaches the reader through no node of its own: without a `label`,
+                // the content names it (a `label` role then reads like text on a page).
+                if spec.label.is_none() && spec.role.is_some() {
+                    spec.label = Some(content.to_string());
+                }
+                a11y::apply(&spec, id, element).into_any_element()
+            }
             None => element.into_any_element(),
         }
     }
