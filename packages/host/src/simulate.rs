@@ -201,6 +201,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Command, "confirm")
             | (NodeType::Settings, "change")
             | (NodeType::Attachment, "click" | "remove" | "retry")
+            | (NodeType::Questionnaire, "change" | "submit")
     );
     if !known {
         return Err(fail(
@@ -254,6 +255,12 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         }
         (NodeType::Alert, "close") => components::alert_closed(tree, id),
         (NodeType::Attachment, event) => components::chat::attachment_action(tree, id, event),
+        (NodeType::Questionnaire, "submit") => components::questionnaire::simulate_submit(tree, id),
+        (NodeType::Questionnaire, _) => {
+            let value = sim.value.clone().unwrap_or_default();
+            components::questionnaire::simulate_change(tree, id, &value)
+                .map_err(|err| fail(ErrorCode::InvalidOperation, err))?
+        }
         // The clipboard is not touched here (there is no window): the event is reported as it is.
         (NodeType::Clipboard, "copied") => {
             let value = node

@@ -53,6 +53,8 @@ pub enum PropKind {
     CommandSections,
     /// A Settings' `pages`: pages of groups of typed fields (PROTOCOL.md section 22).
     SettingsPages,
+    /// A Questionnaire's `items`: questions with choices or free text (PROTOCOL.md section 26).
+    Questions,
     /// A list of plain strings (`Combobox`'s `value`, `ColorPicker`'s `palette`).
     StringList,
 }
@@ -79,7 +81,8 @@ impl PropKind {
             | Self::Series
             | Self::Commands
             | Self::CommandSections
-            | Self::SettingsPages => self.check(value).is_ok(),
+            | Self::SettingsPages
+            | Self::Questions => self.check(value).is_ok(),
             Self::StringList => value
                 .as_array()
                 .is_some_and(|arr| arr.iter().all(Value::is_string)),
@@ -125,6 +128,8 @@ impl PropKind {
                 .map_err(|err| format!("a list of canvas commands ({err})")),
             Self::CommandSections => crate::components::command::check_items(value)
                 .map_err(|err| format!("a list of command sections ({err})")),
+            Self::Questions => crate::components::questionnaire::check_items(value)
+                .map_err(|err| format!("a list of questions ({err})")),
             Self::SettingsPages => crate::components::settings::check_pages(value)
                 .map_err(|err| format!("a list of settings pages ({err})")),
             _ if self.accepts(value) => Ok(()),
@@ -158,6 +163,7 @@ impl PropKind {
             Self::Commands => "a list of canvas command objects".into(),
             Self::CommandSections => "a list of command sections".into(),
             Self::SettingsPages => "a list of settings pages".into(),
+            Self::Questions => "a list of questions".into(),
             Self::StringList => "a list of strings".into(),
         }
     }
@@ -250,6 +256,7 @@ pub enum NodeType {
     Marker,
     Attachment,
     MessageScroller,
+    Questionnaire,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -341,6 +348,7 @@ impl NodeType {
             "Marker" => Some(Self::Marker),
             "Attachment" => Some(Self::Attachment),
             "MessageScroller" => Some(Self::MessageScroller),
+            "Questionnaire" => Some(Self::Questionnaire),
             _ => None,
         }
     }
@@ -545,6 +553,7 @@ impl NodeType {
             (Self::Attachment, "axis") => Some(OneOf(&["horizontal", "vertical"])),
             (Self::MessageScroller, "scrollbar" | "jumpButton") => Some(Bool),
             (Self::MessageScroller, "jumpLabel") => Some(Str),
+            (Self::Questionnaire, "items") => Some(Questions),
             (
                 Self::Input
                 | Self::Checkbox
@@ -685,6 +694,7 @@ impl NodeType {
             Self::Marker => "Marker",
             Self::Attachment => "Attachment",
             Self::MessageScroller => "MessageScroller",
+            Self::Questionnaire => "Questionnaire",
         }
     }
 }
@@ -763,6 +773,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::Marker,
     NodeType::Attachment,
     NodeType::MessageScroller,
+    NodeType::Questionnaire,
 ];
 
 #[cfg(test)]

@@ -94,3 +94,53 @@
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"setProps"}
+# A Questionnaire: one question at a time from `items`; the answers stay in the host.
+> {"op":"create","id":40,"type":"Questionnaire","props":{"items":[{"name":"plan","label":"Which plan?","required":true,"choices":[{"value":"free","label":"Free"},{"value":"pro","label":"Pro","description":"Billed yearly","disabled":true}]},{"name":"tools","label":"Which tools?","description":"Pick any","multiple":true,"input":true,"choices":[{"value":"cli","label":"CLI"},{"value":"ide","label":"IDE"}]},{"name":"notes","label":"Anything else?","input":true}]},"events":["change","submit"]}
+> {"op":"commit"}
+# Each answer is reported with its status; free text is `text`.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["free"]}}
+< {"type":"event","id":40,"event":"change","value":{"name":"plan","status":"answered","choices":["free"],"text":null}}
+# Submit needs every question answered (in a window an optional one can also be skipped).
+> {"op":"simulate","id":40,"event":"submit"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"tools","choices":["cli","ide"],"text":"vim"}}
+< {"type":"event","id":40,"event":"change","value":{"name":"tools","status":"answered","choices":["cli","ide"],"text":"vim"}}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"notes","text":"  "}}
+< {"type":"event","id":40,"event":"change","value":{"name":"notes","status":"unanswered","choices":[],"text":"  "}}
+> {"op":"simulate","id":40,"event":"submit"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"notes","text":"Thanks"}}
+< {"type":"event","id":40,"event":"change","value":{"name":"notes","status":"answered","choices":[],"text":"Thanks"}}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"plan","status":"answered","choices":["free"],"text":null},{"name":"tools","status":"answered","choices":["cli","ide"],"text":"vim"},{"name":"notes","status":"answered","choices":[],"text":"Thanks"}]}
+# An answer the user could not give is an error: a disabled or unknown choice, two choices in a
+# single-choice question, text where there is no field, an unknown question.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["pro"]}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["free","nope"]}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","text":"free"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"age"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# New `items` start over; a `selected` choice is an answer from the start.
+> {"op":"setProps","id":40,"props":{"items":[{"name":"theme","label":"Theme","choices":[{"value":"dark","label":"Dark","selected":true},{"value":"light","label":"Light"}]}]}}
+> {"op":"commit"}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"theme","status":"answered","choices":["dark"],"text":null}]}
+# The same `items` again keep the answers.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"theme","choices":["light"]}}
+< {"type":"event","id":40,"event":"change","value":{"name":"theme","status":"answered","choices":["light"],"text":null}}
+> {"op":"setProps","id":40,"props":{"items":[{"name":"theme","label":"Theme","choices":[{"value":"dark","label":"Dark","selected":true},{"value":"light","label":"Light"}]}]}}
+> {"op":"commit"}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"theme","status":"answered","choices":["light"],"text":null}]}
+# Malformed items are invalid_props: a repeated name or choice, two `selected` in a
+# single-choice question, a question without `label`.
+> {"op":"create","id":41,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A"},{"name":"a","label":"B"}]}}
+> {"op":"create","id":42,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A","choices":[{"value":"x","label":"X"},{"value":"x","label":"Y"}]}]}}
+> {"op":"create","id":43,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A","choices":[{"value":"x","label":"X","selected":true},{"value":"y","label":"Y","selected":true}]}]}}
+> {"op":"create","id":44,"type":"Questionnaire","props":{"items":[{"name":"a"}]}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

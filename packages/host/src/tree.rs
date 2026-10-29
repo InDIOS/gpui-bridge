@@ -577,6 +577,14 @@ impl Tree {
                         .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 }
                 let node = self.node_mut(id).expect("checked above");
+                // New questions start over, as the window's state does (PROTOCOL.md section 26).
+                if node_type == NodeType::Questionnaire
+                    && props
+                        .get("items")
+                        .is_some_and(|items| node.props.get("items") != Some(items))
+                {
+                    node.props.remove("answers");
+                }
                 for (key, value) in props {
                     if value.is_null() {
                         node.props.remove(&key);

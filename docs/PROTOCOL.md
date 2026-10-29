@@ -231,6 +231,7 @@ Rules:
 | `Marker`   | `content`, `icon`, `variant` (`plain`, `separator`, `border`), `alignment` (`start`, `center`, `end`), `loading`, `loadingStyle` (`spinner`, `shimmer`), `class` | — |
 | `Attachment` | `status` (`pending`, `uploading`, `processing`, `failed`, `complete`), `progress`, `title`, `description`, `tooltip`, `axis` (`horizontal`, `vertical`), `src`, `data`, `class` | `click`, `remove`, `retry` |
 | `MessageScroller` | `scrollbar`, `jumpButton`, `jumpLabel`, `class`             | —                  |
+| `Questionnaire` | `items`, `class`                                              | `change`, `submit` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -239,7 +240,7 @@ section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
 `Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
 the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
 `Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
-`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`).
+`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -1408,10 +1409,10 @@ The transcript in `conformance/form-state.txt` is the reference for their props 
 
 ## 26. Chat
 
-Four presentational nodes for a conversation, the header and footer of a `Message`, and the
-scrolling list that holds them. They are drawn from their props every frame; only a
-`MessageScroller` keeps something in the host, its scroll position. An `Attachment`'s upload
-status is the client's to change.
+Four presentational nodes for a conversation, the header and footer of a `Message`, the
+scrolling list that holds them, and a step-by-step questionnaire. They are drawn from their
+props every frame; a `MessageScroller` keeps its scroll position in the host and a
+`Questionnaire` its answers. An `Attachment`'s upload status is the client's to change.
 
 ```json
 {"op":"create","id":80,"type":"Message","props":{"alignment":"end","avatarName":"Ada"}}
@@ -1483,8 +1484,30 @@ status is the client's to change.
   moves the content in small jumps (the wheel and the jump button are smooth). Adding, removing or moving rows keeps the reading position: the
   host compares the new children with the old ones and tells the list only what changed in
   between. The list has the `log` role. It has no events.
+- **Questionnaire** — questions shown one at a time, with progress ("Question 1 of 3"), and
+  Previous, Skip, Next and Submit buttons that appear when they apply. `items` lists the
+  questions: `{name, label, description?, required?, multiple?, disabled?, input?, choices?}`,
+  where `choices` are `{value, label, description?, disabled?, selected?}` (radio buttons, or
+  checkboxes with `multiple`) and `input: true` adds a free-text field. `name`s and each
+  question's choice `value`s must be unique, and a question without `multiple` can have at
+  most one `selected` choice; anything else is `invalid_props`. A `selected` choice is an
+  answer from the start. Choosing in a single-choice question moves to the next one on its own;
+  a `required` question cannot be skipped, and an optional one must be answered or skipped
+  before Submit. On the keyboard, up and down move between answers, left and right between
+  questions, and Enter confirms a filled answer.
 
-`PROTOCOL_VERSION` stays at 1: the seven are new node types, so an older host answers
+  Every answer is reported with `change`, whose value is `{name, status, choices, text}`:
+  `status` is `answered`, `skipped` or `unanswered` (cleared), `choices` the chosen values and
+  `text` the free text or `null`; typing sends one `change` per edit, as an `Input` does.
+  `submit` sends the list of those answers, in question order (disabled questions left out).
+  The host keeps the answers in the node (`answers`, by name, visible in the `--no-window`
+  dump), and setting different `items` starts over (the same ones again keep the answers). Without a window, `simulate change` takes
+  `{name, choices?, text?}` (an answer the user could give, or `invalid_operation`) and
+  `simulate submit` sends `submit` only when every question is answered; skipping exists only
+  in a window. The client cannot set the answers, and validation beyond `required` is the
+  client's, after `submit`.
+
+`PROTOCOL_VERSION` stays at 1: the eight are new node types, so an older host answers
 `unknown_type` to them and nothing else changes.
 
 The transcript in `conformance/chat.txt` is the reference for their props and events.

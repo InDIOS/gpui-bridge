@@ -24,6 +24,7 @@ pub mod layout;
 pub mod menu;
 pub mod otp;
 pub mod overlays;
+pub mod questionnaire;
 pub mod radio;
 pub mod select;
 pub mod settings;

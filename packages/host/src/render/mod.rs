@@ -30,6 +30,7 @@ use crate::components::date_picker::{self, DatePickerSlot};
 use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::otp::{self, OtpSlot};
+use crate::components::questionnaire::{self, QuestionnaireSlot};
 use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
@@ -74,6 +75,7 @@ pub struct RootView {
     charts: HashMap<NodeId, ChartSlot>,
     /// One per Command: the query and highlight the user typed and moved.
     commands: HashMap<NodeId, CommandSlot>,
+    questionnaires: HashMap<NodeId, QuestionnaireSlot>,
     /// One per MessageScroller: its scroll state and the rows it was last given.
     scrollers: HashMap<NodeId, chat::ScrollerSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
@@ -152,6 +154,7 @@ impl RootView {
             time_fields: HashMap::new(),
             color_pickers: HashMap::new(),
             combos: HashMap::new(),
+            questionnaires: HashMap::new(),
             trees: HashMap::new(),
             diffs: HashMap::new(),
             carousels: HashMap::new(),
@@ -309,6 +312,7 @@ impl RootView {
         let time_fields = time_field::snapshot(tree, &members);
         let color_pickers = color_picker::snapshot(tree, &members);
         let combos = combobox::snapshot(tree, &members);
+        let questionnaires = questionnaire::snapshot(tree, &members);
         let sliders = slider::snapshot(tree, &members);
         let tables = table::snapshot(tree, &members);
         let trees = tree::snapshot(tree, &members);
@@ -394,6 +398,13 @@ impl RootView {
             cx,
         );
         combobox::sync(&mut self.combos, combos, &self.session, window, cx);
+        questionnaire::sync(
+            &mut self.questionnaires,
+            questionnaires,
+            &self.session,
+            window,
+            cx,
+        );
         slider::sync(&mut self.sliders, sliders, &self.session, window, cx);
         table::sync(&mut self.tables, tables, &self.session, window, cx);
         tree::sync(&mut self.trees, trees, &self.session, cx);
@@ -546,6 +557,7 @@ impl RootView {
             time_fields: &self.time_fields,
             color_pickers: &self.color_pickers,
             combos: &self.combos,
+            questionnaires: &self.questionnaires,
             trees: &self.trees,
             diffs: &self.diffs,
             carousels: &self.carousels,
@@ -870,6 +882,7 @@ struct RenderCx<'a> {
     time_fields: &'a HashMap<NodeId, TimeFieldSlot>,
     color_pickers: &'a HashMap<NodeId, ColorPickerSlot>,
     combos: &'a HashMap<NodeId, ComboboxSlot>,
+    questionnaires: &'a HashMap<NodeId, QuestionnaireSlot>,
     trees: &'a HashMap<NodeId, tree::TreeSlot>,
     diffs: &'a HashMap<NodeId, DiffSlot>,
     carousels: &'a HashMap<NodeId, CarouselSlot>,
@@ -1041,6 +1054,10 @@ impl RenderCx<'_> {
             }
             NodeType::Attachment => self.attachment_node(id, node, &classes),
             NodeType::MessageScroller => self.message_scroller_node(id, node, &classes),
+            NodeType::Questionnaire => match self.questionnaires.get(&id) {
+                Some(slot) => self.blocking(id, questionnaire::build(node, slot), &classes),
+                None => div().into_any_element(),
+            },
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
