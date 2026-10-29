@@ -70,7 +70,15 @@ export type NodeType =
   | "DatePicker"
   | "TimeField"
   | "ColorPicker"
-  | "Combobox";
+  | "Combobox"
+  | "Bubble"
+  | "Message"
+  | "MessageHeader"
+  | "MessageFooter"
+  | "Marker"
+  | "Attachment"
+  | "MessageScroller"
+  | "Questionnaire";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -163,7 +171,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | SettingsChange | QuestionnaireAnswer | QuestionnaireAnswer[]; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -1124,6 +1132,110 @@ export interface ComboboxProps {
   class?: string;
 }
 
+// Chat (PROTOCOL.md section 26).
+
+export interface BubbleProps {
+  /** The surface; default `filled`. `ghost` has no surface or padding and takes the whole width. */
+  variant?: "filled" | "secondary" | "muted" | "tinted" | "outline" | "ghost" | "destructive";
+  /** Unset, it follows the `Message` that holds it. */
+  alignment?: "start" | "end";
+  class?: string;
+}
+
+export interface MessageProps {
+  /** Default `start`; `end` moves the avatar to that side too. */
+  alignment?: "start" | "end";
+  /** An `Avatar`'s `name` and `src`; without either there is no avatar. */
+  avatarName?: string;
+  avatarSrc?: string;
+  class?: string;
+}
+
+/** A `MessageHeader`/`MessageFooter` lays out its children in a row; outside a `Message` it draws nothing. */
+export interface MessagePartProps {
+  class?: string;
+}
+
+export interface MarkerProps {
+  content?: string;
+  /** A bundled icon before the text; it replaces the loading spinner. */
+  icon?: string;
+  /** Default `plain`. */
+  variant?: "plain" | "separator" | "border";
+  alignment?: "start" | "center" | "end";
+  loading?: boolean;
+  /** Default `spinner`; `shimmer` moves a highlight over `content`. */
+  loadingStyle?: "spinner" | "shimmer";
+  class?: string;
+}
+
+export interface AttachmentProps {
+  /** Default `complete`. */
+  status?: "pending" | "uploading" | "processing" | "failed" | "complete";
+  /** 0–100, shown only while `uploading`. */
+  progress?: number;
+  title?: string;
+  description?: string;
+  /** Shown while the card is hovered. */
+  tooltip?: string;
+  /** The picture, as in an `Image`; `data` (standard base64) wins over `src`. */
+  src?: string;
+  data?: string;
+  /** Default `horizontal`; `vertical` puts the picture on top. */
+  axis?: "horizontal" | "vertical";
+  class?: string;
+}
+
+export interface MessageScrollerProps {
+  /** Default true. */
+  scrollbar?: boolean;
+  /** The round button that goes back to the end; default true. */
+  jumpButton?: boolean;
+  /** That button's tooltip and name; the crate's default is "Jump to latest". */
+  jumpLabel?: string;
+  class?: string;
+}
+
+export interface QuestionnaireChoice {
+  /** Unique within its question. */
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+  /** An answer from the start; at most one without `multiple`. */
+  selected?: boolean;
+}
+
+export interface QuestionnaireItem {
+  /** Unique; it names the answer. */
+  name: string;
+  label: string;
+  description?: string;
+  /** It cannot be skipped. */
+  required?: boolean;
+  /** Checkboxes instead of radio buttons. */
+  multiple?: boolean;
+  disabled?: boolean;
+  /** A free-text field. */
+  input?: boolean;
+  choices?: QuestionnaireChoice[];
+}
+
+/** One answer, as `change` and `submit` report it. */
+export interface QuestionnaireAnswer {
+  name: string;
+  /** `unanswered` when it was cleared. */
+  status: "answered" | "skipped" | "unanswered";
+  choices: string[];
+  text: string | null;
+}
+
+export interface QuestionnaireProps {
+  /** Setting different `items` starts over; the same ones again keep the answers. */
+  items?: QuestionnaireItem[];
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1189,6 +1301,14 @@ export interface NodeProps {
   TimeField: TimeFieldProps & SharedProps;
   ColorPicker: ColorPickerProps & SharedProps;
   Combobox: ComboboxProps & SharedProps;
+  Bubble: BubbleProps & SharedProps;
+  Message: MessageProps & SharedProps;
+  MessageHeader: MessagePartProps & SharedProps;
+  MessageFooter: MessagePartProps & SharedProps;
+  Marker: MarkerProps & SharedProps;
+  Attachment: AttachmentProps & SharedProps;
+  MessageScroller: MessageScrollerProps & SharedProps;
+  Questionnaire: QuestionnaireProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1281,4 +1401,14 @@ export interface NodeEvents {
   ColorPicker: { change: { value: string | null } };
   /** `value` is the whole selection: toggling one sends the full list. */
   Combobox: { change: { value: string[] } };
+  Bubble: {};
+  Message: {};
+  MessageHeader: {};
+  MessageFooter: {};
+  Marker: {};
+  /** The card's controls exist only while their event is subscribed; `retry` only while `failed`. */
+  Attachment: { click: {}; remove: {}; retry: {} };
+  MessageScroller: {};
+  /** `change` sends one answer; `submit` all of them, in question order. */
+  Questionnaire: { change: { value: QuestionnaireAnswer }; submit: { value: QuestionnaireAnswer[] } };
 }

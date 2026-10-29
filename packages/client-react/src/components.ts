@@ -12,6 +12,7 @@ import type {
   NodeProps,
   NodeType,
   Option,
+  QuestionnaireAnswer,
   RadioGroupProps as WireRadioGroupProps,
   SettingsChange,
   TableCell,
@@ -480,3 +481,43 @@ export const ColorPicker = "ColorPicker" as unknown as HostComponent<ColorPicker
 /** A list that picks several options; `onChange` gets the whole selection. */
 export type ComboboxProps = NodeProps["Combobox"] & { onChange?: (value: string[]) => void };
 export const Combobox = "Combobox" as unknown as HostComponent<ComboboxProps>;
+
+// Chat (PROTOCOL.md section 26).
+
+/** A chat bubble; its children are the content. */
+export type BubbleProps = NodeProps["Bubble"] & { children?: ReactNode };
+export const Bubble = "Bubble" as unknown as HostComponent<BubbleProps>;
+
+/** A message row: a `MessageHeader` and a `MessageFooter` child, the rest is the content. */
+export type MessageProps = NodeProps["Message"] & { children?: ReactNode };
+export const Message = "Message" as unknown as HostComponent<MessageProps>;
+
+export type MessageHeaderProps = NodeProps["MessageHeader"] & { children?: ReactNode };
+export const MessageHeader = "MessageHeader" as unknown as HostComponent<MessageHeaderProps>;
+
+export type MessageFooterProps = NodeProps["MessageFooter"] & { children?: ReactNode };
+export const MessageFooter = "MessageFooter" as unknown as HostComponent<MessageFooterProps>;
+
+/** A compact status row; children go after the text. */
+export type MarkerProps = NodeProps["Marker"] & { children?: ReactNode };
+export const Marker = "Marker" as unknown as HostComponent<MarkerProps>;
+
+/** A file or picture card; each handler shows its control (`onRetry` only while `failed`). */
+export type AttachmentProps = NodeProps["Attachment"] & {
+  onClick?: () => void;
+  onRemove?: () => void;
+  onRetry?: () => void;
+  children?: ReactNode;
+};
+export const Attachment = "Attachment" as unknown as HostComponent<AttachmentProps>;
+
+/** A virtual list of messages anchored at the end; each child is a row. */
+export type MessageScrollerProps = NodeProps["MessageScroller"] & { children?: ReactNode };
+export const MessageScroller = "MessageScroller" as unknown as HostComponent<MessageScrollerProps>;
+
+/** Questions one at a time; `onChange` gets one answer, `onSubmit` all of them. */
+export type QuestionnaireProps = NodeProps["Questionnaire"] & {
+  onChange?: (answer: QuestionnaireAnswer) => void;
+  onSubmit?: (answers: QuestionnaireAnswer[]) => void;
+};
+export const Questionnaire = "Questionnaire" as unknown as HostComponent<QuestionnaireProps>;

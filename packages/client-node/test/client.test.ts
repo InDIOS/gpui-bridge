@@ -161,6 +161,44 @@ test("form controls are accepted by the host and report typed values", async () 
   assert.deepEqual(seen, [["switch", false], ["radio", "a"], ["select", "a"], ["slider", 0.3], ["notes", "1\n2"]]);
 });
 
+test("the chat nodes are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const file = app
+    .attachment({ status: "failed", title: "report.pdf", description: "2.4 MB" })
+    .on("click", () => seen.push("click"))
+    .on("remove", () => seen.push("remove"))
+    .on("retry", () => seen.push("retry"));
+  const quiz = app
+    .questionnaire({ items: [{ name: "plan", label: "Plan", choices: [{ value: "free", label: "Free" }] }, { name: "notes", label: "Notes", input: true }] })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("submit", ({ value }) => seen.push(["submit", value]));
+  const message = app
+    .message({ alignment: "end", avatarName: "Ada" })
+    .append(
+      app.messageHeader().append(app.text({ content: "Ada" })),
+      app.bubble({ variant: "secondary" }).append(app.text({ content: "Hi" })),
+      app.messageFooter(),
+    );
+  const scroller = app
+    .messageScroller({ jumpLabel: "Latest" })
+    .append(message, app.marker({ content: "Thinking", loading: true, loadingStyle: "shimmer" }), file, quiz);
+  app.window({ root: app.div({ class: "size-full flex flex-col" }).append(scroller) });
+  app.commit();
+
+  const answer = { name: "plan", status: "answered" as const, choices: ["free"], text: null };
+  app.handleMessage({ type: "event", id: file.id, event: "click" });
+  app.handleMessage({ type: "event", id: file.id, event: "remove" });
+  app.handleMessage({ type: "event", id: file.id, event: "retry" });
+  app.handleMessage({ type: "event", id: quiz.id, event: "change", value: answer });
+  app.handleMessage({ type: "event", id: quiz.id, event: "submit", value: [answer] });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
+});
+
 test("the form controls with state are accepted and report typed values", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

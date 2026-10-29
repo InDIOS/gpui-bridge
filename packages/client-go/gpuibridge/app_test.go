@@ -227,6 +227,82 @@ func TestFormControlsWithStateDispatchValues(t *testing.T) {
 	}
 }
 
+func TestChatNodesDispatchEvents(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(name string) func(any) {
+		return func(payload any) {
+			mu.Lock()
+			seen = append(seen, []any{name, payload.(map[string]any)["value"]})
+			mu.Unlock()
+		}
+	}
+
+	file := app.Attachment(Props{"status": "failed", "title": "report.pdf"}).
+		On("click", add("click")).On("remove", add("remove")).On("retry", add("retry"))
+	quiz := app.Questionnaire(Props{"items": []any{
+		map[string]any{"name": "plan", "label": "Plan", "choices": []any{map[string]any{"value": "free", "label": "Free"}}},
+	}}).On("change", add("change")).On("submit", add("submit"))
+	message := app.Message(Props{"alignment": "end", "avatarName": "Ada"}).Append(
+		app.MessageHeader(Props{}).Append(app.Text(Props{"content": "Ada"})),
+		app.Bubble(Props{"variant": "secondary"}).Append(app.Text(Props{"content": "Hi"})),
+		app.MessageFooter(Props{}),
+	)
+	scroller := app.MessageScroller(Props{"jumpLabel": "Latest"}).
+		Append(message, app.Marker(Props{"content": "Thinking", "loading": true}), file, quiz)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(scroller)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []struct {
+		node     NodeID
+		event    string
+		value    any
+		hasValue bool
+	}{
+		{file.ID(), "click", nil, false},
+		{file.ID(), "remove", nil, false},
+		{file.ID(), "retry", nil, false},
+		{quiz.ID(), "change", map[string]any{"name": "plan", "choices": []any{"free"}}, true},
+		{quiz.ID(), "submit", nil, false},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(s.node, s.event, s.value, s.hasValue); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(steps) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(steps), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	answer := map[string]any{"name": "plan", "status": "answered", "choices": []any{"free"}, "text": nil}
+	want := []any{
+		[]any{"click", nil}, []any{"remove", nil}, []any{"retry", nil},
+		[]any{"change", answer}, []any{"submit", []any{answer}},
+	}
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
+	}
+}
+
 func TestMissingHostBinaryFails(t *testing.T) {
 	_, err := NewApp(AppOptions{HostPath: "does-not-exist.exe", Headless: true})
 	if err == nil {

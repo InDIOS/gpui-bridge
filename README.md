@@ -162,6 +162,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `tray.ts` | Tray icon; closing the window keeps the app in the tray |
 | `animations.ts` | Spinner, pulse and color transitions |
 | `forms.ts` | Switch, RadioGroup, Select, Slider, Textarea; a controlled slider |
+| `chat.ts` | Messages in a MessageScroller, a streamed answer, an Attachment that fails and is retried, a Questionnaire |
 | `keyboard.ts` | Shortcuts, a list moved with the arrow keys, focus |
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |

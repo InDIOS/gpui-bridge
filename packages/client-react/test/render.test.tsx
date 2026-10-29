@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
-import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, AlertDialog, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, MenuBar, NumberInput, Pagination, Popover, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
+import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -28,7 +28,7 @@ function created(sent: ClientMessage[], type: string) {
   return sent.filter((m): m is Extract<ClientMessage, { op: "create" }> => m.op === "create" && m.type === type);
 }
 
-function emit(app: App, message: { id: number; event: string; value?: string | number | null | string[] | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
+function emit(app: App, message: { id: number; event: string; value?: string | number | null | string[] | QuestionnaireAnswer | QuestionnaireAnswer[] | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
 
@@ -808,6 +808,42 @@ test("the overlays render with their props and report their events", async () =>
   emit(app, { id: card.id, event: "change", checked: false });
   await app.close();
   assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
+  assert.deepEqual(errors, []);
+});
+
+test("the chat nodes render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const items = [{ name: "plan", label: "Plan", choices: [{ value: "free", label: "Free" }] }];
+  const { app, sent, errors } = await renderRecorded(
+    <MessageScroller jumpLabel="Latest">
+      <Message alignment="end" avatarName="Ada">
+        <MessageHeader>
+          <Text>Ada</Text>
+        </MessageHeader>
+        <Bubble variant="secondary">
+          <Text>Hi</Text>
+        </Bubble>
+        <MessageFooter />
+      </Message>
+      <Marker content="Thinking" loading loadingStyle="shimmer" />
+      <Attachment status="failed" title="report.pdf" onClick={() => seen.push("click")} onRemove={() => seen.push("remove")} onRetry={() => seen.push("retry")} />
+      <Questionnaire items={items} onChange={(answer) => seen.push(["change", answer])} onSubmit={(answers) => seen.push(["submit", answers])} />
+    </MessageScroller>,
+  );
+  const [file] = created(sent, "Attachment");
+  const [quiz] = created(sent, "Questionnaire");
+  assert.deepEqual(created(sent, "Message")[0].props, { alignment: "end", avatarName: "Ada" });
+  assert.deepEqual(quiz.props, { items });
+
+  const answer = { name: "plan", status: "answered" as const, choices: ["free"], text: null };
+  emit(app, { id: file.id, event: "click" });
+  emit(app, { id: file.id, event: "remove" });
+  emit(app, { id: file.id, event: "retry" });
+  emit(app, { id: quiz.id, event: "change", value: answer });
+  emit(app, { id: quiz.id, event: "submit", value: [answer] });
+  await tick();
+  assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
+  await app.close();
   assert.deepEqual(errors, []);
 });
 

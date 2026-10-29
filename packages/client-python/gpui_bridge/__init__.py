@@ -495,6 +495,46 @@ class App:
         `controlled`. `change` passes the whole selection."""
         return self._create("Combobox", props)
 
+    # Chat (PROTOCOL.md section 26).
+
+    def bubble(self, **props) -> Node:
+        """A chat bubble: `variant`, `alignment`. The children are the content."""
+        return self._create("Bubble", props)
+
+    def message(self, **props) -> Node:
+        """A message row: `alignment`, `avatarName`, `avatarSrc`. A `message_header` and a
+        `message_footer` child are its header and footer; the other children are the content."""
+        return self._create("Message", props)
+
+    def message_header(self, **props) -> Node:
+        """A `message`'s header (sender, time); outside a message it draws nothing."""
+        return self._create("MessageHeader", props)
+
+    def message_footer(self, **props) -> Node:
+        """A `message`'s footer (state, actions); outside a message it draws nothing."""
+        return self._create("MessageFooter", props)
+
+    def marker(self, **props) -> Node:
+        """A status row: `content`, `icon`, `variant`, `alignment`, `loading`, `loadingStyle`."""
+        return self._create("Marker", props)
+
+    def attachment(self, **props) -> Node:
+        """A file or picture card: `status`, `progress`, `title`, `description`, `tooltip`,
+        `src`/`data`, `axis`. Subscribing to `click`, `remove` or `retry` shows that control
+        (`retry` only while `failed`); none passes a value. The children are actions."""
+        return self._create("Attachment", props)
+
+    def message_scroller(self, **props) -> Node:
+        """A virtual list of messages that stays at the end: `scrollbar`, `jumpButton`,
+        `jumpLabel`. Each child is a row."""
+        return self._create("MessageScroller", props)
+
+    def questionnaire(self, **props) -> Node:
+        """Questions one at a time: `items` ([{"name", "label", "choices", "input", ...}]).
+        `change` passes one answer ({"name", "status", "choices", "text"}); `submit` passes
+        the list of answers."""
+        return self._create("Questionnaire", props)
+
     def alert_dialog(self, **props) -> Node:
         """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
         children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""

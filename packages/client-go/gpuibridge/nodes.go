@@ -115,3 +115,11 @@ func (a *App) DatePicker(props Props) *Node      { return a.Create("DatePicker",
 func (a *App) TimeField(props Props) *Node       { return a.Create("TimeField", props) }
 func (a *App) ColorPicker(props Props) *Node     { return a.Create("ColorPicker", props) }
 func (a *App) Combobox(props Props) *Node        { return a.Create("Combobox", props) }
+func (a *App) Bubble(props Props) *Node          { return a.Create("Bubble", props) }
+func (a *App) Message(props Props) *Node         { return a.Create("Message", props) }
+func (a *App) MessageHeader(props Props) *Node   { return a.Create("MessageHeader", props) }
+func (a *App) MessageFooter(props Props) *Node   { return a.Create("MessageFooter", props) }
+func (a *App) Marker(props Props) *Node          { return a.Create("Marker", props) }
+func (a *App) Attachment(props Props) *Node      { return a.Create("Attachment", props) }
+func (a *App) MessageScroller(props Props) *Node { return a.Create("MessageScroller", props) }
+func (a *App) Questionnaire(props Props) *Node   { return a.Create("Questionnaire", props) }

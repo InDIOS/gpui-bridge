@@ -631,6 +631,46 @@ export class App {
     return this.create("Combobox", props);
   }
 
+  /** A chat bubble; its children are the content. */
+  bubble(props: NodeProps["Bubble"] = {}) {
+    return this.create("Bubble", props);
+  }
+
+  /** A message row: `MessageHeader`/`MessageFooter` children, the rest is the content. */
+  message(props: NodeProps["Message"] = {}) {
+    return this.create("Message", props);
+  }
+
+  /** A `Message`'s header (sender, time). */
+  messageHeader(props: NodeProps["MessageHeader"] = {}) {
+    return this.create("MessageHeader", props);
+  }
+
+  /** A `Message`'s footer (state, actions). */
+  messageFooter(props: NodeProps["MessageFooter"] = {}) {
+    return this.create("MessageFooter", props);
+  }
+
+  /** A compact status row in a conversation. */
+  marker(props: NodeProps["Marker"] = {}) {
+    return this.create("Marker", props);
+  }
+
+  /** A file or picture card: `click`, `remove` and `retry` show its controls. */
+  attachment(props: NodeProps["Attachment"] = {}) {
+    return this.create("Attachment", props);
+  }
+
+  /** A virtual list of messages anchored at the end; each child is a row. */
+  messageScroller(props: NodeProps["MessageScroller"] = {}) {
+    return this.create("MessageScroller", props);
+  }
+
+  /** Questions one at a time: `change` with each answer, `submit` with all of them. */
+  questionnaire(props: NodeProps["Questionnaire"] = {}) {
+    return this.create("Questionnaire", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

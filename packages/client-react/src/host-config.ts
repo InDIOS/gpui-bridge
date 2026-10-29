@@ -185,6 +185,8 @@ const EVENT_PROPS: Record<string, string> = {
   onPointerDown: "pointerDown",
   onConfirm: "confirm",
   onCopied: "copied",
+  onRemove: "remove",
+  onRetry: "retry",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -373,6 +375,22 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.colorPicker(wire);
     case "Combobox":
       return app.combobox(wire);
+    case "Bubble":
+      return app.bubble(wire);
+    case "Message":
+      return app.message(wire);
+    case "MessageHeader":
+      return app.messageHeader(wire);
+    case "MessageFooter":
+      return app.messageFooter(wire);
+    case "Marker":
+      return app.marker(wire);
+    case "Attachment":
+      return app.attachment(wire);
+    case "MessageScroller":
+      return app.messageScroller(wire);
+    case "Questionnaire":
+      return app.questionnaire(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

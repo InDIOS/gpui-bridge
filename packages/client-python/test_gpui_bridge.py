@@ -324,6 +324,45 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, [("ok",), ("close",), ("popover", True), ("card", False)])
 
+    def test_chat_nodes_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        file = app.attachment(status="failed", title="report.pdf", description="2.4 MB")
+        file.on("click", lambda: seen.append("click")).on("remove", lambda: seen.append("remove"))
+        file.on("retry", lambda: seen.append("retry"))
+        quiz = app.questionnaire(
+            items=[
+                {"name": "plan", "label": "Plan", "choices": [{"value": "free", "label": "Free"}]},
+                {"name": "notes", "label": "Notes", "input": True},
+            ]
+        )
+        quiz.on("change", lambda value: seen.append(("change", value)))
+        quiz.on("submit", lambda value: seen.append(("submit", value)))
+        message = app.message(alignment="end", avatarName="Ada").append(
+            app.message_header().append(app.text(content="Ada")),
+            app.bubble(variant="secondary").append(app.text(content="Hi")),
+            app.message_footer(),
+        )
+        scroller = app.message_scroller(jumpLabel="Latest").append(
+            message, app.marker(content="Thinking", loading=True, loadingStyle="shimmer"), file, quiz
+        )
+        app.window(root=app.div(class_="size-full flex flex-col").append(scroller))
+        app.commit()
+
+        answer = {"name": "plan", "status": "answered", "choices": ["free"], "text": None}
+        app._dispatch({"type": "event", "id": file.id, "event": "click"})
+        app._dispatch({"type": "event", "id": file.id, "event": "remove"})
+        app._dispatch({"type": "event", "id": file.id, "event": "retry"})
+        app._dispatch({"type": "event", "id": quiz.id, "event": "change", "value": answer})
+        app._dispatch({"type": "event", "id": quiz.id, "event": "submit", "value": [answer]})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["click", "remove", "retry", ("change", answer), ("submit", [answer])])
+
     def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
         app = App(headless=True)
         errors = []
