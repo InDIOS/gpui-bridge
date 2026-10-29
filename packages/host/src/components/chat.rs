@@ -28,6 +28,7 @@ use super::basic::icon;
 use super::{emit, icon_path, prop_bool, prop_f32, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
+use crate::schema::NodeType;
 use crate::tree::{Node, Tree};
 
 fn alignment(node: &Node) -> Option<MessageAlignment> {
@@ -59,6 +60,22 @@ pub fn bubble(node: &Node) -> Bubble {
         Some(alignment) => bubble.alignment(alignment),
         None => bubble,
     }
+}
+
+/// The box that carries a `Bubble`'s `a11y`. `a11y::wrap`'s row would size the bubble to itself;
+/// a full-width column keeps its 80% limit and its side (its own `alignment`, else its `Message`'s).
+// shortcut: a bubble in this box sits 12 px short of the end (cause not found), fix if it shows in an app.
+pub fn bubble_a11y(tree: &Tree, node: &Node, wrapper: Stateful<Div>) -> Stateful<Div> {
+    let message = node
+        .parent
+        .and_then(|parent| tree.node(parent))
+        .filter(|parent| parent.node_type == NodeType::Message);
+    let end = matches!(
+        alignment(node).or_else(|| message.and_then(alignment)),
+        Some(MessageAlignment::End)
+    );
+    let column = wrapper.flex().flex_col().w_full();
+    if end { column.items_end() } else { column }
 }
 
 /// Props: `alignment`, `avatarName`/`avatarSrc` (an `Avatar`'s `name`/`src`). The header and

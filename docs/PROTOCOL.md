@@ -1438,7 +1438,8 @@ props every frame; a `MessageScroller` keeps its scroll position in the host and
 - **Bubble** — a chat bubble: its children are the content. `variant` is the surface (`filled`
   by default; `ghost` has no surface or padding and takes the whole width). `alignment` puts it at
   the `start` or `end` of the row; unset, it follows the `Message` that holds it. It is at most
-  80% as wide as its parent. Reactions are not part of this node (put a row of `Button`s in the
+  80% as wide as its parent; with `a11y`, the box that carries it is a full-width column, so it
+  keeps that width and its side. Reactions are not part of this node (put a row of `Button`s in the
   message's footer instead).
 - **Message** — a message row: an avatar, a header, the content and a footer, aligned to the
   `start` (default) or the `end` (the avatar moves to that side too). `avatarName`/`avatarSrc`

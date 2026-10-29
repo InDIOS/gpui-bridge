@@ -1041,8 +1041,13 @@ impl RenderCx<'_> {
             }
             NodeType::Bubble => {
                 let children = self.children(node);
-                self.style(id, chat::bubble(node).children(children), &classes, false)
-                    .into_any_element()
+                let bubble = self.style(id, chat::bubble(node).children(children), &classes, false);
+                match accessibility.as_ref() {
+                    Some(spec) => chat::bubble_a11y(self.tree, node, a11y::apply(spec, id, div()))
+                        .child(bubble)
+                        .into_any_element(),
+                    None => bubble.into_any_element(),
+                }
             }
             NodeType::Message => self.message_node(id, node, &classes),
             // Drawn by their `Message`, like a `Tab` by its `Tabs`.
@@ -1080,6 +1085,7 @@ impl RenderCx<'_> {
                     node.node_type,
                     NodeType::Div
                         | NodeType::Text
+                        | NodeType::Bubble
                         | NodeType::Tabs
                         | NodeType::Tree
                         | NodeType::Diff
