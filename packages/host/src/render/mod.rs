@@ -1314,9 +1314,11 @@ impl RenderCx<'_> {
         let view = self.view.clone();
         let row = move |ix: usize, window: &mut Window, cx: &mut App| {
             let row = rows.get(ix..=ix).unwrap_or_default();
-            view.update(cx, |view, cx| view.render_rows(row, window, cx))
+            let row = view
+                .update(cx, |view, cx| view.render_rows(row, window, cx))
                 .pop()
-                .unwrap_or_else(|| div().into_any_element())
+                .unwrap_or_else(|| div().into_any_element());
+            chat::scroller_row(ix, rows.len(), row)
         };
         let scroller = chat::message_scroller(id, node, state, row);
         self.blocking(id, scroller, classes)

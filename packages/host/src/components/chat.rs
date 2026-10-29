@@ -267,6 +267,22 @@ fn changed(old: &[NodeId], new: &[NodeId]) -> (Range<usize>, usize) {
     (start..old.len() - end, new.len() - start - end)
 }
 
+/// Row `ix` of `count` with the space the crate's list would have kept above the first row and
+/// below the last (its `py_2`).
+pub fn scroller_row(ix: usize, count: usize, row: AnyElement) -> AnyElement {
+    if ix != 0 && ix + 1 != count {
+        return row;
+    }
+    let mut slot = div().flex().flex_col().w_full();
+    if ix == 0 {
+        slot = slot.pt_2();
+    }
+    if ix + 1 == count {
+        slot = slot.pb_2();
+    }
+    slot.child(row).into_any_element()
+}
+
 /// Props: `scrollbar`, `jumpButton` (both on by default), `jumpLabel` (the jump button's tooltip
 /// and name). `row` draws the child at an index; only the rows in view are drawn.
 pub fn message_scroller(
@@ -278,7 +294,10 @@ pub fn message_scroller(
     // shortcut: rows never drawn count as 0 px, so dragging the scrollbar jumps; the crate hides
     // its `ListState` (no `with_uniform_item_height`), upgrade if it exposes one or we own the list.
     let on = |key| node.props.get(key).and_then(Value::as_bool).unwrap_or(true);
+    // GPUI's list leaves its padding out of the bound the wheel is clamped to but not out of its
+    // "at the end" check, so a padded list never reaches its end; the rows carry it (`scroller_row`).
     let scroller = MessageScroller::new(("node", id), state.clone(), row)
+        .with_list_style(StyleRefinement::default().py_0())
         .scrollbar(on("scrollbar"))
         .jump_button(on("jumpButton"));
     match prop_str(node, "jumpLabel") {
