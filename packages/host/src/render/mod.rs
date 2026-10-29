@@ -74,6 +74,8 @@ pub struct RootView {
     charts: HashMap<NodeId, ChartSlot>,
     /// One per Command: the query and highlight the user typed and moved.
     commands: HashMap<NodeId, CommandSlot>,
+    /// One per MessageScroller: its scroll state and the rows it was last given.
+    scrollers: HashMap<NodeId, chat::ScrollerSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -155,6 +157,7 @@ impl RootView {
             carousels: HashMap::new(),
             charts: HashMap::new(),
             commands: HashMap::new(),
+            scrollers: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -313,6 +316,17 @@ impl RootView {
         let carousels = carousel::snapshot(tree, &members);
         let charts = chart::snapshot(tree, &members);
         let commands = command::snapshot(tree, &members);
+        // Only a commit changes the rows of a MessageScroller.
+        let scrollers = (tree.commits() != self.applied_commit).then(|| {
+            members
+                .iter()
+                .filter_map(|&id| {
+                    tree.node(id)
+                        .filter(|node| node.node_type == NodeType::MessageScroller)
+                        .map(|node| (id, node.children.clone()))
+                })
+                .collect::<Vec<_>>()
+        });
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -345,6 +359,9 @@ impl RootView {
                 .or_insert_with(VirtualListScrollHandle::new);
         }
         self.texts.retain(|id, _| tree.node(*id).is_some());
+        if let Some(scrollers) = scrollers {
+            chat::sync_scrollers(&mut self.scrollers, scrollers, cx);
+        }
         if let Some(loops) = loops {
             self.sync_animated(loops, cx);
         }
@@ -534,6 +551,7 @@ impl RootView {
             carousels: &self.carousels,
             charts: &self.charts,
             commands: &self.commands,
+            scrollers: &self.scrollers,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
@@ -857,6 +875,7 @@ struct RenderCx<'a> {
     carousels: &'a HashMap<NodeId, CarouselSlot>,
     charts: &'a HashMap<NodeId, ChartSlot>,
     commands: &'a HashMap<NodeId, CommandSlot>,
+    scrollers: &'a HashMap<NodeId, chat::ScrollerSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -1021,6 +1040,7 @@ impl RenderCx<'_> {
                     .into_any_element()
             }
             NodeType::Attachment => self.attachment_node(id, node, &classes),
+            NodeType::MessageScroller => self.message_scroller_node(id, node, &classes),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
@@ -1259,6 +1279,24 @@ impl RenderCx<'_> {
         let actions = self.children(node);
         let attachment = chat::attachment(id, node, image, actions, self.session);
         self.blocking(id, attachment, classes)
+    }
+
+    // Only the rows in view are built, one at a time (`render_rows`), as in a VirtualList; the
+    // scroller fills its container.
+    fn message_scroller_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let Some((state, _)) = self.scrollers.get(&id) else {
+            return div().into_any_element();
+        };
+        let rows = node.children.clone();
+        let view = self.view.clone();
+        let row = move |ix: usize, window: &mut Window, cx: &mut App| {
+            let row = rows.get(ix..=ix).unwrap_or_default();
+            view.update(cx, |view, cx| view.render_rows(row, window, cx))
+                .pop()
+                .unwrap_or_else(|| div().into_any_element())
+        };
+        let scroller = chat::message_scroller(id, node, state, row);
+        self.blocking(id, scroller, classes)
     }
 
     fn number_input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {

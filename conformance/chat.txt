@@ -25,6 +25,11 @@
 > {"op":"append","parent":1,"child":9}
 > {"op":"append","parent":1,"child":10}
 > {"op":"append","parent":1,"child":12}
+# A MessageScroller's rows are its children; it has no events.
+> {"op":"create","id":13,"type":"MessageScroller","props":{"class":"flex-1","scrollbar":false,"jumpButton":true,"jumpLabel":"Ir al último"}}
+> {"op":"create","id":14,"type":"Marker","props":{"content":"Today","variant":"separator"}}
+> {"op":"append","parent":13,"child":14}
+> {"op":"append","parent":1,"child":13}
 > {"op":"window","root":1}
 > {"op":"commit"}
 # The card and its corner button report a click and a remove, with no value.
@@ -57,6 +62,12 @@
 < {"type":"error","code":"invalid_operation","op":"simulate"}
 > {"op":"simulate","id":10,"event":"change"}
 < {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":13,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Rows come and go like any children (the host tells the list what changed).
+> {"op":"insertBefore","parent":13,"child":2,"before":14}
+> {"op":"remove","id":14}
+> {"op":"commit"}
 # Malformed props are invalid_props.
 > {"op":"create","id":20,"type":"Bubble","props":{"variant":"primary"}}
 > {"op":"create","id":21,"type":"Bubble","props":{"alignment":"center"}}
@@ -67,8 +78,12 @@
 > {"op":"create","id":26,"type":"Attachment","props":{"status":"done"}}
 > {"op":"create","id":27,"type":"Attachment","props":{"progress":"45"}}
 > {"op":"create","id":28,"type":"Attachment","props":{"data":"not base64!"}}
+> {"op":"create","id":29,"type":"MessageScroller","props":{"jumpButton":"yes"}}
+> {"op":"create","id":30,"type":"MessageScroller","props":{"jumpLabel":5}}
 > {"op":"setProps","id":10,"props":{"axis":"diagonal"}}
 > {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}
 < {"type":"error","code":"invalid_props","op":"create"}

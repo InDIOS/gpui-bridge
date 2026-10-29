@@ -230,6 +230,7 @@ Rules:
 | `MessageFooter` | `class`                                                 | —                  |
 | `Marker`   | `content`, `icon`, `variant` (`plain`, `separator`, `border`), `alignment` (`start`, `center`, `end`), `loading`, `loadingStyle` (`spinner`, `shimmer`), `class` | — |
 | `Attachment` | `status` (`pending`, `uploading`, `processing`, `failed`, `complete`), `progress`, `title`, `description`, `tooltip`, `axis` (`horizontal`, `vertical`), `src`, `data`, `class` | `click`, `remove`, `retry` |
+| `MessageScroller` | `scrollbar`, `jumpButton`, `jumpLabel`, `class`             | —                  |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -238,7 +239,7 @@ section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
 `Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
 the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
 `Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
-`MessageFooter`, `Marker`, `Attachment`).
+`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -1407,9 +1408,10 @@ The transcript in `conformance/form-state.txt` is the reference for their props 
 
 ## 26. Chat
 
-Four presentational nodes for a conversation, plus the header and footer of a `Message`. None
-keeps state in the host: they are drawn from their props every frame, and an `Attachment`'s
-upload status is the client's to change.
+Four presentational nodes for a conversation, the header and footer of a `Message`, and the
+scrolling list that holds them. They are drawn from their props every frame; only a
+`MessageScroller` keeps something in the host, its scroll position. An `Attachment`'s upload
+status is the client's to change.
 
 ```json
 {"op":"create","id":80,"type":"Message","props":{"alignment":"end","avatarName":"Ada"}}
@@ -1427,6 +1429,9 @@ upload status is the client's to change.
 {"op":"append","parent":80,"child":85}
 {"op":"create","id":87,"type":"Marker","props":{"content":"Thinking","loading":true,"loadingStyle":"shimmer"}}
 {"op":"create","id":88,"type":"Attachment","props":{"status":"uploading","progress":45,"title":"report.pdf","description":"2.4 MB"},"events":["click","remove"]}
+{"op":"create","id":89,"type":"MessageScroller","props":{"class":"flex-1","jumpLabel":"Ir al último"}}
+{"op":"append","parent":89,"child":80}
+{"op":"append","parent":89,"child":87}
 ```
 
 - **Bubble** — a chat bubble: its children are the content. `variant` is the surface (`filled`
@@ -1455,9 +1460,8 @@ upload status is the client's to change.
   border), `uploading`, `processing`, or `failed` (red border); `progress` (0–100, clamped) draws
   a ring and a bar along the bottom and is added to `description`, only while `uploading`.
   `title` and `description` are text (the title shimmers while in progress; the description
-  turns red when `failed`). The picture is `src` or
-  `data`, exactly as in an `Image` (`data` wins and must be standard base64); without one the
-  media shows a file icon. `axis: "vertical"` turns the chip into a card with the picture on top
+  turns red when `failed`). The picture is `src` or `data`, exactly as in an `Image` (`data`
+  wins and must be standard base64); without one the media shows a file icon. `axis: "vertical"` turns the chip into a card with the picture on top
   (only the picture, without `title`/`description`, makes a square tile). `tooltip` shows while
   the card is hovered (the reason an upload failed, for example). The children are actions
   (usually `Button`s): they sit on the trailing edge and their clicks never reach the card.
@@ -1467,8 +1471,18 @@ upload status is the client's to change.
   shows a retry control, only while `failed` (a round button on the picture or the file icon,
   and a link after `description`). None carries a value. `simulate` sends all three;
   a `retry` on an attachment that is not `failed` sends nothing, since the button is not there.
+- **MessageScroller** — a virtual list of messages: each child is a row (usually a `Message` or
+  a `Marker`), rows can have any height, and only the ones in view are built, so tens of
+  thousands of messages cost little. It fills the box it is given, so size its parent or give
+  it `class` (`flex-1`). It starts at the end and stays there as rows are added or the last one
+  grows (a streamed answer); when the user scrolls up it stays put, and a round button
+  (`jumpButton`, on by default) brings it back to the end. `jumpLabel` is that button's tooltip
+  and name (the crate's default is the English "Jump to latest"); `scrollbar` (on by default)
+  shows a vertical scrollbar. Adding, removing or moving rows keeps the reading position: the
+  host compares the new children with the old ones and tells the list only what changed in
+  between. The list has the `log` role. It has no events.
 
-`PROTOCOL_VERSION` stays at 1: the six are new node types, so an older host answers
+`PROTOCOL_VERSION` stays at 1: the seven are new node types, so an older host answers
 `unknown_type` to them and nothing else changes.
 
 The transcript in `conformance/chat.txt` is the reference for their props and events.

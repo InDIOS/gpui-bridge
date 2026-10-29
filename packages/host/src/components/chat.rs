@@ -1,7 +1,10 @@
 //! The chat components of gpui-kit (PROTOCOL.md section 26): `Bubble`, `Message` (with its
-//! `MessageHeader` and `MessageFooter` children), `Marker` and `Attachment`. All four are drawn
-//! from props each frame and keep no state: an `Attachment`'s status is the client's.
+//! `MessageHeader` and `MessageFooter` children), `Marker`, `Attachment` and `MessageScroller`.
+//! They are drawn from props each frame; only a `MessageScroller` keeps state, its scroll position
+//! (an `Attachment`'s status is the client's).
 
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 use std::path::PathBuf;
 
 use gpui_kit::component::Icon;
@@ -17,6 +20,7 @@ use gpui_kit::component::marker::{
 use gpui_kit::component::message::{
     Message, MessageAlignment, MessageContent, MessageFooter, MessageHeader,
 };
+use gpui_kit::component::message_scroller::{MessageScroller, MessageScrollerState};
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -202,5 +206,81 @@ pub fn attachment_action(tree: &Tree, id: NodeId, event: &str) {
         == Some("failed");
     if event != "retry" || failed {
         emit(tree, id, event, None, None);
+    }
+}
+
+/// One per `MessageScroller`: its list state and the rows it was last given.
+pub type ScrollerSlot = (Entity<MessageScrollerState>, Vec<NodeId>);
+
+/// Tells each scroller which of its rows changed, so the list keeps the reading position (and
+/// stays on the latest message while it is there). Rows are compared by id.
+pub fn sync_scrollers<V: 'static>(
+    slots: &mut HashMap<NodeId, ScrollerSlot>,
+    found: Vec<(NodeId, Vec<NodeId>)>,
+    cx: &mut Context<V>,
+) {
+    let ids: HashSet<NodeId> = found.iter().map(|(id, _)| *id).collect();
+    slots.retain(|id, _| ids.contains(id));
+    for (id, rows) in found {
+        match slots.get_mut(&id) {
+            None => {
+                let state = cx.new(|cx| MessageScrollerState::new(rows.len(), cx));
+                slots.insert(id, (state, rows));
+            }
+            Some((state, old)) if *old != rows => {
+                let (range, count) = changed(old, &rows);
+                state.update(cx, |state, cx| state.splice(range, count, cx));
+                *old = rows;
+            }
+            Some(_) => {}
+        }
+    }
+}
+
+/// The rows of `old` that `new` replaces and how many take their place: what is left between
+/// the common start and the common end. An append or a prepend is one splice at an edge.
+fn changed(old: &[NodeId], new: &[NodeId]) -> (Range<usize>, usize) {
+    let start = old.iter().zip(new).take_while(|(a, b)| a == b).count();
+    let end = old[start..]
+        .iter()
+        .rev()
+        .zip(new[start..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    (start..old.len() - end, new.len() - start - end)
+}
+
+/// Props: `scrollbar`, `jumpButton` (both on by default), `jumpLabel` (the jump button's tooltip
+/// and name). `row` draws the child at an index; only the rows in view are drawn.
+pub fn message_scroller(
+    id: NodeId,
+    node: &Node,
+    state: &Entity<MessageScrollerState>,
+    row: impl FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static,
+) -> MessageScroller {
+    let on = |key| node.props.get(key).and_then(Value::as_bool).unwrap_or(true);
+    let scroller = MessageScroller::new(("node", id), state.clone(), row)
+        .scrollbar(on("scrollbar"))
+        .jump_button(on("jumpButton"));
+    match prop_str(node, "jumpLabel") {
+        Some(label) => scroller.with_jump_button_label(label.to_owned()),
+        None => scroller,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::changed;
+
+    #[test]
+    fn a_row_change_is_one_splice() {
+        // Append, prepend, a removal in the middle, one row replaced, all replaced.
+        assert_eq!(changed(&[1, 2], &[1, 2, 3, 4]), (2..2, 2));
+        assert_eq!(changed(&[3, 4], &[1, 2, 3, 4]), (0..0, 2));
+        assert_eq!(changed(&[1, 2, 3], &[1, 3]), (1..2, 0));
+        assert_eq!(changed(&[1, 2, 3], &[1, 9, 3]), (1..2, 1));
+        assert_eq!(changed(&[1, 2], &[3]), (0..2, 1));
+        // A repeated id at the seam is not counted twice.
+        assert_eq!(changed(&[1, 1], &[1]), (1..2, 0));
     }
 }

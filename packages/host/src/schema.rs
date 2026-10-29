@@ -249,6 +249,7 @@ pub enum NodeType {
     MessageFooter,
     Marker,
     Attachment,
+    MessageScroller,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -339,6 +340,7 @@ impl NodeType {
             "MessageFooter" => Some(Self::MessageFooter),
             "Marker" => Some(Self::Marker),
             "Attachment" => Some(Self::Attachment),
+            "MessageScroller" => Some(Self::MessageScroller),
             _ => None,
         }
     }
@@ -541,6 +543,8 @@ impl NodeType {
             (Self::Attachment, "title" | "description" | "tooltip" | "src") => Some(Str),
             (Self::Attachment, "data") => Some(Base64),
             (Self::Attachment, "axis") => Some(OneOf(&["horizontal", "vertical"])),
+            (Self::MessageScroller, "scrollbar" | "jumpButton") => Some(Bool),
+            (Self::MessageScroller, "jumpLabel") => Some(Str),
             (
                 Self::Input
                 | Self::Checkbox
@@ -680,6 +684,7 @@ impl NodeType {
             Self::MessageFooter => "MessageFooter",
             Self::Marker => "Marker",
             Self::Attachment => "Attachment",
+            Self::MessageScroller => "MessageScroller",
         }
     }
 }
@@ -757,6 +762,7 @@ pub const ALL: &[NodeType] = &[
     NodeType::MessageFooter,
     NodeType::Marker,
     NodeType::Attachment,
+    NodeType::MessageScroller,
 ];
 
 #[cfg(test)]
