@@ -200,6 +200,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Canvas, "pointerDown")
             | (NodeType::Command, "confirm")
             | (NodeType::Settings, "change")
+            | (NodeType::Attachment, "click" | "remove" | "retry")
     );
     if !known {
         return Err(fail(
@@ -252,6 +253,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             components::clicked(tree, id)
         }
         (NodeType::Alert, "close") => components::alert_closed(tree, id),
+        (NodeType::Attachment, event) => components::chat::attachment_action(tree, id, event),
         // The clipboard is not touched here (there is no window): the event is reported as it is.
         (NodeType::Clipboard, "copied") => {
             let value = node

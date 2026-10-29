@@ -242,6 +242,13 @@ pub enum NodeType {
     TimeField,
     ColorPicker,
     Combobox,
+    // Chat (PROTOCOL.md section 26).
+    Bubble,
+    Message,
+    MessageHeader,
+    MessageFooter,
+    Marker,
+    Attachment,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -326,6 +333,12 @@ impl NodeType {
             "TimeField" => Some(Self::TimeField),
             "ColorPicker" => Some(Self::ColorPicker),
             "Combobox" => Some(Self::Combobox),
+            "Bubble" => Some(Self::Bubble),
+            "Message" => Some(Self::Message),
+            "MessageHeader" => Some(Self::MessageHeader),
+            "MessageFooter" => Some(Self::MessageFooter),
+            "Marker" => Some(Self::Marker),
+            "Attachment" => Some(Self::Attachment),
             _ => None,
         }
     }
@@ -500,6 +513,34 @@ impl NodeType {
             (Self::InputGroup, "prefixIcon" | "suffixIcon") => Some(Icon),
             (Self::InputGroup, "readonly" | "invalid") => Some(Bool),
             (Self::Clipboard, "value") => Some(Str),
+            (Self::Bubble, "variant") => Some(OneOf(&[
+                "filled",
+                "secondary",
+                "muted",
+                "tinted",
+                "outline",
+                "ghost",
+                "destructive",
+            ])),
+            (Self::Bubble | Self::Message, "alignment") => Some(OneOf(&["start", "end"])),
+            (Self::Message, "avatarName" | "avatarSrc") => Some(Str),
+            (Self::Marker, "content") => Some(Str),
+            (Self::Marker, "icon") => Some(Icon),
+            (Self::Marker, "variant") => Some(OneOf(&["plain", "separator", "border"])),
+            (Self::Marker, "alignment") => Some(OneOf(&["start", "center", "end"])),
+            (Self::Marker, "loading") => Some(Bool),
+            (Self::Marker, "loadingStyle") => Some(OneOf(&["spinner", "shimmer"])),
+            (Self::Attachment, "status") => Some(OneOf(&[
+                "pending",
+                "uploading",
+                "processing",
+                "failed",
+                "complete",
+            ])),
+            (Self::Attachment, "progress") => Some(Number),
+            (Self::Attachment, "title" | "description" | "tooltip" | "src") => Some(Str),
+            (Self::Attachment, "data") => Some(Base64),
+            (Self::Attachment, "axis") => Some(OneOf(&["horizontal", "vertical"])),
             (
                 Self::Input
                 | Self::Checkbox
@@ -545,6 +586,11 @@ impl NodeType {
             ) => Some(Bool),
             _ => None,
         }
+    }
+
+    /// The types whose `src`/`data` is a picture, kept by the tree like an `Image`'s.
+    pub fn takes_image(self) -> bool {
+        matches!(self, Self::Image | Self::Attachment)
     }
 
     /// The props a node cannot be built without. Only a `Tab` has one: the `value` it reports
@@ -628,6 +674,12 @@ impl NodeType {
             Self::TimeField => "TimeField",
             Self::ColorPicker => "ColorPicker",
             Self::Combobox => "Combobox",
+            Self::Bubble => "Bubble",
+            Self::Message => "Message",
+            Self::MessageHeader => "MessageHeader",
+            Self::MessageFooter => "MessageFooter",
+            Self::Marker => "Marker",
+            Self::Attachment => "Attachment",
         }
     }
 }
@@ -699,6 +751,12 @@ pub const ALL: &[NodeType] = &[
     NodeType::TimeField,
     NodeType::ColorPicker,
     NodeType::Combobox,
+    NodeType::Bubble,
+    NodeType::Message,
+    NodeType::MessageHeader,
+    NodeType::MessageFooter,
+    NodeType::Marker,
+    NodeType::Attachment,
 ];
 
 #[cfg(test)]

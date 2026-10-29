@@ -11,6 +11,7 @@ pub mod calendar;
 pub mod canvas;
 pub mod carousel;
 pub mod chart;
+pub mod chat;
 pub mod checkbox;
 pub mod color_picker;
 pub mod combobox;

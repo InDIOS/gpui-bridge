@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::component::form::Field;
 use gpui_kit::component::menu::ContextMenuExt;
+use gpui_kit::component::message::{MessageFooter, MessageHeader};
 use gpui_kit::component::scroll::{ScrollableElement, Scrollbar};
 use gpui_kit::component::theme::{ActiveTheme, Theme};
 use gpui_kit::component::tooltip::Tooltip;
@@ -34,8 +35,8 @@ use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
 use crate::components::time_field::{self, TimeFieldSlot};
 use crate::components::{
-    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, overlays, radio,
-    settings, sidebar, switch, tabs, toggle, tree,
+    self, accordion, basic, button, canvas, chat, checkbox, keyboard, layout, menu, overlays,
+    radio, settings, sidebar, switch, tabs, toggle, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -1006,6 +1007,20 @@ impl RenderCx<'_> {
                 let element = settings::build(id, node, self.session);
                 self.component_a11y(id, element, &classes, accessibility.as_ref())
             }
+            NodeType::Bubble => {
+                let children = self.children(node);
+                self.style(id, chat::bubble(node).children(children), &classes, false)
+                    .into_any_element()
+            }
+            NodeType::Message => self.message_node(id, node, &classes),
+            // Drawn by their `Message`, like a `Tab` by its `Tabs`.
+            NodeType::MessageHeader | NodeType::MessageFooter => div().into_any_element(),
+            NodeType::Marker => {
+                let children = self.children(node);
+                self.style(id, chat::marker(node, children), &classes, false)
+                    .into_any_element()
+            }
+            NodeType::Attachment => self.attachment_node(id, node, &classes),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
@@ -1200,6 +1215,50 @@ impl RenderCx<'_> {
     fn empty_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let content = self.children(node);
         self.component(id, basic::empty(node, content), classes)
+    }
+
+    /// A `Message` takes its header and footer from `MessageHeader`/`MessageFooter` children (the
+    /// last of each wins, styled by its own `class`) and every other child as content.
+    fn message_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let (mut header, mut footer, mut content, mut ghost) = (None, None, Vec::new(), false);
+        for &child in &node.children {
+            let Some(part) = self.tree.node(child) else {
+                continue;
+            };
+            match part.node_type {
+                NodeType::MessageHeader => {
+                    header = Some(self.message_part(part, MessageHeader::new()))
+                }
+                NodeType::MessageFooter => {
+                    footer = Some(self.message_part(part, MessageFooter::new()))
+                }
+                _ => {
+                    ghost |= part.node_type == NodeType::Bubble && chat::is_ghost(part);
+                    content.push(self.node(child));
+                }
+            }
+        }
+        let message = chat::message(node, header, content, footer, ghost);
+        self.style(id, message, classes, false).into_any_element()
+    }
+
+    fn message_part<E: ParentElement + Styled>(&mut self, node: &Node, part: E) -> E {
+        let class = node
+            .props
+            .get("class")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let classes = self.styles.classes(class);
+        let children = self.children(node);
+        styles::apply(part.children(children), &classes, self.theme)
+    }
+
+    // The children are the actions; the card's own controls block a `windowControl` area.
+    fn attachment_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let image = self.image_file(id, node);
+        let actions = self.children(node);
+        let attachment = chat::attachment(id, node, image, actions, self.session);
+        self.blocking(id, attachment, classes)
     }
 
     fn number_input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -1466,14 +1525,15 @@ impl RenderCx<'_> {
         self.style(id, bar, classes, false).into_any_element()
     }
 
-    fn image_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
-        // Bytes sent as `data` win over `src`; the host keeps them in a file per node.
+    /// The picture of an `Image` or an `Attachment`. Bytes sent as `data` win over `src`; the
+    /// host keeps them in a file per node.
+    fn image_file(&self, id: NodeId, node: &Node) -> Option<PathBuf> {
         let has_data = node
             .props
             .get("data")
             .and_then(Value::as_str)
             .is_some_and(|data| !data.is_empty());
-        let path = if has_data {
+        if has_data {
             self.tree.image_path(id)
         } else {
             node.props
@@ -1481,8 +1541,11 @@ impl RenderCx<'_> {
                 .and_then(Value::as_str)
                 .filter(|src| !src.is_empty())
                 .map(PathBuf::from)
-        };
-        let Some(path) = path else {
+        }
+    }
+
+    fn image_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let Some(path) = self.image_file(id, node) else {
             return self.style(id, div(), classes, false).into_any_element();
         };
         let fit = match node.props.get("fit").and_then(Value::as_str) {

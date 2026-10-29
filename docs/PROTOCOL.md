@@ -224,14 +224,21 @@ Rules:
 | `TimeField` | `value` (`HH:MM`, or `HH:MM:SS` with `seconds`), `seconds`, `disabled`, `controlled`, `class` | `change` |
 | `ColorPicker` | `value` (`#RRGGBB` or `#RRGGBBAA`), `palette`, `controlled`, `class` | `change` |
 | `Combobox` | `options`, `value` (a list of option values), `placeholder`, `searchable`, `disabled`, `controlled`, `class` | `change` |
+| `Bubble`   | `variant` (`filled`, `secondary`, `muted`, `tinted`, `outline`, `ghost`, `destructive`), `alignment` (`start`, `end`), `class` | — |
+| `Message`  | `alignment` (`start`, `end`), `avatarName`, `avatarSrc`, `class` | —                  |
+| `MessageHeader` | `class`                                                 | —                  |
+| `MessageFooter` | `class`                                                 | —                  |
+| `Marker`   | `content`, `icon`, `variant` (`plain`, `separator`, `border`), `alignment` (`start`, `center`, `end`), `loading`, `loadingStyle` (`spinner`, `shimmer`), `class` | — |
+| `Attachment` | `status` (`pending`, `uploading`, `processing`, `failed`, `complete`), `progress`, `title`, `description`, `tooltip`, `axis` (`horizontal`, `vertical`), `src`, `data`, `class` | `click`, `remove`, `retry` |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
 `Carousel`) in section 18, `Sidebar` and `Chart` in section 19, the simple components of
 section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
 `Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
-and the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
-`Combobox`).
+the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
+`Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
+`MessageFooter`, `Marker`, `Attachment`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -1397,3 +1404,71 @@ a `Combobox` list that adds a disabled option (removing one is allowed: the clea
 to them.
 
 The transcript in `conformance/form-state.txt` is the reference for their props and events.
+
+## 26. Chat
+
+Four presentational nodes for a conversation, plus the header and footer of a `Message`. None
+keeps state in the host: they are drawn from their props every frame, and an `Attachment`'s
+upload status is the client's to change.
+
+```json
+{"op":"create","id":80,"type":"Message","props":{"alignment":"end","avatarName":"Ada"}}
+{"op":"create","id":81,"type":"MessageHeader"}
+{"op":"create","id":82,"type":"text","props":{"content":"Ada · 10:42"}}
+{"op":"create","id":83,"type":"Bubble","props":{"variant":"filled"}}
+{"op":"create","id":84,"type":"text","props":{"content":"Here is the report."}}
+{"op":"create","id":85,"type":"MessageFooter"}
+{"op":"create","id":86,"type":"Button","props":{"label":"Copy","variant":"ghost"},"events":["click"]}
+{"op":"append","parent":81,"child":82}
+{"op":"append","parent":83,"child":84}
+{"op":"append","parent":85,"child":86}
+{"op":"append","parent":80,"child":81}
+{"op":"append","parent":80,"child":83}
+{"op":"append","parent":80,"child":85}
+{"op":"create","id":87,"type":"Marker","props":{"content":"Thinking","loading":true,"loadingStyle":"shimmer"}}
+{"op":"create","id":88,"type":"Attachment","props":{"status":"uploading","progress":45,"title":"report.pdf","description":"2.4 MB"},"events":["click","remove"]}
+```
+
+- **Bubble** — a chat bubble: its children are the content. `variant` is the surface (`filled`
+  by default; `ghost` has no surface or padding and takes the whole width). `alignment` puts it at
+  the `start` or `end` of the row; unset, it follows the `Message` that holds it. It is at most
+  80% as wide as its parent. Reactions are not part of this node (put a row of `Button`s in the
+  message's footer instead).
+- **Message** — a message row: an avatar, a header, the content and a footer, aligned to the
+  `start` (default) or the `end` (the avatar moves to that side too). `avatarName`/`avatarSrc`
+  draw an `Avatar` (its `name` and `src`); without either there is no avatar. A
+  **MessageHeader** child is the header (sender, time) and a **MessageFooter** child the footer
+  (state, actions); both lay out their own children in a row with small muted text, take their
+  own `class`, and the last of each wins. Every other child is the content, usually one or more
+  `Bubble`s. With a `ghost` bubble the header and footer lose their side inset so they line up
+  with its text. A `MessageHeader` or `MessageFooter` outside a `Message` draws nothing, like a
+  `Tab` outside `Tabs`. Group messages with a `div` and `class` (`flex flex-col gap-4`).
+- **Marker** — a compact status row in a conversation: `content` (text), an `icon` before it,
+  and children after the text (inside the same content slot). `variant` is `plain` (default),
+  `separator` (a line on each side, label centered) or `border` (a line under it); `alignment`
+  overrides where the content sits, and a separator keeps only the line on the far side of a
+  `start` or `end` label. `loading` adds a spinner (unless there is an `icon`) or, with
+  `loadingStyle: "shimmer"`, a moving highlight over `content` (children only fade; the shimmer
+  stops when the system asks for reduced motion). A marker that reports progress can be
+  announced with `a11y: {"role": "status"}`.
+- **Attachment** — a file or picture card. `status` is `complete` (default), `pending` (dashed
+  border), `uploading`, `processing`, or `failed` (red border); `progress` (0–100, clamped) draws
+  a ring and a bar along the bottom and is added to `description`, only while `uploading`.
+  `title` and `description` are text (the title shimmers while in progress; the description
+  turns red when `failed`). The picture is `src` or
+  `data`, exactly as in an `Image` (`data` wins and must be standard base64); without one the
+  media shows a file icon. `axis: "vertical"` turns the chip into a card with the picture on top
+  (only the picture, without `title`/`description`, makes a square tile). `tooltip` shows while
+  the card is hovered (the reason an upload failed, for example). The children are actions
+  (usually `Button`s): they sit on the trailing edge and their clicks never reach the card.
+
+  The card's own controls exist only while their event is subscribed: `click` makes the whole
+  card clickable, `remove` shows a remove button on its upper corner (on hover), and `retry`
+  shows a retry control, only while `failed` (a round button on the picture or the file icon,
+  and a link after `description`). None carries a value. `simulate` sends all three;
+  a `retry` on an attachment that is not `failed` sends nothing, since the button is not there.
+
+`PROTOCOL_VERSION` stays at 1: the six are new node types, so an older host answers
+`unknown_type` to them and nothing else changes.
+
+The transcript in `conformance/chat.txt` is the reference for their props and events.
