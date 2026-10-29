@@ -1478,7 +1478,9 @@ status is the client's to change.
   grows (a streamed answer); when the user scrolls up it stays put, and a round button
   (`jumpButton`, on by default) brings it back to the end. `jumpLabel` is that button's tooltip
   and name (the crate's default is the English "Jump to latest"); `scrollbar` (on by default)
-  shows a vertical scrollbar. Adding, removing or moving rows keeps the reading position: the
+  shows a vertical scrollbar. The scrollbar is approximate: rows that were never drawn count as
+  zero height, so its thumb changes size as the user scrolls through the list, and dragging it
+  moves the content in small jumps (the wheel and the jump button are smooth). Adding, removing or moving rows keeps the reading position: the
   host compares the new children with the old ones and tells the list only what changed in
   between. The list has the `log` role. It has no events.
 

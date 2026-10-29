@@ -258,6 +258,8 @@ pub fn message_scroller(
     state: &Entity<MessageScrollerState>,
     row: impl FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static,
 ) -> MessageScroller {
+    // shortcut: rows never drawn count as 0 px, so dragging the scrollbar jumps; the crate hides
+    // its `ListState` (no `with_uniform_item_height`), upgrade if it exposes one or we own the list.
     let on = |key| node.props.get(key).and_then(Value::as_bool).unwrap_or(true);
     let scroller = MessageScroller::new(("node", id), state.clone(), row)
         .scrollbar(on("scrollbar"))
