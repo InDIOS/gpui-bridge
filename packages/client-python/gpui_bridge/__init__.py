@@ -5,6 +5,9 @@ them in one batch. `run()` blocks and calls event handlers on the calling thread
 until the host exits.
 """
 
+# App.list() shadows the builtin in the class body; defer annotations so `list[str]` stays the type (eager before 3.14).
+from __future__ import annotations
+
 import json
 import os
 import queue
