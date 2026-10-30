@@ -109,18 +109,18 @@ pub fn check_items(value: &Value) -> Result<(), String> {
 
 /// Props: `items`, `multiple`, `bordered` (default true), `disabled`, `controlled`.
 /// Events: `change` with the id of the section the user opened or closed.
-/// `sections` are the `sections` of the node, each with its content already built.
+/// `sections` are the `sections` of the node, each with its title and content already built.
 pub fn build(
     id: NodeId,
     node: &Node,
     session: &Entity<Session>,
-    sections: Vec<(Item, AnyElement)>,
+    sections: Vec<(Item, AnyElement, AnyElement)>,
 ) -> Accordion {
-    let ids: Vec<String> = sections.iter().map(|((id, ..), _)| id.clone()).collect();
+    let ids: Vec<String> = sections.iter().map(|((id, ..), ..)| id.clone()).collect();
     let open: Vec<usize> = sections
         .iter()
         .enumerate()
-        .filter(|(_, (item, _))| item.3)
+        .filter(|(_, (item, ..))| item.3)
         .map(|(ix, _)| ix)
         .collect();
     let controlled = prop_bool(node, "controlled");
@@ -129,9 +129,9 @@ pub fn build(
         .multiple(prop_bool(node, "multiple"))
         .bordered(node.props.get("bordered") != Some(&Value::Bool(false)))
         .disabled(prop_bool(node, "disabled"));
-    for ((_, title, _, is_open, disabled), content) in sections {
+    for ((_, _, _, is_open, disabled), title, content) in sections {
         accordion = accordion.item(move |item| {
-            item.title(SharedString::from(title))
+            item.title(title)
                 .open(is_open)
                 .disabled(disabled)
                 .child(content)

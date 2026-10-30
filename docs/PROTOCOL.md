@@ -862,9 +862,13 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   reads as its chosen tab, and its `a11y.label` becomes the description.
   Without a stop (`disabled`) they read the same way. gpui-kit already reports a `Slider` as a
   slider, so its `a11y.label` names that one too.
-- The other components keep gpui-component's own keyboard behaviour: `Accordion`, `Calendar` and
-  `Toggle` take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own
-  navigation still reads their `a11y`).
+- An `Accordion` section's title reads as its name. The title of each enabled `AccordionItem`
+  (none when it or its `Accordion` is `disabled`) is a Tab stop that reads as a button with its
+  open state; Enter and Space open and close it with the same `change` a click sends. Sections
+  given as `items` take no stop.
+- The other components keep gpui-component's own keyboard behaviour: `Calendar` and `Toggle`
+  take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own navigation
+  still reads their `a11y`).
 
 ## 17. Basic, Form, Layout and Advanced components
 

@@ -356,6 +356,7 @@ impl RootView {
                 tree.node(id).is_some_and(|node| {
                     (node.node_type == NodeType::Div && node.events.contains("keyDown"))
                         || keyboard::takes_stop(node)
+                        || node.node_type == NodeType::AccordionItem
                 })
             })
             .collect();
@@ -1260,14 +1261,7 @@ impl RenderCx<'_> {
         } else {
             div()
         };
-        // Inset: an outer shadow fills the transparent wrapper instead of drawing a ring.
-        let ring = BoxShadow {
-            color: self.theme.ring,
-            offset: point(px(0.), px(0.)),
-            blur_radius: px(0.),
-            spread_radius: px(2.),
-            inset: true,
-        };
+        let ring = self.ring();
         let session = self.session.clone();
         let own = handle.clone();
         let stop = a11y::apply(
@@ -1296,6 +1290,18 @@ impl RenderCx<'_> {
         self.style(id, stop, classes, false)
             .child(element)
             .into_any_element()
+    }
+
+    /// The focus ring of a host Tab stop. Inset: an outer shadow fills a transparent wrapper
+    /// instead of drawing a ring.
+    fn ring(&self) -> BoxShadow {
+        BoxShadow {
+            color: self.theme.ring,
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+            inset: true,
+        }
     }
 
     /// `component` for a node whose `a11y` goes on the same sized wrapper. The general
@@ -1397,14 +1403,61 @@ impl RenderCx<'_> {
     /// `items` entry's text.
     fn accordion_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let tree = self.tree;
+        let ring = self.ring();
         let sections = accordion::sections(tree, node)
             .into_iter()
-            .map(|(item, part)| {
+            .enumerate()
+            .map(|(ix, (item, part))| {
+                // shortcut: the crate's header button has no name and no Tab stop, so the title is
+                // a named label, and an enabled AccordionItem's title a button of its own that
+                // Enter and Space toggle; drop this when gpui-component names and focuses it.
+                let handle = part
+                    .filter(|_| !item.4 && node.props.get("disabled") != Some(&Value::Bool(true)))
+                    .and_then(|part| self.focusables.get(&part).cloned());
+                let spec = a11y::A11y {
+                    role: Some(if handle.is_some() {
+                        Role::Button
+                    } else {
+                        Role::Label
+                    }),
+                    label: Some(item.1.clone()),
+                    expanded: handle.is_some().then_some(item.3),
+                    ..Default::default()
+                };
+                let title = a11y::apply_stateful(
+                    &spec,
+                    div()
+                        .id(("accordion-title", ix))
+                        .flex_1()
+                        .child(SharedString::from(item.1.clone())),
+                );
+                let title = match handle {
+                    Some(handle) => {
+                        let (session, value, ring) =
+                            (self.session.clone(), item.0.clone(), ring.clone());
+                        title
+                            .rounded(self.theme.radius)
+                            .track_focus(&handle)
+                            .focus(move |style| style.shadow(vec![ring.clone()]))
+                            .on_key_down(move |event: &KeyDownEvent, _, cx| {
+                                if !matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    return;
+                                }
+                                session.update(cx, |session, cx| {
+                                    // The item is this render's, so it is there.
+                                    let _ = accordion::toggled(&mut session.tree, id, &value);
+                                    cx.notify();
+                                });
+                                cx.stop_propagation();
+                            })
+                    }
+                    None => title,
+                };
                 let content = match part.and_then(|part| tree.node(part)) {
                     Some(part) => self.message_part(part, div()).into_any_element(),
                     None => SharedString::from(item.2.clone()).into_any_element(),
                 };
-                (item, content)
+                (item, title.into_any_element(), content)
             })
             .collect();
         let accordion = accordion::build(id, node, self.session, sections);
