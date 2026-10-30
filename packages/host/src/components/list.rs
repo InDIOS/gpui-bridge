@@ -58,15 +58,31 @@ impl ListDelegate for Delegate {
         let tree = &self.session.read(cx).tree;
         let (item, node) = items(tree, self.id).nth(ix.row)?;
         let disabled = prop_bool(node, "disabled");
-        let label = crate::a11y::of(node).and_then(|spec| spec.label);
+        let a11y = crate::a11y::of(node);
+        let selected = position(tree, self.id) == Some(ix.row);
         let row = ListItem::new(("list-item", item)).disabled(disabled);
-        let row = match label {
-            Some(label) => row.accessibility_label(label),
-            None => row,
-        };
         // The crate stacks its children in a block; a row of them reads like a list entry.
-        let content = (self.render)(item, window, cx);
-        Some(row.child(h_flex().w_full().gap_2().items_center().children(content)))
+        let content = h_flex()
+            .w_full()
+            .gap_2()
+            .items_center()
+            .children((self.render)(item, window, cx));
+        // The crate's row node has the `ListItem` role but no name, and AccessKit does not name a
+        // list item from its children: `a11y` goes on the content, read as a `label` by default,
+        // and the selected row is the one a reader announces while the list has the focus.
+        let content = match a11y {
+            Some(mut spec) => {
+                spec.role.get_or_insert(Role::Label);
+                let content = crate::a11y::apply(&spec, item, content);
+                if selected {
+                    content.aria_active_descendant().into_any_element()
+                } else {
+                    content.into_any_element()
+                }
+            }
+            None => content.into_any_element(),
+        };
+        Some(row.child(content))
     }
 
     // The selection is the List's `value`, kept in the tree by `list_event`.

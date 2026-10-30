@@ -1536,8 +1536,12 @@ are **`ListItem` children** (the pattern of `Tab`, section 15), so a row can hol
 
 - A `ListItem` is `value` —required and not empty, it is what the events report— and
   `disabled`. Values should be unique within a list (with a repeat, the first row wins). Its
-  children are laid out in a row, and `a11y.label` names the row for a screen reader. Other
-  children of a `List` are not drawn.
+  children are laid out in a row. Other children of a `List` are not drawn.
+- A screen reader reads a row by its `a11y.label`: gpui-component gives the row the list item role
+  but no name, so the host puts `a11y` on the row's content (with the `label` role unless another is
+  given). While the list itself has the focus, moving the selection moves the reader to the
+  selected row. With `searchable` the focus stays in the search field, so the reader stays there
+  too and reads the rows only when browsing (scan mode). A row without `a11y.label` has no name.
 - Every row has the height of the first one (gpui-component measures one row); what is taller
   is cut. The list virtualizes its rows and fills its container, so give it a height (`h-64`,
   `flex-1`) with `class`. The client still sends every row as nodes, as with `VirtualList`.

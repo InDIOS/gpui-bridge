@@ -65,7 +65,7 @@ const feed = app
 function page() {
   for (let n = 0; n < 50; n++) {
     loaded++;
-    feed.append(app.listItem({ value: `f${loaded}` }).append(app.text({ content: `Event ${loaded}` })));
+    feed.append(app.listItem({ value: `f${loaded}`, a11y: { label: `Event ${loaded}` } }).append(app.text({ content: `Event ${loaded}` })));
   }
   feed.set({ loading: false, hasMore: loaded < 500 });
   app.commit();

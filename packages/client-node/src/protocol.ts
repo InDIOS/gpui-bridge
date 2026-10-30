@@ -1257,6 +1257,7 @@ export interface ListProps {
   class?: string;
 }
 
+/** A screen reader reads a row by its `a11y.label` (PROTOCOL.md section 27). */
 export interface ListItemProps {
   /** What the List's events report. Required: the host rejects a `ListItem` without it. */
   value?: string;
