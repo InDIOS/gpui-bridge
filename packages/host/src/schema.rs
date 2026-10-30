@@ -262,6 +262,11 @@ pub enum NodeType {
     // Dock (PROTOCOL.md section 28).
     Dock,
     DockPanel,
+    // Slots as children (ADR 0004): drawn by the node that holds them.
+    AccordionItem,
+    DialogFooter,
+    StatusBarLeft,
+    StatusBarRight,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -358,6 +363,10 @@ impl NodeType {
             "ListItem" => Some(Self::ListItem),
             "Dock" => Some(Self::Dock),
             "DockPanel" => Some(Self::DockPanel),
+            "AccordionItem" => Some(Self::AccordionItem),
+            "DialogFooter" => Some(Self::DialogFooter),
+            "StatusBarLeft" => Some(Self::StatusBarLeft),
+            "StatusBarRight" => Some(Self::StatusBarRight),
             _ => None,
         }
     }
@@ -449,6 +458,8 @@ impl NodeType {
             (Self::Collapsible, "open") => Some(Bool),
             (Self::Accordion, "items") => Some(Items),
             (Self::Accordion, "multiple" | "bordered") => Some(Bool),
+            (Self::AccordionItem, "id" | "title") => Some(Str),
+            (Self::AccordionItem, "open" | "disabled") => Some(Bool),
             (Self::Avatar, "name" | "src") => Some(Str),
             (Self::Stepper, "items") => Some(Options),
             (Self::Stepper, "value") => Some(Str),
@@ -624,20 +635,24 @@ impl NodeType {
         matches!(self, Self::Image | Self::Attachment)
     }
 
-    /// The props a node cannot be built without. Only a `Tab` and a `ListItem` have one: the
-    /// `value` they report (PROTOCOL.md sections 15 and 27). `props` is the whole message, so this
-    /// also rejects a `setProps` that removes or empties `value`.
+    /// The props a node cannot be built without: the `value` a `Tab` and a `ListItem` report and
+    /// the `id` an `AccordionItem` reports (PROTOCOL.md sections 15, 27 and 17). `props` is the
+    /// whole message, so this also rejects a `setProps` that removes or empties it.
     pub fn check_required(self, props: &Props) -> Result<(), String> {
-        if !matches!(self, Self::Tab | Self::ListItem)
-            || props
-                .get("value")
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.is_empty())
+        let key = match self {
+            Self::Tab | Self::ListItem => "value",
+            Self::AccordionItem => "id",
+            _ => return Ok(()),
+        };
+        if props
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty())
         {
             return Ok(());
         }
         Err(format!(
-            "A {} needs a non-empty 'value' string",
+            "A {} needs a non-empty '{key}' string",
             self.name()
         ))
     }
@@ -720,6 +735,10 @@ impl NodeType {
             Self::ListItem => "ListItem",
             Self::Dock => "Dock",
             Self::DockPanel => "DockPanel",
+            Self::AccordionItem => "AccordionItem",
+            Self::DialogFooter => "DialogFooter",
+            Self::StatusBarLeft => "StatusBarLeft",
+            Self::StatusBarRight => "StatusBarRight",
         }
     }
 }
@@ -803,6 +822,10 @@ pub const ALL: &[NodeType] = &[
     NodeType::ListItem,
     NodeType::Dock,
     NodeType::DockPanel,
+    NodeType::AccordionItem,
+    NodeType::DialogFooter,
+    NodeType::StatusBarLeft,
+    NodeType::StatusBarRight,
 ];
 
 #[cfg(test)]

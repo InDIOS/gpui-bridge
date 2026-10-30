@@ -236,6 +236,10 @@ Rules:
 | `ListItem`      | `value` (required), `disabled`                                 | —                  |
 | `Dock`          | `class`                                                        | —                  |
 | `DockPanel`     | `title`, `placement` (`center`, `left`, `right`, `bottom`), `closable` | `close`    |
+| `AccordionItem` | `id` (required), `title`, `open`, `disabled`, `class`          | —                  |
+| `DialogFooter`  | `class`                                                        | —                  |
+| `StatusBarLeft` | `class`                                                        | —                  |
+| `StatusBarRight` | `class`                                                       | —                  |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -246,6 +250,9 @@ the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPic
 `Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
 `MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`), `List` with
 its `ListItem` rows in section 27, and `Dock` with its `DockPanel` children in section 28.
+`AccordionItem`, `StatusBarLeft` and `StatusBarRight` are in section 17, `DialogFooter` in
+sections 14 and 24: each is a slot of the node that holds it and draws nothing elsewhere
+(`conformance/slots.txt`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -672,6 +679,10 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
   sends nothing.
 - One dialog at a time per window: if several are open, the one with the lowest id shows.
 - Changes to its props and to the body show while it is open.
+- A **DialogFooter** child replaces the OK/Cancel footer (`okText` and `cancelText` are then
+  ignored): its children (for example `Button`s, each with its own `click`) are the footer, and
+  its `class` styles it. The client closes the dialog with `open: false`; Escape, the X and a
+  click outside still send `cancel`. It is not part of the body; the last one wins.
 
 **notify** is an action (section 13): it shows a toast in a window now, not on `commit`.
 
@@ -687,7 +698,7 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.
 For another type, wrap it in a `div`.
 
-Not supported: several dialogs stacked, dialogs without the OK button or with more buttons,
+Not supported: several dialogs stacked (beyond an `AlertDialog` over a `Dialog`, section 24),
 notification actions (buttons inside a toast), and rich tooltips.
 
 ## 15. Lists, tables and tabs
@@ -885,10 +896,12 @@ components (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
   with the page, kept in `page` in synced mode.
 - **Collapsible** — shows its children while `open`; the trigger is the app's (a `Button` that
   sets `open`), so it has no event of its own.
-- **Accordion** — sections as `items`: `{"id", "title", "content", "open", "disabled"}`; the
-  content is **text** (a section that needs rich content uses a `Collapsible` with children).
-  `multiple` (default `false`), `bordered` (default `true`), `disabled`. A toggle sends `change`
-  with the section's `id` and, in synced mode, rewrites that item's `open`.
+- **Accordion** — sections as `items`: `{"id", "title", "content", "open", "disabled"}`, whose
+  content is text, or as **AccordionItem** children (`id`, required and not empty, `title`,
+  `open`, `disabled`), whose children are the content, styled by its `class`. With any
+  `AccordionItem` child, `items` is ignored (the host logs it once). `multiple` (default
+  `false`), `bordered` (default `true`), `disabled`. A toggle sends `change` with the section's
+  `id` and, in synced mode, rewrites its `open` (the `AccordionItem`'s, or the item's in `items`).
 - **Avatar** — a picture from `src` (an image file), or the initial of `name`.
 - **Stepper** — `items` as `RadioGroup`'s `options` (`value`, `label`, `disabled`), `value` is
   the current step, `vertical` stacks them. A click sends `change` with the step's `value`.
@@ -904,7 +917,9 @@ components (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
   its children are the content.
 - **DescriptionList** — key-value rows as `items` (`{"label", "value", "span"}`), `columns`
   (default 1), `bordered`, `horizontal` (label and value side by side).
-- **StatusBar** — `left` and `right` text.
+- **StatusBar** — `left` and `right` text. A **StatusBarLeft** (or **StatusBarRight**) child
+  replaces that side's text: its children go in a row on that side, styled by its `class` (the
+  last one wins). Other children are not drawn.
 - **Toolbar** — a strip for tools; its children are its content.
 - **Resizable** — panels the user can drag: `axis` (`horizontal` by default, or `vertical`) and
   `sizes`, the initial width (or height) in pixels of each panel in order; a panel without a
@@ -1319,7 +1334,8 @@ trigger opens.
   dismiss-by-click, so neither cancels. An open `AlertDialog` shows over an open `Dialog`, and
   closing it brings the `Dialog` back, with its contents as they were: that is how a confirmation
   is put on top of another dialog. The two share one layer, so a window still shows one dialog at
-  a time (the open `AlertDialog` wins; among equals, the lowest id).
+  a time (the open `AlertDialog` wins; among equals, the lowest id). A `DialogFooter` child
+  replaces its OK/Cancel buttons, as in a `Dialog` (Escape still sends `cancel`).
 - **Sheet** — a panel that slides in from `side` (`right` by default; `left`, `top`, `bottom`):
   `open`, `title` and `size` in pixels (default 350; the width on the sides, the height above and
   below). Its children are the scrollable body and `class` styles it. Closing it with its X,

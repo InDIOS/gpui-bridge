@@ -18,7 +18,7 @@ pub fn open(
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) {
-    let body = dialog::body(id, session, cx);
+    let body = dialog::body(id, false, session, cx);
     let placement = side(session, id, cx);
     let view = cx.entity().downgrade();
     let session = session.clone();

@@ -1,6 +1,7 @@
 //! Dialog nodes (`Dialog` and `AlertDialog`, PROTOCOL.md sections 14 and 24), shown with
 //! gpui-component's `open_dialog` so they get its overlay, Escape, focus trap and layout; the body
-//! is drawn by the window's `RootView`.
+//! is drawn by the window's `RootView`, and so is a `DialogFooter` child, which replaces the
+//! OK/Cancel footer.
 
 use gpui_kit::component::WindowExt;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -13,29 +14,33 @@ use crate::Session;
 use crate::components;
 use crate::components::basic;
 use crate::protocol::NodeId;
+use crate::schema::NodeType;
+use crate::tree::Tree;
 
-/// The body view: re-renders when the session changes.
+/// The body view, or the footer view of a `DialogFooter`: re-renders when the session changes.
 pub(super) struct Body {
     view: WeakEntity<RootView>,
     id: NodeId,
+    footer: bool,
     _observe: Subscription,
 }
 
 impl Render for Body {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let (id, owner) = (self.id, cx.entity().entity_id());
+        let (id, footer, owner) = (self.id, self.footer, cx.entity().entity_id());
         self.view
             .update(cx, |view, cx| {
-                view.render_dialog_body(id, owner, window, cx)
+                view.render_dialog_body(id, footer, owner, window, cx)
             })
             .unwrap_or_else(|_| div().into_any_element())
     }
 }
 
 /// One body per layer, shared by `Dialog`, `AlertDialog` and `Sheet`: the node's children, drawn
-/// by the window's `RootView`.
+/// by the window's `RootView`. With `footer`, its `DialogFooter`'s children instead.
 pub(super) fn body(
     id: NodeId,
+    footer: bool,
     session: &Entity<Session>,
     cx: &mut Context<RootView>,
 ) -> Entity<Body> {
@@ -43,8 +48,21 @@ pub(super) fn body(
     cx.new(|cx| Body {
         view,
         id,
+        footer,
         _observe: cx.observe(session, |_, _, cx| cx.notify()),
     })
+}
+
+/// Whether `id` is a `DialogFooter`.
+pub(super) fn is_footer(tree: &Tree, id: NodeId) -> bool {
+    tree.node(id)
+        .is_some_and(|node| node.node_type == NodeType::DialogFooter)
+}
+
+/// Whether the dialog `id` has a `DialogFooter` child.
+fn has_footer(tree: &Tree, id: NodeId) -> bool {
+    tree.node(id)
+        .is_some_and(|node| node.children.iter().any(|&child| is_footer(tree, child)))
 }
 
 pub fn open(
@@ -54,7 +72,8 @@ pub fn open(
     cx: &mut Context<RootView>,
 ) {
     let view = cx.entity().downgrade();
-    let body = body(id, session, cx);
+    let body = body(id, false, session, cx);
+    let footer = self::body(id, true, session, cx);
     let session = session.clone();
     // Runs again whenever the dialog layer rebuilds, so prop changes show while it is open.
     window.open_dialog(cx, move |dialog, _, cx| {
@@ -69,13 +88,19 @@ pub fn open(
             .node(id)
             .and_then(|node| node.props.get("width"))
             .and_then(Value::as_f64);
-        let mut footer = DialogFooter::new();
-        if let Some(cancel) = text("cancelText") {
-            footer = footer.child(DialogClose::new().child(Button::new("cancel").label(cancel)));
+        let mut dialog = dialog.child(body.clone());
+        if has_footer(tree, id) {
+            dialog = dialog.footer(footer.clone());
+        } else {
+            let mut footer = DialogFooter::new();
+            if let Some(cancel) = text("cancelText") {
+                let cancel = Button::new("cancel").label(cancel);
+                footer = footer.child(DialogClose::new().child(cancel));
+            }
+            let ok = text("okText").unwrap_or_else(|| "OK".into());
+            footer = footer.child(DialogAction::new().child(Button::new("ok").primary().label(ok)));
+            dialog = dialog.footer(footer);
         }
-        let ok = text("okText").unwrap_or_else(|| "OK".into());
-        footer = footer.child(DialogAction::new().child(Button::new("ok").primary().label(ok)));
-        let mut dialog = dialog.child(body.clone()).footer(footer);
         if let Some(title) = text("title") {
             dialog = dialog.title(title);
         }
@@ -99,7 +124,8 @@ pub fn open_alert(
     cx: &mut Context<RootView>,
 ) {
     let view = cx.entity().downgrade();
-    let body = body(id, session, cx);
+    let body = body(id, false, session, cx);
+    let footer = self::body(id, true, session, cx);
     let session = session.clone();
     // Runs again whenever the dialog layer rebuilds, so prop changes show while it is open.
     window.open_alert_dialog(cx, move |alert, _, cx| {
@@ -120,12 +146,16 @@ pub fn open_alert(
         if let Some(icon) = node.and_then(|node| basic::icon(node, "icon")) {
             alert = alert.icon(icon);
         }
-        // `cancelText` is what asks for the Cancel button, as in a `Dialog`; Escape cancels too.
-        if let Some(cancel) = text("cancelText") {
-            alert = alert.confirm().cancel_text(cancel);
-        }
-        if let Some(ok) = text("okText") {
-            alert = alert.ok_text(ok);
+        if has_footer(tree, id) {
+            alert = alert.footer(footer.clone());
+        } else {
+            // `cancelText` is what asks for the Cancel button, as in a `Dialog`; Escape cancels too.
+            if let Some(cancel) = text("cancelText") {
+                alert = alert.confirm().cancel_text(cancel);
+            }
+            if let Some(ok) = text("okText") {
+                alert = alert.ok_text(ok);
+            }
         }
         let (ok_session, ok_view) = (session.clone(), view.clone());
         let (cancel_session, cancel_view) = (session.clone(), view.clone());

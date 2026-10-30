@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::time::{Duration, Instant};
 
+use gpui_kit::component::dialog::DialogFooter;
 use gpui_kit::component::form::Field;
 use gpui_kit::component::menu::ContextMenuExt;
 use gpui_kit::component::message::{MessageFooter, MessageHeader};
@@ -688,10 +689,12 @@ impl RootView {
 
     /// A Dialog's children, for its body in the dialog layer, with the Dialog's classes on the
     /// container. Built like `render`, as a separate pass. `owner` is the body's own view, which is
-    /// the one that has to re-render when a `hover:` inside it changes.
+    /// the one that has to re-render when a `hover:` inside it changes. With `footer`, the
+    /// children of its `DialogFooter` (the last one wins, styled by its own `class`).
     fn render_dialog_body(
         &mut self,
         id: NodeId,
+        footer: bool,
         owner: EntityId,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -700,14 +703,40 @@ impl RootView {
         let Some(node) = ctx.tree.node(id) else {
             return div().into_any_element();
         };
+        if footer {
+            let tree = ctx.tree;
+            let part = node
+                .children
+                .iter()
+                .rev()
+                .find(|&&child| dialog::is_footer(tree, child))
+                .and_then(|&child| tree.node(child));
+            let footer = match part {
+                Some(part) => ctx
+                    .message_part(part, DialogFooter::new())
+                    .into_any_element(),
+                None => div().into_any_element(),
+            };
+            let animating = ctx.animating;
+            drop(ctx);
+            if animating {
+                self.clock.borrow_mut().next_frame(window, cx, owner);
+            }
+            return footer;
+        }
         let classes = ctx.styles.classes(
             node.props
                 .get("class")
                 .and_then(Value::as_str)
                 .unwrap_or(""),
         );
-        let children: Vec<AnyElement> =
-            node.children.iter().map(|&child| ctx.node(child)).collect();
+        // A `DialogFooter` is drawn in the footer (`render_dialog_footer`), not in the body.
+        let children: Vec<AnyElement> = node
+            .children
+            .iter()
+            .filter(|&&child| !dialog::is_footer(ctx.tree, child))
+            .map(|&child| ctx.node(child))
+            .collect();
         let body = ctx
             .style(id, div().flex().flex_col().gap_2(), &classes, false)
             .children(children);
@@ -1062,9 +1091,7 @@ impl RenderCx<'_> {
                 self.component(id, basic::pagination(id, node, self.session), &classes)
             }
             NodeType::Collapsible => self.collapsible_node(id, node, &classes),
-            NodeType::Accordion => {
-                self.component(id, accordion::build(id, node, self.session), &classes)
-            }
+            NodeType::Accordion => self.accordion_node(id, node, &classes),
             NodeType::Avatar => self.component(id, basic::avatar(node), &classes),
             NodeType::Stepper => {
                 self.component(id, basic::stepper(id, node, self.session), &classes)
@@ -1075,7 +1102,7 @@ impl RenderCx<'_> {
             NodeType::DescriptionList => {
                 self.component(id, layout::description_list(node), &classes)
             }
-            NodeType::StatusBar => self.component(id, layout::status_bar(node), &classes),
+            NodeType::StatusBar => self.status_bar_node(id, node, &classes),
             NodeType::Toolbar => self.toolbar_node(id, node, &classes),
             NodeType::Resizable => self.resizable_node(id, node, &classes),
             NodeType::Calendar => self.calendar_node(id, node, &classes),
@@ -1114,8 +1141,13 @@ impl RenderCx<'_> {
                 }
             }
             NodeType::Message => self.message_node(id, node, &classes),
-            // Drawn by their `Message`, like a `Tab` by its `Tabs`.
-            NodeType::MessageHeader | NodeType::MessageFooter => div().into_any_element(),
+            // Drawn by the node that holds them, like a `Tab` by its `Tabs`.
+            NodeType::MessageHeader
+            | NodeType::MessageFooter
+            | NodeType::AccordionItem
+            | NodeType::DialogFooter
+            | NodeType::StatusBarLeft
+            | NodeType::StatusBarRight => div().into_any_element(),
             NodeType::Marker => {
                 let children = self.children(node);
                 self.style(id, chat::marker(node, children), &classes, false)
@@ -1359,6 +1391,50 @@ impl RenderCx<'_> {
         }
         let message = chat::message(node, header, content, footer, ghost);
         self.style(id, message, classes, false).into_any_element()
+    }
+
+    /// An `Accordion`'s sections: an `AccordionItem`'s children, styled by its `class`, or an
+    /// `items` entry's text.
+    fn accordion_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let tree = self.tree;
+        let sections = accordion::sections(tree, node)
+            .into_iter()
+            .map(|(item, part)| {
+                let content = match part.and_then(|part| tree.node(part)) {
+                    Some(part) => self.message_part(part, div()).into_any_element(),
+                    None => SharedString::from(item.2.clone()).into_any_element(),
+                };
+                (item, content)
+            })
+            .collect();
+        let accordion = accordion::build(id, node, self.session, sections);
+        self.component(id, accordion, classes)
+    }
+
+    /// A `StatusBar` takes each side from a `StatusBarLeft`/`StatusBarRight` child (the last of
+    /// each wins, styled by its own `class`), else from the `left`/`right` text.
+    fn status_bar_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let (mut left, mut right) = (None, None);
+        for &child in &node.children {
+            match self.tree.node(child) {
+                Some(part) if part.node_type == NodeType::StatusBarLeft => left = Some(part),
+                Some(part) if part.node_type == NodeType::StatusBarRight => right = Some(part),
+                _ => {}
+            }
+        }
+        let side = |this: &mut Self, part: Option<&Node>, key| match part {
+            Some(part) => {
+                let row = div().flex().items_center().gap_2();
+                Some(this.message_part(part, row).into_any_element())
+            }
+            None => node
+                .props
+                .get(key)
+                .and_then(Value::as_str)
+                .map(|text| SharedString::from(text.to_owned()).into_any_element()),
+        };
+        let (left, right) = (side(self, left, "left"), side(self, right, "right"));
+        self.component(id, layout::status_bar(left, right), classes)
     }
 
     fn message_part<E: ParentElement + Styled>(&mut self, node: &Node, part: E) -> E {
