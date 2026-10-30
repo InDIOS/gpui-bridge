@@ -2100,3 +2100,47 @@ cambiaría nodos ya publicados quedó para M18.
 retraso perceptible y ventana real; `List` con 10 000 filas, árbol profundo (pila) y teclado;
 `a11y` de cada nodo con Narrator; `HISTORIAL.md` con la fase y el tamaño; `PROTOCOL_VERSION`
 en 1.
+
+### Fase 48 — M16: `Dock` (2026-10-30)
+
+Paneles que el usuario reordena: arrastra una pestaña a otro grupo o a un borde para dividir,
+cambia el tamaño de las divisiones y pliega los docks laterales. Dos nodos nuevos, `Dock` y
+`DockPanel` (PROTOCOL.md §28); `PROTOCOL_VERSION` sigue en 1. Decidido antes de programar en
+`docs/adr/0003-dock.md` (spike `516e4cc`, aprobado en `7d29a94`): el host posee el layout, el id
+del nodo `DockPanel` es el panel, el contenido son hijos-nodo y el layout vive en memoria.
+
+- **Paso 1 (host):** commit `a5f65e0`. `components/dock.rs`: un `DockArea` del crate por `Dock`
+  y una entidad por `DockPanel` que dibuja sus hijos con el mismo `RenderItem` de `List`. En cada
+  commit el host solo añade los paneles nuevos (en el primer grupo de su `placement`) y quita los
+  que ya no están; `setProps` nunca deshace lo que el usuario movió. `closable` + evento `close`
+  (como `Alert`), detectado por `Panel::on_removed`, que mover un panel no dispara; el panel
+  cerrado no vuelve mientras exista su nodo. Extra: el host quita el dock lateral que se queda
+  sin paneles (el crate lo dejaba como franja vacía). `conformance/dock.txt` y `simulate close`.
+  Ventana real manejada desde PowerShell: contenido y `setProps` en vivo, título en caliente,
+  añadir y quitar, arrastrar a un split con `setProps` corriendo y cerrar desde el menú.
+- **Paso 2 (clientes):** commit `9edb973`. Node (`dock`/`dockPanel`), React (`<Dock>`,
+  `<DockPanel onClose>`), Python (`dock`/`dock_panel`) y Go (`Dock`/`DockPanel`), una prueba
+  cada uno.
+- **Paso 3 (ejemplo):** commit `152ca19`, `examples/dock.ts` (Files a la izquierda, Notes y los
+  archivos abiertos en pestañas, Output abajo con una línea por segundo por `setProps`). Dos
+  arreglos tras la prueba del usuario: `a74cffd` (al cerrar la ventana el temporizador seguía
+  haciendo `commit` y lanzaba `HostExitedError`; ahora se para con `exit`) y `d8d9c97` (Narrator
+  leía los botones pero no las pestañas: el crate pone el título como hijo de `Tab` sin
+  `.label()` y AccessKit no nombra una pestaña por sus hijos; como en `List`, el título es un
+  `label` con nombre propio). El usuario probó a mano abrir, cerrar y mover paneles y lo
+  confirmó con Narrator.
+- **Pruebas:** host 74 unitarios + transcripciones + `no_window`, `fmt`/`clippy` limpios;
+  29 Node, 27 React, 29 Python y Go en verde.
+- **Tamaño del host release:** 21.151.232 → **21.371.904 B** (+220.672 B), medido en `152ca19`.
+- **Pendiente en el crate:** la pestaña (`TabItem`) sigue sin nombre propio y los botones de
+  cerrar y plegar no tienen nombre; al hacer clic en un panel sale el aviso «focused element …
+  has no accessibility node» (probablemente el marco con foco del grupo de pestañas en
+  gpui-base, sin confirmar). La prueba automática con ratón se dejó: con el escritorio del
+  usuario en uso los clics caían en otra ventana.
+- **Fuera (ADR §7):** persistencia en disco, operaciones de layout desde el cliente (mover,
+  seleccionar, tamaños), eventos de pestaña activa y de plegar, vetar un cierre, tamaño inicial
+  de los docks laterales, bloqueo, las ranuras `title_suffix`/`toolbar_buttons`/`dropdown_menu` y
+  `Dock` dentro de un `DockPanel`.
+
+**Criterio de aceptación:** ADR con decisión; paneles con contenido del cliente que el usuario
+arrastra sin que `setProps` y el layout se pisen. Cumplido.
