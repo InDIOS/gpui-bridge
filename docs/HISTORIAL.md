@@ -2029,3 +2029,67 @@ ejemplo con ventana real y Narrator, `HISTORIAL.md` con la fase y el tamaño, `P
 en 1.
 
 
+### Fase 47 — M15: chat y listas (2026-10-29)
+
+Ocho nodos de chat y una lista de gpui-kit 0.8: `Bubble`, `Message` (con `MessageHeader` y
+`MessageFooter`), `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`, y `List` con sus
+filas `ListItem`. Todo aditivo: `PROTOCOL_VERSION` sigue en 1 (PROTOCOL.md §26 y §27). Las
+decisiones D1–D7 se aprobaron con el usuario antes de programar (`DECISIONES-M15.md`); lo que
+cambiaría nodos ya publicados quedó para M18.
+
+- **Fase 1 (presentacionales):** commit `e8b2b05`. Rehecho desde cero un borrador sin commitear
+  que no compilaba y no seguía las decisiones. `Bubble`, `Message` con cabecera y pie como
+  hijos-nodo (D2, opción C, patrón `Tab`), `Marker` y `Attachment` presentacional y controlado
+  (el estado lo lleva el cliente; `click`/`remove`/`retry` solo con suscripción) en
+  `components/chat.rs`. `conformance/chat.txt`. Release 20.302.848 → 20.665.344 B.
+- **Fase 2 (`MessageScroller`):** commits `a3a1a3b` y `1554123`. La `list` de GPUI con alto
+  variable y anclada al final; un estado por nodo y, por commit, un `splice` de lo que cambió
+  entre el principio y el final comunes (agregar, anteponer o quitar conserva la posición de
+  lectura). 10 000 mensajes (30 000 nodos) en 242 ms con el host release y streaming sin
+  solapes, sin `remeasure`. Hallazgo del usuario: al arrastrar la barra el contenido da saltos
+  (GPUI cuenta como 0 px las filas no dibujadas y el crate no deja estimarlas); documentado.
+  Release 20.725.760 B.
+- **Fase 3 (`Questionnaire`):** commit `614b2b2`. Preguntas de una en una desde la prop `items`
+  (validada: nombres y valores únicos, un solo `selected` sin `multiple`); el crate lleva el
+  estado, la navegación y `required`; el host reporta `change` con `{name, status, choices,
+  text}` y `submit` con todas. D6 recortado con el usuario: sin respuestas puestas por el
+  cliente, `errors`, `current` ni atajos. Release 21.018.112 B.
+- **Fase 4 (clientes y ejemplo):** commit `8db2d77` y cuatro arreglos tras la ventana real y el
+  Narrator del usuario: `0a2649c` (cada mensaje con `a11y`), `c18f564` (un `Bubble` con `a11y`
+  conserva su lado y su ancho), `0c0df83` (la rueda vuelve a llegar al final: el padding de la
+  lista quedaba fuera del chequeo de GPUI) y `f8fad4e` (un `text` con rol y sin `label` toma su
+  contenido como nombre; el rol `label` pasa su texto como valor, porque AccessKit nombra un
+  `label` desde el valor). `examples/chat.ts`. El usuario leyó la conversación con Narrator en
+  modo de examen.
+- **Fase 5 (`List`):** commits `fece703` y `403e1ee`. Eventos aprobados al empezar (D7 E1–E6,
+  más `loadMoreThreshold` a pedido del usuario): filas como hijos `ListItem` con `value` y
+  `disabled`; `change` con flechas o clic (`null` con Escape) en modo sincronizado o
+  `controlled`; `confirm` con Enter o clic; `query` con el texto del buscador (el cliente manda
+  las filas que coinciden); `loadMore` una vez por número de filas mientras haya `hasMore`. Sin
+  `cancel` y sin `ListSection` (a la cola). `ListState` del crate con un delegate que lee las
+  filas del árbol y las pinta con el mismo pase de `VirtualList`; las flechas saltan filas
+  deshabilitadas; la lista acepta `focus`. `conformance/list.txt`, `simulate`, una prueba por
+  cliente y `examples/list.ts`. Hallazgos en la ventana: el `ListItem` del crate apila sus hijos
+  (el host los pone en fila) y deja su etiqueta en un elemento sin rol, así que el lector leía
+  las filas sin nombre (Narrator del usuario); el host pone el `a11y` de la fila en su contenido
+  y marca la seleccionada como descendiente activo. Con `searchable` el foco queda en el
+  buscador y el lector no sigue a las flechas (limitación del crate, en §27). Va en el mismo
+  commit el arreglo de `scripts/dev.mjs`: `pnpm dev react/todo` compilaba y salía sin abrir el
+  ejemplo.
+- **Ventana real con el host release (`list`):** flechas, Enter, Escape y clic (el clic manda
+  `change` y luego `confirm`), filas deshabilitadas saltadas (c96 → c98), búsqueda de 10 a
+  80 ms por tecla con 10 000 filas, final de las 10 000 filas sin cortes, una fila de 40 niveles
+  sin desbordar la pila, `loadMore` a las 50, 100 y 150 filas. Con el host de depuración la
+  búsqueda tarda segundos: mover una fila ya colocada recorre los hijos del padre (`retain`),
+  coste anterior a `List` que no se tocó. UIA: cada fila con nombre y el foco sigue a las
+  flechas en la lista sin buscador. El usuario repitió con Narrator: todo se lee bien.
+- **Pruebas:** host 74 unitarios + transcripciones + `no_window`, `fmt`/`clippy` limpios;
+  28 Node, 26 React, 28 Python y Go en verde.
+- **Tamaño del host release:** 20.302.848 → **21.151.232 B** (+848.384 B, +0,85 MB, por debajo del
+  umbral de ~1 MB).
+- **Sin probar:** Escape con una `List` dentro de un `Dialog` (la frase se quitó de §27).
+
+**Criterios de aceptación:** un ejemplo de chat con los seis primeros, 10 000 mensajes sin
+retraso perceptible y ventana real; `List` con 10 000 filas, árbol profundo (pila) y teclado;
+`a11y` de cada nodo con Narrator; `HISTORIAL.md` con la fase y el tamaño; `PROTOCOL_VERSION`
+en 1.
