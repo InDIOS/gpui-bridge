@@ -40,19 +40,27 @@ const env = { ...process.env, GPUI_BRIDGE_HOST: host };
 // Which host a manual test is running: a stale binary looks exactly like a broken feature.
 if (extra.includes("--debug")) console.log(`gpui-bridge host: ${host}`);
 
-function run(command, commandArgs) {
-  const result = spawnSync(command, commandArgs, { cwd: root, env, stdio: "inherit", shell: process.platform === "win32" });
-  process.exit(result.status ?? 1);
+// Exits only on failure, so a build step can run before the example. No shell for the
+// example itself: on Windows it would split a checkout path with spaces (and Node warns, DEP0190).
+function run(command, commandArgs, shell = false) {
+  const result = spawnSync(command, commandArgs, { cwd: root, env, stdio: "inherit", shell });
+  if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-const isTsx = name.endsWith(".tsx") || existsSync(join(root, "examples", `${name}.tsx`));
+const file = name.endsWith(".py") || /\.(tsx?|js)$/.test(name) ? name
+  : existsSync(join(root, "examples", `${name}.tsx`)) ? `${name}.tsx` : `${name}.ts`;
+// Checked before any build, so a typo does not cost a React compile.
+if (!existsSync(join(root, "examples", file))) {
+  console.error(`example not found: examples/${file}`);
+  process.exit(1);
+}
 
-if (name.endsWith(".py")) {
-  run("python", [join("examples", name), ...extra]);
-} else if (isTsx) {
-  run("pnpm", ["--filter", "gpui-bridge-examples", "build:react"]);
-  run("node", [join("examples", "dist", name.replace(/\.tsx$/, ".js")), ...extra]);
+if (file.endsWith(".py")) {
+  run("python", [join("examples", file), ...extra]);
+} else if (file.endsWith(".tsx")) {
+  // pnpm is a .cmd on Windows, which Node only spawns through a shell; one string, no paths.
+  run("pnpm --filter gpui-bridge-examples build:react", [], true);
+  run("node", [join("examples", "dist", file.replace(/\.tsx$/, ".js")), ...extra]);
 } else {
-  const file = /\.(ts|js)$/.test(name) ? name : `${name}.ts`;
   run("node", [join("examples", file), ...extra]);
 }

@@ -78,7 +78,9 @@ export type NodeType =
   | "Marker"
   | "Attachment"
   | "MessageScroller"
-  | "Questionnaire";
+  | "Questionnaire"
+  | "List"
+  | "ListItem";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -1236,6 +1238,32 @@ export interface QuestionnaireProps {
   class?: string;
 }
 
+// List (PROTOCOL.md section 27).
+
+export interface ListProps {
+  /** The selected row's `value`; one that is not among the rows selects nothing. */
+  value?: string;
+  /** The host only reports selections; the client confirms them with `value`. */
+  controlled?: boolean;
+  /** A search field above the rows: each edit sends `query`, and the client sends the matching rows. */
+  searchable?: boolean;
+  placeholder?: string;
+  /** Near the end, the list sends `loadMore` (once per row count). */
+  hasMore?: boolean;
+  /** How many rows before the end `loadMore` is sent; default 20. */
+  loadMoreThreshold?: number;
+  /** Shows a skeleton instead of the rows. */
+  loading?: boolean;
+  class?: string;
+}
+
+export interface ListItemProps {
+  /** What the List's events report. Required: the host rejects a `ListItem` without it. */
+  value?: string;
+  /** Neither selected nor confirmed; the arrow keys pass over it. */
+  disabled?: boolean;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1309,6 +1337,8 @@ export interface NodeProps {
   Attachment: AttachmentProps & SharedProps;
   MessageScroller: MessageScrollerProps & SharedProps;
   Questionnaire: QuestionnaireProps & SharedProps;
+  List: ListProps & SharedProps;
+  ListItem: ListItemProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1411,4 +1441,7 @@ export interface NodeEvents {
   MessageScroller: {};
   /** `change` sends one answer; `submit` all of them, in question order. */
   Questionnaire: { change: { value: QuestionnaireAnswer }; submit: { value: QuestionnaireAnswer[] } };
+  /** `change` sends the selected row's `value` (`null`: Escape); `query` the search text; `loadMore` nothing. */
+  List: { change: { value: string | null }; confirm: { value: string }; query: { value: string }; loadMore: {} };
+  ListItem: {};
 }

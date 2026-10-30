@@ -535,6 +535,20 @@ class App:
         the list of answers."""
         return self._create("Questionnaire", props)
 
+    # List (PROTOCOL.md section 27).
+
+    def list(self, **props) -> Node:
+        """A selectable list over its `list_item` children: `value`, `controlled`, `searchable`,
+        `placeholder`, `hasMore`, `loadMoreThreshold`, `loading`. `change` passes the selected
+        row's value (None: Escape), `confirm` the confirmed one, `query` the search text (send
+        the matching rows); `loadMore` asks for more rows."""
+        return self._create("List", props)
+
+    def list_item(self, **props) -> Node:
+        """A `list` row: `value` (required) is what the list reports, `disabled`. The children
+        are the content."""
+        return self._create("ListItem", props)
+
     def alert_dialog(self, **props) -> Node:
         """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
         children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""

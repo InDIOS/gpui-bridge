@@ -123,3 +123,5 @@ func (a *App) Marker(props Props) *Node          { return a.Create("Marker", pro
 func (a *App) Attachment(props Props) *Node      { return a.Create("Attachment", props) }
 func (a *App) MessageScroller(props Props) *Node { return a.Create("MessageScroller", props) }
 func (a *App) Questionnaire(props Props) *Node   { return a.Create("Questionnaire", props) }
+func (a *App) List(props Props) *Node            { return a.Create("List", props) }
+func (a *App) ListItem(props Props) *Node        { return a.Create("ListItem", props) }

@@ -671,6 +671,16 @@ export class App {
     return this.create("Questionnaire", props);
   }
 
+  /** A selectable list over its `ListItem` children: `change`, `confirm`, `query` and `loadMore`. */
+  list(props: NodeProps["List"] = {}) {
+    return this.create("List", props);
+  }
+
+  /** A `List` row: `value` is what the events report; its children are the content. */
+  listItem(props: NodeProps["ListItem"] = {}) {
+    return this.create("ListItem", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

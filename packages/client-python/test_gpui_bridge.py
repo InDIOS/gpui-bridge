@@ -363,6 +363,33 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, ["click", "remove", "retry", ("change", answer), ("submit", [answer])])
 
+    def test_list_is_accepted_and_reports_its_events(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        rows = app.list(value="a", searchable=True, placeholder="Search", hasMore=True, loadMoreThreshold=5)
+        rows.on("change", lambda value: seen.append(("change", value)))
+        rows.on("confirm", lambda value: seen.append(("confirm", value)))
+        rows.on("query", lambda value: seen.append(("query", value)))
+        rows.on("loadMore", lambda: seen.append("loadMore"))
+        rows.append(
+            app.list_item(value="a").append(app.text(content="Apple")),
+            app.list_item(value="b", disabled=True).append(app.text(content="Banana")),
+        )
+        app.window(root=app.div(class_="size-full flex flex-col").append(rows))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": rows.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": rows.id, "event": "confirm", "value": "a"})
+        app._dispatch({"type": "event", "id": rows.id, "event": "query", "value": "ap"})
+        app._dispatch({"type": "event", "id": rows.id, "event": "loadMore"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("change", None), ("confirm", "a"), ("query", "ap"), "loadMore"])
+
     def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
         app = App(headless=True)
         errors = []

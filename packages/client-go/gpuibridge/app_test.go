@@ -303,6 +303,73 @@ func TestChatNodesDispatchEvents(t *testing.T) {
 	}
 }
 
+func TestListDispatchesEvents(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(name string) func(any) {
+		return func(payload any) {
+			mu.Lock()
+			seen = append(seen, []any{name, payload.(map[string]any)["value"]})
+			mu.Unlock()
+		}
+	}
+
+	list := app.List(Props{"value": "a", "searchable": true, "hasMore": true, "loadMoreThreshold": 5}).
+		On("change", add("change")).On("confirm", add("confirm")).
+		On("query", add("query")).On("loadMore", add("loadMore")).
+		Append(
+			app.ListItem(Props{"value": "a"}).Append(app.Text(Props{"content": "Apple"})),
+			app.ListItem(Props{"value": "b"}).Append(app.Text(Props{"content": "Banana"})),
+		)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(list)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []struct {
+		event    string
+		value    any
+		hasValue bool
+	}{
+		{"confirm", "b", true},
+		{"query", "ap", true},
+		{"loadMore", nil, false},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(list.ID(), s.event, s.value, s.hasValue); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Confirming another row selects it first: one more event than steps.
+	want := []any{
+		[]any{"change", "b"}, []any{"confirm", "b"}, []any{"query", "ap"}, []any{"loadMore", nil},
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(want) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(want), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
+	}
+}
+
 func TestMissingHostBinaryFails(t *testing.T) {
 	_, err := NewApp(AppOptions{HostPath: "does-not-exist.exe", Headless: true})
 	if err == nil {

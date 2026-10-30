@@ -187,6 +187,8 @@ const EVENT_PROPS: Record<string, string> = {
   onCopied: "copied",
   onRemove: "remove",
   onRetry: "retry",
+  onQuery: "query",
+  onLoadMore: "loadMore",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -220,7 +222,7 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
   if (type === "NumberInput" || type === "OtpInput" || type === "InputGroup") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
-  if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
+  if (type === "Tree" || type === "Carousel" || type === "Sidebar" || type === "List") wire.controlled = props.value !== undefined;
   if (type === "Checkbox" || type === "Switch" || type === "Toggle") wire.controlled = props.checked !== undefined;
   if (type === "DatePicker" || type === "TimeField" || type === "ColorPicker" || type === "Combobox") wire.controlled = props.value !== undefined;
   return { wire, handlers };
@@ -232,7 +234,7 @@ function subscribe(instance: Instance, event: string): void {
   node.on(event, (payload: { value?: string | number | null | string[]; checked?: boolean; item?: string; key?: string; paths?: string[] }) => {
     const handler = instance.handlers.get(event);
     if (!handler) return;
-    if (event === "click" || event === "ok" || event === "cancel" || event === "close") handler();
+    if (event === "click" || event === "ok" || event === "cancel" || event === "close" || event === "loadMore") handler();
     // A Table's double click carries the row.
     else if (event === "doubleClick") instance.type === "Table" ? handler(payload.value) : handler();
     else if (event === "sort") handler(payload);
@@ -391,6 +393,10 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.messageScroller(wire);
     case "Questionnaire":
       return app.questionnaire(wire);
+    case "List":
+      return app.list(wire);
+    case "ListItem":
+      return app.listItem(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

@@ -199,6 +199,33 @@ test("the chat nodes are accepted and report their events", async () => {
   assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
 });
 
+test("a List with ListItem rows is accepted and reports its events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const list = app
+    .list({ value: "a", searchable: true, placeholder: "Search", hasMore: true, loadMoreThreshold: 5 })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("confirm", ({ value }) => seen.push(["confirm", value]))
+    .on("query", ({ value }) => seen.push(["query", value]))
+    .on("loadMore", () => seen.push("loadMore"))
+    .append(
+      app.listItem({ value: "a" }).append(app.text({ content: "Apple" })),
+      app.listItem({ value: "b", disabled: true }).append(app.icon({ name: "star" }), app.text({ content: "Banana" })),
+    );
+  app.window({ root: app.div({ class: "size-full flex flex-col" }).append(list) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: list.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: list.id, event: "confirm", value: "a" });
+  app.handleMessage({ type: "event", id: list.id, event: "query", value: "ap" });
+  app.handleMessage({ type: "event", id: list.id, event: "loadMore" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["change", null], ["confirm", "a"], ["query", "ap"], "loadMore"]);
+});
+
 test("the form controls with state are accepted and report typed values", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

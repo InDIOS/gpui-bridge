@@ -29,6 +29,7 @@ use crate::components::command::{self, CommandSlot};
 use crate::components::date_picker::{self, DatePickerSlot};
 use crate::components::diff::{self, DiffSlot};
 use crate::components::input::{self, InputSlot};
+use crate::components::list::{self, ListSlot};
 use crate::components::otp::{self, OtpSlot};
 use crate::components::questionnaire::{self, QuestionnaireSlot};
 use crate::components::select::{self, SelectSlot};
@@ -75,6 +76,8 @@ pub struct RootView {
     charts: HashMap<NodeId, ChartSlot>,
     /// One per Command: the query and highlight the user typed and moved.
     commands: HashMap<NodeId, CommandSlot>,
+    /// One per List: its selection, scroll position and search field.
+    list_states: HashMap<NodeId, ListSlot>,
     questionnaires: HashMap<NodeId, QuestionnaireSlot>,
     /// One per MessageScroller: its scroll state and the rows it was last given.
     scrollers: HashMap<NodeId, chat::ScrollerSlot>,
@@ -160,6 +163,7 @@ impl RootView {
             carousels: HashMap::new(),
             charts: HashMap::new(),
             commands: HashMap::new(),
+            list_states: HashMap::new(),
             scrollers: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
@@ -320,6 +324,7 @@ impl RootView {
         let carousels = carousel::snapshot(tree, &members);
         let charts = chart::snapshot(tree, &members);
         let commands = command::snapshot(tree, &members);
+        let list_snapshot = list::snapshot(tree, &members);
         // Only a commit changes the rows of a MessageScroller.
         let scrollers = (tree.commits() != self.applied_commit).then(|| {
             members
@@ -412,6 +417,20 @@ impl RootView {
         carousel::sync(&mut self.carousels, carousels, &self.session, cx);
         chart::sync(&mut self.charts, charts, &self.session, cx);
         command::sync(&mut self.commands, commands, window, cx);
+        // Weak: the list states live in this view, so a strong handle would never be dropped.
+        let view = cx.weak_entity();
+        let render: list::RenderItem = Rc::new(move |item, window, cx| {
+            view.update(cx, |view, cx| view.render_item(item, window, cx))
+                .unwrap_or_default()
+        });
+        list::sync(
+            &mut self.list_states,
+            list_snapshot,
+            &self.session,
+            &render,
+            window,
+            cx,
+        );
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
@@ -518,6 +537,8 @@ impl RootView {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.commands.get(&id) {
                 slot.focus(window, cx);
+            } else if let Some(slot) = self.list_states.get(&id) {
+                slot.focus(window, cx);
             }
             self.session
                 .update(cx, |session, _| session.tree.clear_focus_request());
@@ -563,6 +584,7 @@ impl RootView {
             carousels: &self.carousels,
             charts: &self.charts,
             commands: &self.commands,
+            list_states: &self.list_states,
             scrollers: &self.scrollers,
             lists: &self.lists,
             texts: &mut self.texts,
@@ -588,20 +610,46 @@ impl RootView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
+        // A one-cell grid stretches each row to the list's width and `rowHeight`, as a list item is.
+        self.list_pass(window, cx, |ctx| {
+            rows.iter()
+                .map(|&row| {
+                    div()
+                        .grid()
+                        .size_full()
+                        .child(ctx.node(row))
+                        .into_any_element()
+                })
+                .collect()
+        })
+    }
+
+    /// The content of one List row: its `ListItem`'s children (the crate's item lays them out).
+    fn render_item(
+        &mut self,
+        item: NodeId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        self.list_pass(window, cx, |ctx| {
+            let tree = ctx.tree;
+            tree.node(item)
+                .map(|node| ctx.children(node))
+                .unwrap_or_default()
+        })
+    }
+
+    /// Builds rows for the list being drawn now, and keeps their animations running.
+    fn list_pass<T>(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        build: impl FnOnce(&mut RenderCx) -> T,
+    ) -> T {
         // The view this pass belongs to: the list's, which draws its rows.
         let owner = window.current_view();
         let mut ctx = self.render_cx(cx, owner);
-        // A one-cell grid stretches each row to the list's width and `rowHeight`, as a list item is.
-        let rows = rows
-            .iter()
-            .map(|&row| {
-                div()
-                    .grid()
-                    .size_full()
-                    .child(ctx.node(row))
-                    .into_any_element()
-            })
-            .collect();
+        let rows = build(&mut ctx);
         let animating = ctx.animating;
         drop(ctx);
         if animating {
@@ -888,6 +936,7 @@ struct RenderCx<'a> {
     carousels: &'a HashMap<NodeId, CarouselSlot>,
     charts: &'a HashMap<NodeId, ChartSlot>,
     commands: &'a HashMap<NodeId, CommandSlot>,
+    list_states: &'a HashMap<NodeId, ListSlot>,
     scrollers: &'a HashMap<NodeId, chat::ScrollerSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
@@ -1063,6 +1112,12 @@ impl RenderCx<'_> {
                 Some(slot) => self.blocking(id, questionnaire::build(node, slot), &classes),
                 None => div().into_any_element(),
             },
+            NodeType::List => match self.list_states.get(&id) {
+                Some(slot) => self.blocking(id, list::build(node, slot), &classes),
+                None => div().into_any_element(),
+            },
+            // Drawn by its `List`, like a `Tab` by its `Tabs`.
+            NodeType::ListItem => div().into_any_element(),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).

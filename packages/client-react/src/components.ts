@@ -521,3 +521,23 @@ export type QuestionnaireProps = NodeProps["Questionnaire"] & {
   onSubmit?: (answers: QuestionnaireAnswer[]) => void;
 };
 export const Questionnaire = "Questionnaire" as unknown as HostComponent<QuestionnaireProps>;
+
+// List (PROTOCOL.md section 27).
+
+/**
+ * A selectable list over its `ListItem` children. Passing `value` makes the selection controlled.
+ * `onQuery` gets the search text (render the matching rows); `onLoadMore` asks for more rows.
+ */
+export type ListProps = NodeProps["List"] & {
+  value?: string | null;
+  onChange?: (value: string | null) => void;
+  onConfirm?: (value: string) => void;
+  onQuery?: (query: string) => void;
+  onLoadMore?: () => void;
+  children?: ReactNode;
+};
+export const List = "List" as unknown as HostComponent<ListProps>;
+
+/** A `List` row: `value` is what the list reports; its children are the content. */
+export type ListItemProps = NodeProps["ListItem"] & { children?: ReactNode };
+export const ListItem = "ListItem" as unknown as HostComponent<ListItemProps>;

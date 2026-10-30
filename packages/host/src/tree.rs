@@ -440,6 +440,7 @@ impl Tree {
                         | NodeType::Div
                         | NodeType::Table
                         | NodeType::Command
+                        | NodeType::List
                 ) {
                     return Err(fail(
                         ErrorCode::InvalidOperation,

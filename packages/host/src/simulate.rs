@@ -202,6 +202,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Settings, "change")
             | (NodeType::Attachment, "click" | "remove" | "retry")
             | (NodeType::Questionnaire, "change" | "submit")
+            | (NodeType::List, "change" | "confirm" | "query" | "loadMore")
     );
     if !known {
         return Err(fail(
@@ -668,6 +669,39 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             }
         }
         // An entry of a Command: an unknown id is an error; a disabled one does nothing.
+        // A row by its `value` (`null` for `change`: Escape clears it); a disabled row does
+        // nothing, and confirming selects the row first, as a click does.
+        (NodeType::List, "change" | "confirm") => {
+            let value = match &sim.value {
+                Some(Value::Null) | None if sim.event == "change" => None,
+                _ => Some(text()?),
+            };
+            if let Some(value) = &value {
+                match components::list::find(tree, id, value) {
+                    None => {
+                        return Err(fail(
+                            ErrorCode::InvalidOperation,
+                            format!("List {id} has no row '{value}'"),
+                        ));
+                    }
+                    Some(true) => return Ok(Outcome::Done),
+                    Some(false) => {}
+                }
+            }
+            if node.props.get("value").and_then(Value::as_str) != value.as_deref() {
+                components::list::selected(tree, id, value.as_deref());
+            }
+            if let (Some(value), "confirm") = (&value, sim.event.as_str()) {
+                components::list::confirmed(tree, id, value);
+            }
+        }
+        (NodeType::List, "query") => components::list::searched(tree, id, &text()?),
+        // The window asks only while `hasMore` is set.
+        (NodeType::List, _) => {
+            if node.props.get("hasMore") == Some(&Value::Bool(true)) {
+                components::list::more(tree, id);
+            }
+        }
         (NodeType::Command, "confirm") => {
             let entry = text()?;
             let sections = components::command::sections(node);

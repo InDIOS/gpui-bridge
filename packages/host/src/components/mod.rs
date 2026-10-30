@@ -21,6 +21,7 @@ pub mod diff;
 pub mod input;
 pub mod keyboard;
 pub mod layout;
+pub mod list;
 pub mod menu;
 pub mod otp;
 pub mod overlays;

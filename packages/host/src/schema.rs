@@ -257,6 +257,8 @@ pub enum NodeType {
     Attachment,
     MessageScroller,
     Questionnaire,
+    List,
+    ListItem,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -349,6 +351,8 @@ impl NodeType {
             "Attachment" => Some(Self::Attachment),
             "MessageScroller" => Some(Self::MessageScroller),
             "Questionnaire" => Some(Self::Questionnaire),
+            "List" => Some(Self::List),
+            "ListItem" => Some(Self::ListItem),
             _ => None,
         }
     }
@@ -554,6 +558,11 @@ impl NodeType {
             (Self::MessageScroller, "scrollbar" | "jumpButton") => Some(Bool),
             (Self::MessageScroller, "jumpLabel") => Some(Str),
             (Self::Questionnaire, "items") => Some(Questions),
+            (Self::List, "value" | "placeholder") => Some(Str),
+            (Self::List, "searchable" | "hasMore" | "loading") => Some(Bool),
+            (Self::List, "loadMoreThreshold") => Some(Index),
+            (Self::ListItem, "value") => Some(Str),
+            (Self::ListItem, "disabled") => Some(Bool),
             (
                 Self::Input
                 | Self::Checkbox
@@ -572,6 +581,7 @@ impl NodeType {
                 | Self::Tree
                 | Self::Carousel
                 | Self::Sidebar
+                | Self::List
                 | Self::Toggle
                 | Self::InputGroup,
                 "controlled",
@@ -606,11 +616,11 @@ impl NodeType {
         matches!(self, Self::Image | Self::Attachment)
     }
 
-    /// The props a node cannot be built without. Only a `Tab` has one: the `value` it reports
-    /// (PROTOCOL.md section 15). `props` is the whole message, so this also rejects a `setProps`
-    /// that removes or empties `value`.
+    /// The props a node cannot be built without. Only a `Tab` and a `ListItem` have one: the
+    /// `value` they report (PROTOCOL.md sections 15 and 27). `props` is the whole message, so this
+    /// also rejects a `setProps` that removes or empties `value`.
     pub fn check_required(self, props: &Props) -> Result<(), String> {
-        if self != Self::Tab
+        if !matches!(self, Self::Tab | Self::ListItem)
             || props
                 .get("value")
                 .and_then(Value::as_str)
@@ -618,7 +628,10 @@ impl NodeType {
         {
             return Ok(());
         }
-        Err("A Tab needs a non-empty 'value' string".into())
+        Err(format!(
+            "A {} needs a non-empty 'value' string",
+            self.name()
+        ))
     }
 
     pub fn name(self) -> &'static str {
@@ -695,6 +708,8 @@ impl NodeType {
             Self::Attachment => "Attachment",
             Self::MessageScroller => "MessageScroller",
             Self::Questionnaire => "Questionnaire",
+            Self::List => "List",
+            Self::ListItem => "ListItem",
         }
     }
 }
@@ -774,6 +789,8 @@ pub const ALL: &[NodeType] = &[
     NodeType::Attachment,
     NodeType::MessageScroller,
     NodeType::Questionnaire,
+    NodeType::List,
+    NodeType::ListItem,
 ];
 
 #[cfg(test)]

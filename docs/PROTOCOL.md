@@ -232,6 +232,8 @@ Rules:
 | `Attachment` | `status` (`pending`, `uploading`, `processing`, `failed`, `complete`), `progress`, `title`, `description`, `tooltip`, `axis` (`horizontal`, `vertical`), `src`, `data`, `class` | `click`, `remove`, `retry` |
 | `MessageScroller` | `scrollbar`, `jumpButton`, `jumpLabel`, `class`             | —                  |
 | `Questionnaire` | `items`, `class`                                              | `change`, `submit` |
+| `List`          | `value`, `controlled`, `searchable`, `placeholder`, `hasMore`, `loading`, `loadMoreThreshold`, `class` | `change`, `confirm`, `query`, `loadMore` |
+| `ListItem`      | `value` (required), `disabled`                                 | —                  |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -240,7 +242,8 @@ section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
 `Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
 the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
 `Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
-`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`).
+`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`), and `List` with
+its `ListItem` rows in section 27.
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -604,7 +607,7 @@ with exactly those modifiers.
 - `doubleClick` (opt-in) on a `div` is sent on the second click of a double click; both
   clicks also send `click`.
 - `focus` gives the keyboard focus to an `Input`, a `Textarea`, a `NumberInput`, an `OtpInput`, a
-  `Calendar`, a `Tree`, a `Table`, a `Command` (its search field) or a `div` with `keyDown`,
+  `Calendar`, a `Tree`, a `Table`, a `Command` (its search field), a `List` or a `div` with `keyDown`,
   once the commit is applied and its window is showing. Another type is `invalid_operation`.
 - Not supported: system-wide shortcuts (when the app is not focused), key up events, and
   focus or blur events.
@@ -1515,3 +1518,47 @@ props every frame; a `MessageScroller` keeps its scroll position in the host and
 `unknown_type` to them and nothing else changes.
 
 The transcript in `conformance/chat.txt` is the reference for their props and events.
+
+## 27. List
+
+A selectable list with the keyboard, an optional search field and incremental loading. Its rows
+are **`ListItem` children** (the pattern of `Tab`, section 15), so a row can hold any nodes:
+
+```json
+{"op":"create","id":1,"type":"List","props":{"class":"h-64","value":"b","searchable":true,"placeholder":"Search fruit","hasMore":true},"events":["change","confirm","query","loadMore"]}
+{"op":"create","id":2,"type":"ListItem","props":{"value":"a"}}
+{"op":"create","id":3,"type":"text","props":{"content":"Apple"}}
+{"op":"append","parent":2,"child":3}
+{"op":"append","parent":1,"child":2}
+{"type":"event","id":1,"event":"change","value":"a"}
+{"type":"event","id":1,"event":"confirm","value":"a"}
+```
+
+- A `ListItem` is `value` —required and not empty, it is what the events report— and
+  `disabled`. Values should be unique within a list (with a repeat, the first row wins). Its
+  children are laid out in a row, and `a11y.label` names the row for a screen reader. Other
+  children of a `List` are not drawn.
+- Every row has the height of the first one (gpui-component measures one row); what is taller
+  is cut. The list virtualizes its rows and fills its container, so give it a height (`h-64`,
+  `flex-1`) with `class`. The client still sends every row as nodes, as with `VirtualList`.
+- `value` is the selected row's `value`; one that is not among the rows selects nothing. The
+  arrow keys (passing over disabled rows) and a click send `change` with the row's `value`, and
+  Escape sends `change` with `null`. `value` follows the synced and controlled modes of
+  section 5 (`controlled`). The list passes Escape on to what holds it.
+- `confirm` reports the row's `value` on Enter or a click (a click on another row sends its
+  `change` first). A disabled row is neither selected nor confirmed.
+- `searchable` shows a search field above the rows (`placeholder` is its hint). Each edit sends
+  `query` with the text, trimmed; the same text twice is sent once. The host does not filter:
+  the client sends the rows that match (and, to keep Enter useful, usually sets `value` to the
+  first one). While typing, the list highlights its first row until the new rows arrive.
+- With `hasMore`, scrolling to within `loadMoreThreshold` rows of the end (a whole number,
+  default 20) sends `loadMore`, once per row count: the client appends rows, and clears
+  `hasMore` when there are no more. `loading` replaces the rows with gpui-component's skeleton.
+  A list without rows shows gpui-component's empty state.
+- `focus` (section 12) works on a List, so the arrow keys move the selection.
+- Without a window, `simulate change` takes a row's `value` or `null`, `simulate confirm` a
+  row's `value` (it selects it first), `simulate query` the text and `simulate loadMore` nothing
+  (sent only with `hasMore`). An unknown row is `invalid_operation`; a disabled one does nothing.
+
+`PROTOCOL_VERSION` stays at 1: `List` and `ListItem` are new node types. The transcript in
+`conformance/list.txt` is the reference for their props and events.

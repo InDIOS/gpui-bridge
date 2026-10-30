@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
-import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -843,6 +843,33 @@ test("the chat nodes render with their props and report their events", async () 
   emit(app, { id: quiz.id, event: "submit", value: [answer] });
   await tick();
   assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a List renders its ListItem rows and reports its events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <List value="a" searchable placeholder="Search" hasMore onChange={(value) => seen.push(["change", value])} onConfirm={(value) => seen.push(["confirm", value])} onQuery={(query) => seen.push(["query", query])} onLoadMore={() => seen.push("loadMore")}>
+      <ListItem value="a">
+        <Text>Apple</Text>
+      </ListItem>
+      <ListItem value="b" disabled>
+        <Text>Banana</Text>
+      </ListItem>
+    </List>,
+  );
+  const [list] = created(sent, "List");
+  // Like React DOM, passing `value` makes it controlled; the wire says so.
+  assert.deepEqual(list.props, { value: "a", searchable: true, placeholder: "Search", hasMore: true, controlled: true });
+  assert.deepEqual(created(sent, "ListItem").map((item) => item.props), [{ value: "a" }, { value: "b", disabled: true }]);
+
+  emit(app, { id: list.id, event: "change", value: null });
+  emit(app, { id: list.id, event: "confirm", value: "b" });
+  emit(app, { id: list.id, event: "query", value: "ap" });
+  emit(app, { id: list.id, event: "loadMore" });
+  await tick();
+  assert.deepEqual(seen, [["change", null], ["confirm", "b"], ["query", "ap"], "loadMore"]);
   await app.close();
   assert.deepEqual(errors, []);
 });
