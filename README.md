@@ -165,6 +165,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `chat.ts` | Messages in a MessageScroller, a streamed answer, an Attachment that fails and is retried, a Questionnaire |
 | `list.ts` | A List of 10,000 rows with search and the keyboard, a second one that loads rows as it scrolls, a row 40 nodes deep |
 | `dock.ts` | A Dock: panels the user drags into tabs and splits while the app updates them, files that open as closable panels |
+| `slots.ts` | Slots as children: Accordion sections that hold controls, a Dialog and an AlertDialog with their own footer buttons, a StatusBar built from nodes |
 | `keyboard.ts` | Shortcuts, a list moved with the arrow keys, focus |
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |
