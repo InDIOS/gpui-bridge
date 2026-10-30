@@ -42,11 +42,15 @@ const files = app.div({ class: "flex flex-col gap-1 p-2" }).append(
 
 const log = app.text({ class: "p-3 font-mono text-sm", content: "" });
 let lines: string[] = [];
-setInterval(() => {
-  lines = [...lines, `${new Date().toLocaleTimeString()}  tick ${lines.length + 1}`].slice(-6);
+let ticks = 0;
+const timer = setInterval(() => {
+  ticks++;
+  lines = [...lines, `${new Date().toLocaleTimeString()}  tick ${ticks}`].slice(-6);
   log.set({ content: lines.join("\n") });
   app.commit();
 }, 1000);
+// Closing the window ends the host; a commit after that would throw.
+app.on("exit", () => clearInterval(timer));
 
 dock.append(
   app.dockPanel({ title: "Files", placement: "left" }).append(files),
