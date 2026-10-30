@@ -552,6 +552,18 @@ class App:
         are the content."""
         return self._create("ListItem", props)
 
+    # Dock (PROTOCOL.md section 28).
+
+    def dock(self, **props) -> Node:
+        """Panels the user rearranges: its `dock_panel` children. The host owns the layout."""
+        return self._create("Dock", props)
+
+    def dock_panel(self, **props) -> Node:
+        """A `dock` panel: `title`, `placement` (`center`, `left`, `right`, `bottom`; read only
+        when it is added), `closable`. The children are the content. `close` means the user
+        closed it: remove the node."""
+        return self._create("DockPanel", props)
+
     def alert_dialog(self, **props) -> Node:
         """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
         children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""

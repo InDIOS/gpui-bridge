@@ -681,6 +681,16 @@ export class App {
     return this.create("ListItem", props);
   }
 
+  /** Panels the user rearranges: its `DockPanel` children. The host owns the layout. */
+  dock(props: NodeProps["Dock"] = {}) {
+    return this.create("Dock", props);
+  }
+
+  /** A `Dock` panel: `title`, `placement` (read once) and `closable` (`close`); its children are the content. */
+  dockPanel(props: NodeProps["DockPanel"] = {}) {
+    return this.create("DockPanel", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

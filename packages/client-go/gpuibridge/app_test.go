@@ -370,6 +370,31 @@ func TestListDispatchesEvents(t *testing.T) {
 	}
 }
 
+func TestDockPanelReportsClose(t *testing.T) {
+	app := mustApp(t)
+	closed := make(chan struct{}, 1)
+	notes := app.DockPanel(Props{"title": "Notes", "closable": true}).
+		On("close", func(any) { closed <- struct{}{} }).
+		Append(app.Text(Props{"content": "Hello"}))
+	dock := app.Dock(Props{"class": "size-full"}).Append(
+		app.DockPanel(Props{"title": "Files", "placement": "left"}).Append(app.Text(Props{"content": "src/"})),
+		notes,
+	)
+	app.Window(WindowOptions{Root: dock})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(notes.ID(), "close", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("close did not arrive")
+	}
+	app.Close()
+}
+
 func TestMissingHostBinaryFails(t *testing.T) {
 	_, err := NewApp(AppOptions{HostPath: "does-not-exist.exe", Headless: true})
 	if err == nil {

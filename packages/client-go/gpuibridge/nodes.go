@@ -125,3 +125,5 @@ func (a *App) MessageScroller(props Props) *Node { return a.Create("MessageScrol
 func (a *App) Questionnaire(props Props) *Node   { return a.Create("Questionnaire", props) }
 func (a *App) List(props Props) *Node            { return a.Create("List", props) }
 func (a *App) ListItem(props Props) *Node        { return a.Create("ListItem", props) }
+func (a *App) Dock(props Props) *Node            { return a.Create("Dock", props) }
+func (a *App) DockPanel(props Props) *Node       { return a.Create("DockPanel", props) }

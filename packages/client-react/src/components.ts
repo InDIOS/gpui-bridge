@@ -541,3 +541,13 @@ export const List = "List" as unknown as HostComponent<ListProps>;
 /** A `List` row: `value` is what the list reports; its children are the content. */
 export type ListItemProps = NodeProps["ListItem"] & { children?: ReactNode };
 export const ListItem = "ListItem" as unknown as HostComponent<ListItemProps>;
+
+// Dock (PROTOCOL.md section 28).
+
+/** Panels the user rearranges: its `DockPanel` children. The host owns the layout. */
+export type DockProps = NodeProps["Dock"] & { children?: ReactNode };
+export const Dock = "Dock" as unknown as HostComponent<DockProps>;
+
+/** A `Dock` panel; `onClose` means the user closed it: stop rendering it. */
+export type DockPanelProps = NodeProps["DockPanel"] & { onClose?: () => void; children?: ReactNode };
+export const DockPanel = "DockPanel" as unknown as HostComponent<DockPanelProps>;

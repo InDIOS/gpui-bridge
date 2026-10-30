@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
-import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, Dock, DockPanel, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -870,6 +870,28 @@ test("a List renders its ListItem rows and reports its events", async () => {
   emit(app, { id: list.id, event: "loadMore" });
   await tick();
   assert.deepEqual(seen, [["change", null], ["confirm", "b"], ["query", "ap"], "loadMore"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a Dock renders its DockPanel children and reports close", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Dock class="size-full">
+      <DockPanel title="Files" placement="left">
+        <Text>src/</Text>
+      </DockPanel>
+      <DockPanel title="Notes" closable onClose={() => seen.push("close")}>
+        <Text>Hello</Text>
+      </DockPanel>
+    </Dock>,
+  );
+  const panels = created(sent, "DockPanel");
+  assert.deepEqual(panels.map((panel) => panel.props), [{ title: "Files", placement: "left" }, { title: "Notes", closable: true }]);
+
+  emit(app, { id: panels[1].id, event: "close" });
+  await tick();
+  assert.deepEqual(seen, ["close"]);
   await app.close();
   assert.deepEqual(errors, []);
 });

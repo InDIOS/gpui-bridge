@@ -226,6 +226,24 @@ test("a List with ListItem rows is accepted and reports its events", async () =>
   assert.deepEqual(seen, [["change", null], ["confirm", "a"], ["query", "ap"], "loadMore"]);
 });
 
+test("a Dock with DockPanel children is accepted and reports close", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const notes = app.dockPanel({ title: "Notes", closable: true }).on("close", () => seen.push("close"));
+  const dock = app
+    .dock({ class: "size-full" })
+    .append(app.dockPanel({ title: "Files", placement: "left" }).append(app.text({ content: "src/" })), notes.append(app.text({ content: "Hello" })));
+  app.window({ root: dock });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: notes.id, event: "close" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["close"]);
+});
+
 test("the form controls with state are accepted and report typed values", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

@@ -80,7 +80,9 @@ export type NodeType =
   | "MessageScroller"
   | "Questionnaire"
   | "List"
-  | "ListItem";
+  | "ListItem"
+  | "Dock"
+  | "DockPanel";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -1265,6 +1267,21 @@ export interface ListItemProps {
   disabled?: boolean;
 }
 
+// Dock (PROTOCOL.md section 28).
+
+export interface DockProps {
+  class?: string;
+}
+
+export interface DockPanelProps {
+  /** The tab's text. */
+  title?: string;
+  /** Where the panel starts; read only when it is added (the layout is the user's after that). */
+  placement?: "center" | "left" | "right" | "bottom";
+  /** The tab offers to close it: `close` is sent, and the app removes the node. */
+  closable?: boolean;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1340,6 +1357,8 @@ export interface NodeProps {
   Questionnaire: QuestionnaireProps & SharedProps;
   List: ListProps & SharedProps;
   ListItem: ListItemProps & SharedProps;
+  Dock: DockProps & SharedProps;
+  DockPanel: DockPanelProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1445,4 +1464,7 @@ export interface NodeEvents {
   /** `change` sends the selected row's `value` (`null`: Escape); `query` the search text; `loadMore` nothing. */
   List: { change: { value: string | null }; confirm: { value: string }; query: { value: string }; loadMore: {} };
   ListItem: {};
+  Dock: {};
+  /** `close`: the user closed the panel; it has left the layout. */
+  DockPanel: { close: {} };
 }

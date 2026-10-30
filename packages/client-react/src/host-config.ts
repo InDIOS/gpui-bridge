@@ -397,6 +397,10 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.list(wire);
     case "ListItem":
       return app.listItem(wire);
+    case "Dock":
+      return app.dock(wire);
+    case "DockPanel":
+      return app.dockPanel(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

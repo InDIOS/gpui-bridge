@@ -390,6 +390,27 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, [("change", None), ("confirm", "a"), ("query", "ap"), "loadMore"])
 
+    def test_dock_is_accepted_and_reports_close(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        notes = app.dock_panel(title="Notes", closable=True)
+        notes.on("close", lambda: seen.append("close"))
+        dock = app.dock(class_="size-full").append(
+            app.dock_panel(title="Files", placement="left").append(app.text(content="src/")),
+            notes.append(app.text(content="Hello")),
+        )
+        app.window(root=dock)
+        app.commit()
+
+        app._dispatch({"type": "event", "id": notes.id, "event": "close"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["close"])
+
     def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
         app = App(headless=True)
         errors = []
