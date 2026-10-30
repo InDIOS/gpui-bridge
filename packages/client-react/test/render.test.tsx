@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
-import { Accordion, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, Diff, Div, Dock, DockPanel, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import { Accordion, AccordionItem, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, DialogFooter, Diff, Div, Dock, DockPanel, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, StatusBarLeft, StatusBarRight, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -892,6 +892,41 @@ test("a Dock renders its DockPanel children and reports close", async () => {
   emit(app, { id: panels[1].id, event: "close" });
   await tick();
   assert.deepEqual(seen, ["close"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("slot children render under their parents and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Accordion onChange={(id) => seen.push(id)}>
+        <AccordionItem id="a" title="First" open>
+          <Text>Body</Text>
+        </AccordionItem>
+      </Accordion>
+      <Dialog open title="Rename">
+        <DialogFooter>
+          <Button label="Save" onClick={() => seen.push("save")} />
+        </DialogFooter>
+      </Dialog>
+      <StatusBar>
+        <StatusBarLeft>
+          <Text>Ready</Text>
+        </StatusBarLeft>
+        <StatusBarRight>
+          <Text>UTF-8</Text>
+        </StatusBarRight>
+      </StatusBar>
+    </Div>,
+  );
+  assert.deepEqual(created(sent, "AccordionItem").map((item) => item.props), [{ id: "a", title: "First", open: true }]);
+  for (const type of ["DialogFooter", "StatusBarLeft", "StatusBarRight"]) assert.equal(created(sent, type).length, 1);
+
+  emit(app, { id: created(sent, "Accordion")[0].id, event: "change", value: "a" });
+  emit(app, { id: created(sent, "Button")[0].id, event: "click" });
+  await tick();
+  assert.deepEqual(seen, ["a", "save"]);
   await app.close();
   assert.deepEqual(errors, []);
 });

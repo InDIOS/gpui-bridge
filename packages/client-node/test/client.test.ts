@@ -244,6 +244,28 @@ test("a Dock with DockPanel children is accepted and reports close", async () =>
   assert.deepEqual(seen, ["close"]);
 });
 
+test("slot children (AccordionItem, DialogFooter, StatusBar sides) are accepted", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const accordion = app
+    .accordion()
+    .on("change", ({ value }) => seen.push(value))
+    .append(app.accordionItem({ id: "a", title: "First", open: true }).append(app.text({ content: "Body" })));
+  const dialog = app.dialog({ open: true, title: "Rename" }).append(app.dialogFooter().append(app.button({ label: "Save" })));
+  const bar = app
+    .statusBar()
+    .append(app.statusBarLeft().append(app.text({ content: "Ready" })), app.statusBarRight().append(app.text({ content: "UTF-8" })));
+  app.window({ root: app.div().append(accordion, dialog, bar) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: accordion.id, event: "change", value: "a" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["a"]);
+});
+
 test("the form controls with state are accepted and report typed values", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

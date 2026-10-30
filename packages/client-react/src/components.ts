@@ -332,7 +332,7 @@ export const Pagination = "Pagination" as unknown as HostComponent<PaginationPro
 export type CollapsibleProps = NodeProps["Collapsible"] & { children?: ReactNode };
 export const Collapsible = "Collapsible" as unknown as HostComponent<CollapsibleProps>;
 
-export type AccordionProps = NodeProps["Accordion"] & { onChange?: (id: string) => void };
+export type AccordionProps = NodeProps["Accordion"] & { onChange?: (id: string) => void; children?: ReactNode };
 export const Accordion = "Accordion" as unknown as HostComponent<AccordionProps>;
 
 export type AvatarProps = NodeProps["Avatar"];
@@ -359,7 +359,7 @@ export const GroupBox = "GroupBox" as unknown as HostComponent<GroupBoxProps>;
 export type DescriptionListProps = NodeProps["DescriptionList"];
 export const DescriptionList = "DescriptionList" as unknown as HostComponent<DescriptionListProps>;
 
-export type StatusBarProps = NodeProps["StatusBar"];
+export type StatusBarProps = NodeProps["StatusBar"] & { children?: ReactNode };
 export const StatusBar = "StatusBar" as unknown as HostComponent<StatusBarProps>;
 
 export type ToolbarProps = NodeProps["Toolbar"] & { children?: ReactNode };
@@ -551,3 +551,21 @@ export const Dock = "Dock" as unknown as HostComponent<DockProps>;
 /** A `Dock` panel; `onClose` means the user closed it: stop rendering it. */
 export type DockPanelProps = NodeProps["DockPanel"] & { onClose?: () => void; children?: ReactNode };
 export const DockPanel = "DockPanel" as unknown as HostComponent<DockPanelProps>;
+
+// Slots as children (PROTOCOL.md sections 14, 17 and 24).
+
+/** An `Accordion` section: `id` is what `onChange` reports; its children are the content. */
+export type AccordionItemProps = NodeProps["AccordionItem"] & { children?: ReactNode };
+export const AccordionItem = "AccordionItem" as unknown as HostComponent<AccordionItemProps>;
+
+/** A `Dialog`'s or `AlertDialog`'s footer: its children (buttons) replace OK/Cancel. */
+export type DialogFooterProps = NodeProps["DialogFooter"] & { children?: ReactNode };
+export const DialogFooter = "DialogFooter" as unknown as HostComponent<DialogFooterProps>;
+
+/** A `StatusBar`'s left side: its children replace the `left` text. */
+export type StatusBarLeftProps = NodeProps["StatusBarLeft"] & { children?: ReactNode };
+export const StatusBarLeft = "StatusBarLeft" as unknown as HostComponent<StatusBarLeftProps>;
+
+/** A `StatusBar`'s right side: its children replace the `right` text. */
+export type StatusBarRightProps = NodeProps["StatusBarRight"] & { children?: ReactNode };
+export const StatusBarRight = "StatusBarRight" as unknown as HostComponent<StatusBarRightProps>;

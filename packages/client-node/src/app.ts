@@ -691,6 +691,26 @@ export class App {
     return this.create("DockPanel", props);
   }
 
+  /** An `Accordion` section: `id` (what `change` reports), `title`, `open`, `disabled`; its children are the content. */
+  accordionItem(props: NodeProps["AccordionItem"] = {}) {
+    return this.create("AccordionItem", props);
+  }
+
+  /** A `Dialog`'s or `AlertDialog`'s footer: its children (buttons) replace OK/Cancel. */
+  dialogFooter(props: NodeProps["DialogFooter"] = {}) {
+    return this.create("DialogFooter", props);
+  }
+
+  /** A `StatusBar`'s left side: its children replace the `left` text. */
+  statusBarLeft(props: NodeProps["StatusBarLeft"] = {}) {
+    return this.create("StatusBarLeft", props);
+  }
+
+  /** A `StatusBar`'s right side: its children replace the `right` text. */
+  statusBarRight(props: NodeProps["StatusBarRight"] = {}) {
+    return this.create("StatusBarRight", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);

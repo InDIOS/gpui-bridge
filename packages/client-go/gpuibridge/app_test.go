@@ -395,6 +395,45 @@ func TestDockPanelReportsClose(t *testing.T) {
 	app.Close()
 }
 
+func TestSlotChildrenAreAcceptedAndReport(t *testing.T) {
+	app := mustApp(t)
+	changed := make(chan any, 1)
+	clicked := make(chan struct{}, 1)
+	accordion := app.Accordion(Props{}).
+		On("change", func(payload any) { changed <- payload.(map[string]any)["value"] }).
+		Append(app.AccordionItem(Props{"id": "a", "title": "First", "open": true}).Append(app.Text(Props{"content": "Body"})))
+	save := app.Button(Props{"label": "Save"}).On("click", func(any) { clicked <- struct{}{} })
+	dialog := app.Dialog(Props{"open": true, "title": "Rename"}).Append(app.DialogFooter(Props{}).Append(save))
+	bar := app.StatusBar(Props{}).Append(
+		app.StatusBarLeft(Props{}).Append(app.Text(Props{"content": "Ready"})),
+		app.StatusBarRight(Props{}).Append(app.Text(Props{"content": "UTF-8"})),
+	)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(accordion, dialog, bar)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(accordion.ID(), "change", "a", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(save.ID(), "click", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case value := <-changed:
+		if value != "a" {
+			t.Fatalf("change sent %v", value)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("change did not arrive")
+	}
+	select {
+	case <-clicked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("click did not arrive")
+	}
+	app.Close()
+}
+
 func TestMissingHostBinaryFails(t *testing.T) {
 	_, err := NewApp(AppOptions{HostPath: "does-not-exist.exe", Headless: true})
 	if err == nil {

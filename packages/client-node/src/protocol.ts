@@ -82,7 +82,11 @@ export type NodeType =
   | "List"
   | "ListItem"
   | "Dock"
-  | "DockPanel";
+  | "DockPanel"
+  | "AccordionItem"
+  | "DialogFooter"
+  | "StatusBarLeft"
+  | "StatusBarRight";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -385,7 +389,7 @@ export interface DialogProps {
   title?: string;
   /** Default "OK". */
   okText?: string;
-  /** Adds a cancel button. */
+  /** Adds a cancel button. A `DialogFooter` child replaces both buttons. */
   cancelText?: string;
   /** In pixels. */
   width?: number;
@@ -547,7 +551,7 @@ export interface PaginationProps {
   class?: string;
 }
 
-/** A section of an `Accordion`; its content is text. */
+/** An `items` entry of an `Accordion`; its content is text. */
 export interface AccordionItem {
   id: string;
   title: string;
@@ -557,6 +561,7 @@ export interface AccordionItem {
 }
 
 export interface AccordionProps {
+  /** Ignored when the Accordion has `AccordionItem` children. */
   items?: AccordionItem[];
   /** Several sections open at once; default false. */
   multiple?: boolean;
@@ -652,7 +657,9 @@ export interface DescriptionListProps {
 }
 
 export interface StatusBarProps {
+  /** Replaced by a `StatusBarLeft` child. */
   left?: string;
+  /** Replaced by a `StatusBarRight` child. */
   right?: string;
   class?: string;
 }
@@ -1042,7 +1049,7 @@ export interface AlertDialogProps {
   icon?: string;
   /** Default "OK". */
   okText?: string;
-  /** Adds the Cancel button. */
+  /** Adds the Cancel button. A `DialogFooter` child replaces both buttons. */
   cancelText?: string;
   /** Classes of the body that holds the children. */
   class?: string;
@@ -1282,6 +1289,24 @@ export interface DockPanelProps {
   closable?: boolean;
 }
 
+// Slots as children (PROTOCOL.md sections 14, 17 and 24).
+
+/** A section of an `Accordion`; its children are the content. */
+export interface AccordionItemProps {
+  /** What the Accordion's `change` reports. Required: the host rejects an `AccordionItem` without it. */
+  id?: string;
+  title?: string;
+  /** The host keeps it in synced mode. */
+  open?: boolean;
+  disabled?: boolean;
+  class?: string;
+}
+
+/** A `Dialog`'s or `AlertDialog`'s footer instead of OK/Cancel; outside one it draws nothing. */
+export interface SlotProps {
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -1359,6 +1384,10 @@ export interface NodeProps {
   ListItem: ListItemProps & SharedProps;
   Dock: DockProps & SharedProps;
   DockPanel: DockPanelProps & SharedProps;
+  AccordionItem: AccordionItemProps & SharedProps;
+  DialogFooter: SlotProps & SharedProps;
+  StatusBarLeft: SlotProps & SharedProps;
+  StatusBarRight: SlotProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1467,4 +1496,8 @@ export interface NodeEvents {
   Dock: {};
   /** `close`: the user closed the panel; it has left the layout. */
   DockPanel: { close: {} };
+  AccordionItem: {};
+  DialogFooter: {};
+  StatusBarLeft: {};
+  StatusBarRight: {};
 }

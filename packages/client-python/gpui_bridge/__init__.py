@@ -265,7 +265,8 @@ class App:
         return self._create("Textarea", props)
 
     def dialog(self, **props) -> Node:
-        """A modal dialog shown while `open=True`; append its body as children. Events `ok`, `cancel`."""
+        """A modal dialog shown while `open=True`; append its body as children. Events `ok`, `cancel`.
+        A `dialog_footer` child replaces the OK/Cancel buttons."""
         return self._create("Dialog", props)
 
     def virtual_list(self, **props) -> Node:
@@ -337,9 +338,15 @@ class App:
         return self._create("Collapsible", props)
 
     def accordion(self, **props) -> Node:
-        """Sections as `items=[{"id", "title", "content", "open", "disabled"}]`, `multiple`,
-        `bordered`, `controlled`. `change` passes the id of the section toggled."""
+        """Sections as `items=[{"id", "title", "content", "open", "disabled"}]`, or as
+        `accordion_item` children (then `items` is ignored); `multiple`, `bordered`,
+        `controlled`. `change` passes the id of the section toggled."""
         return self._create("Accordion", props)
+
+    def accordion_item(self, **props) -> Node:
+        """An `accordion` section: `id` (required; what `change` passes), `title`, `open`,
+        `disabled`. The children are the content."""
+        return self._create("AccordionItem", props)
 
     def avatar(self, **props) -> Node:
         """A picture from `src`, or the initial of `name`."""
@@ -375,8 +382,17 @@ class App:
         return self._create("DescriptionList", props)
 
     def status_bar(self, **props) -> Node:
-        """A status bar: `left` and `right` text."""
+        """A status bar: `left` and `right` text, or a `status_bar_left` and a
+        `status_bar_right` child in their place."""
         return self._create("StatusBar", props)
+
+    def status_bar_left(self, **props) -> Node:
+        """A `status_bar`'s left side: its children replace the `left` text."""
+        return self._create("StatusBarLeft", props)
+
+    def status_bar_right(self, **props) -> Node:
+        """A `status_bar`'s right side: its children replace the `right` text."""
+        return self._create("StatusBarRight", props)
 
     def toolbar(self, **props) -> Node:
         """A toolbar; append its content."""
@@ -566,8 +582,14 @@ class App:
 
     def alert_dialog(self, **props) -> Node:
         """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
-        children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one."""
+        children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one.
+        A `dialog_footer` child replaces its buttons."""
         return self._create("AlertDialog", props)
+
+    def dialog_footer(self, **props) -> Node:
+        """A `dialog`'s or `alert_dialog`'s footer: its children (buttons, each with its own
+        `click`) replace OK/Cancel. Close the dialog with `open=False`."""
+        return self._create("DialogFooter", props)
 
     def sheet(self, **props) -> Node:
         """A panel from `side` (left, right, top, bottom): `open`, `title`, `size` in pixels. The

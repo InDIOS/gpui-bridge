@@ -411,6 +411,32 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, ["close"])
 
+    def test_slot_children_are_accepted(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        accordion = app.accordion().append(
+            app.accordion_item(id="a", title="First", open=True).append(app.text(content="Body"))
+        )
+        accordion.on("change", seen.append)
+        dialog = app.dialog(open=True, title="Rename").append(
+            app.dialog_footer().append(app.button(label="Save"))
+        )
+        bar = app.status_bar().append(
+            app.status_bar_left().append(app.text(content="Ready")),
+            app.status_bar_right().append(app.text(content="UTF-8")),
+        )
+        app.window(root=app.div().append(accordion, dialog, bar))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": accordion.id, "event": "change", "value": "a"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["a"])
+
     def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
         app = App(headless=True)
         errors = []

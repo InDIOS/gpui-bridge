@@ -127,3 +127,7 @@ func (a *App) List(props Props) *Node            { return a.Create("List", props
 func (a *App) ListItem(props Props) *Node        { return a.Create("ListItem", props) }
 func (a *App) Dock(props Props) *Node            { return a.Create("Dock", props) }
 func (a *App) DockPanel(props Props) *Node       { return a.Create("DockPanel", props) }
+func (a *App) AccordionItem(props Props) *Node   { return a.Create("AccordionItem", props) }
+func (a *App) DialogFooter(props Props) *Node    { return a.Create("DialogFooter", props) }
+func (a *App) StatusBarLeft(props Props) *Node   { return a.Create("StatusBarLeft", props) }
+func (a *App) StatusBarRight(props Props) *Node  { return a.Create("StatusBarRight", props) }
