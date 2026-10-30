@@ -74,12 +74,21 @@ impl dock::BasePanel for Panel {
 impl dock::Panel for Panel {
     fn title(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let tree = &self.session.read(cx).tree;
-        SharedString::from(
+        let title = SharedString::from(
             tree.node(self.id)
                 .and_then(|node| prop_str(node, "title"))
                 .unwrap_or_default()
                 .to_owned(),
-        )
+        );
+        // shortcut: the crate puts the title in the tab as a child, not as its label, and AccessKit
+        // does not name a tab from its children, so the title is a `label` of its own; drop this
+        // when gpui-component labels its dock tabs.
+        let spec = crate::a11y::A11y {
+            role: Some(Role::Label),
+            label: Some(title.to_string()),
+            ..Default::default()
+        };
+        crate::a11y::apply(&spec, self.id, div().child(title))
     }
 }
 
