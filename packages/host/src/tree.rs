@@ -84,6 +84,8 @@ pub struct Tree {
     /// Files holding the bytes of `Image` and `Attachment` nodes that use `data` (one per node).
     image_data: image_data::Store,
     warned_props: HashSet<(NodeType, String)>,
+    /// `DockPanel`s the user closed: they stay out of their `Dock` while the node exists.
+    closed_panels: HashSet<NodeId>,
 }
 
 impl Tree {
@@ -126,6 +128,14 @@ impl Tree {
 
     pub fn clear_focus_request(&mut self) {
         self.focus_request = None;
+    }
+
+    pub fn is_panel_closed(&self, id: NodeId) -> bool {
+        self.closed_panels.contains(&id)
+    }
+
+    pub fn close_panel(&mut self, id: NodeId) {
+        self.closed_panels.insert(id);
     }
 
     pub fn tray(&self) -> Option<&TraySpec> {
@@ -610,6 +620,7 @@ impl Tree {
                 self.detach(id);
                 let mut stack = vec![id];
                 while let Some(id) = stack.pop() {
+                    self.closed_panels.remove(&id);
                     if let Some(node) = self.nodes.remove(&id) {
                         if node.node_type.takes_image() {
                             self.image_data.remove(id);

@@ -18,6 +18,7 @@ pub mod combobox;
 pub mod command;
 pub mod date_picker;
 pub mod diff;
+pub mod dock;
 pub mod input;
 pub mod keyboard;
 pub mod layout;

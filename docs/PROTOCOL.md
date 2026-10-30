@@ -234,6 +234,8 @@ Rules:
 | `Questionnaire` | `items`, `class`                                              | `change`, `submit` |
 | `List`          | `value`, `controlled`, `searchable`, `placeholder`, `hasMore`, `loading`, `loadMoreThreshold`, `class` | `change`, `confirm`, `query`, `loadMore` |
 | `ListItem`      | `value` (required), `disabled`                                 | —                  |
+| `Dock`          | `class`                                                        | —                  |
+| `DockPanel`     | `title`, `placement` (`center`, `left`, `right`, `bottom`), `closable` | `close`    |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
@@ -242,8 +244,8 @@ section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup
 `Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
 the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
 `Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
-`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`), and `List` with
-its `ListItem` rows in section 27.
+`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`), `List` with
+its `ListItem` rows in section 27, and `Dock` with its `DockPanel` children in section 28.
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -1566,3 +1568,36 @@ are **`ListItem` children** (the pattern of `Tab`, section 15), so a row can hol
 
 `PROTOCOL_VERSION` stays at 1: `List` and `ListItem` are new node types. The transcript in
 `conformance/list.txt` is the reference for their props and events.
+
+## 28. Dock
+
+Panels the user rearranges: drags a tab to another group or to an edge to split, resizes the
+splits, and folds the side docks. The panels are **`DockPanel` children** of the `Dock`, and a
+panel's children are its content (any nodes):
+
+```json
+{"op":"create","id":1,"type":"Dock","props":{"class":"size-full"}}
+{"op":"create","id":2,"type":"DockPanel","props":{"title":"Files","placement":"left"}}
+{"op":"create","id":3,"type":"DockPanel","props":{"title":"Notes","closable":true},"events":["close"]}
+{"op":"append","parent":1,"child":2}
+{"op":"append","parent":1,"child":3}
+{"type":"event","id":3,"event":"close"}
+```
+
+- **The host owns the layout** (ADR 0003). A new `DockPanel` joins the first tab group of its
+  `placement` (`center` by default, or the `left`, `right` or `bottom` dock, created on first
+  use); `placement` is read only then, and changing it later does not move the panel. A removed
+  `DockPanel` leaves the layout. Nothing else a client does touches the layout, so `setProps` on
+  a panel or its content never undoes what the user arranged; moving a panel keeps its content.
+  The layout lives as long as the window and is not saved.
+- `title` is the tab's text; it can change at any time. Other children of a `Dock` are not
+  drawn, and a `DockPanel` outside a `Dock` draws nothing.
+- With `closable`, the tab offers to close the panel. Closing it removes it from the layout and
+  sends `close`; the app then removes the node. The panel does not come back while its node
+  exists: to show it again, append a new `DockPanel` (a new id). A close cannot be refused.
+- The `Dock` fills what its `class` gives it (`size-full`, `flex-1`).
+- Without a window, `simulate close` works on a `DockPanel` with `closable` that is still open;
+  otherwise it is `invalid_operation`.
+
+`PROTOCOL_VERSION` stays at 1: `Dock` and `DockPanel` are new node types. The transcript in
+`conformance/dock.txt` is the reference for their props and events.

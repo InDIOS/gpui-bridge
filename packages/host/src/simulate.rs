@@ -155,7 +155,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             | (NodeType::Div | NodeType::Input, "keyDown")
             | (NodeType::Div, "drop")
             | (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel")
-            | (NodeType::Sheet, "close")
+            | (NodeType::Sheet | NodeType::DockPanel, "close")
             | (NodeType::Popover, "change")
             | (
                 NodeType::Checkbox | NodeType::Switch | NodeType::Toggle,
@@ -306,6 +306,16 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 ));
             }
             components::overlays::sheet_closed(tree, id);
+        }
+        // The user closed the panel's tab: it leaves its Dock.
+        (NodeType::DockPanel, "close") => {
+            if !prop("closable") || tree.is_panel_closed(id) {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("DockPanel {id} is not closable, or already closed"),
+                ));
+            }
+            components::dock::closed(tree, id);
         }
         // The user opened or closed the popover: the state is kept, and reported, as a checkbox's.
         (NodeType::Popover, "change") => {

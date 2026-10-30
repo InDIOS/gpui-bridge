@@ -259,6 +259,9 @@ pub enum NodeType {
     Questionnaire,
     List,
     ListItem,
+    // Dock (PROTOCOL.md section 28).
+    Dock,
+    DockPanel,
 }
 
 /// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
@@ -353,6 +356,8 @@ impl NodeType {
             "Questionnaire" => Some(Self::Questionnaire),
             "List" => Some(Self::List),
             "ListItem" => Some(Self::ListItem),
+            "Dock" => Some(Self::Dock),
+            "DockPanel" => Some(Self::DockPanel),
             _ => None,
         }
     }
@@ -563,6 +568,9 @@ impl NodeType {
             (Self::List, "loadMoreThreshold") => Some(Index),
             (Self::ListItem, "value") => Some(Str),
             (Self::ListItem, "disabled") => Some(Bool),
+            (Self::DockPanel, "title") => Some(Str),
+            (Self::DockPanel, "placement") => Some(OneOf(&["center", "left", "right", "bottom"])),
+            (Self::DockPanel, "closable") => Some(Bool),
             (
                 Self::Input
                 | Self::Checkbox
@@ -710,6 +718,8 @@ impl NodeType {
             Self::Questionnaire => "Questionnaire",
             Self::List => "List",
             Self::ListItem => "ListItem",
+            Self::Dock => "Dock",
+            Self::DockPanel => "DockPanel",
         }
     }
 }
@@ -791,6 +801,8 @@ pub const ALL: &[NodeType] = &[
     NodeType::Questionnaire,
     NodeType::List,
     NodeType::ListItem,
+    NodeType::Dock,
+    NodeType::DockPanel,
 ];
 
 #[cfg(test)]

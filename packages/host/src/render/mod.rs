@@ -28,6 +28,7 @@ use crate::components::combobox::{self, ComboboxSlot};
 use crate::components::command::{self, CommandSlot};
 use crate::components::date_picker::{self, DatePickerSlot};
 use crate::components::diff::{self, DiffSlot};
+use crate::components::dock::{self, DockSlot};
 use crate::components::input::{self, InputSlot};
 use crate::components::list::{self, ListSlot};
 use crate::components::otp::{self, OtpSlot};
@@ -78,6 +79,7 @@ pub struct RootView {
     commands: HashMap<NodeId, CommandSlot>,
     /// One per List: its selection, scroll position and search field.
     list_states: HashMap<NodeId, ListSlot>,
+    docks: HashMap<NodeId, DockSlot>,
     questionnaires: HashMap<NodeId, QuestionnaireSlot>,
     /// One per MessageScroller: its scroll state and the rows it was last given.
     scrollers: HashMap<NodeId, chat::ScrollerSlot>,
@@ -164,6 +166,7 @@ impl RootView {
             charts: HashMap::new(),
             commands: HashMap::new(),
             list_states: HashMap::new(),
+            docks: HashMap::new(),
             scrollers: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
@@ -325,6 +328,7 @@ impl RootView {
         let charts = chart::snapshot(tree, &members);
         let commands = command::snapshot(tree, &members);
         let list_snapshot = list::snapshot(tree, &members);
+        let dock_snapshot = dock::snapshot(tree, &members);
         // Only a commit changes the rows of a MessageScroller.
         let scrollers = (tree.commits() != self.applied_commit).then(|| {
             members
@@ -419,6 +423,7 @@ impl RootView {
         command::sync(&mut self.commands, commands, window, cx);
         // Weak: the list states live in this view, so a strong handle would never be dropped.
         let view = cx.weak_entity();
+        // Also draws a DockPanel's children, from the panel's own view.
         let render: list::RenderItem = Rc::new(move |item, window, cx| {
             view.update(cx, |view, cx| view.render_item(item, window, cx))
                 .unwrap_or_default()
@@ -426,6 +431,14 @@ impl RootView {
         list::sync(
             &mut self.list_states,
             list_snapshot,
+            &self.session,
+            &render,
+            window,
+            cx,
+        );
+        dock::sync(
+            &mut self.docks,
+            dock_snapshot,
             &self.session,
             &render,
             window,
@@ -585,6 +598,7 @@ impl RootView {
             charts: &self.charts,
             commands: &self.commands,
             list_states: &self.list_states,
+            docks: &self.docks,
             scrollers: &self.scrollers,
             lists: &self.lists,
             texts: &mut self.texts,
@@ -937,6 +951,7 @@ struct RenderCx<'a> {
     charts: &'a HashMap<NodeId, ChartSlot>,
     commands: &'a HashMap<NodeId, CommandSlot>,
     list_states: &'a HashMap<NodeId, ListSlot>,
+    docks: &'a HashMap<NodeId, DockSlot>,
     scrollers: &'a HashMap<NodeId, chat::ScrollerSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
@@ -1118,6 +1133,12 @@ impl RenderCx<'_> {
             },
             // Drawn by its `List`, like a `Tab` by its `Tabs`.
             NodeType::ListItem => div().into_any_element(),
+            NodeType::Dock => match self.docks.get(&id) {
+                Some(slot) => self.blocking(id, div().child(slot.area()), &classes),
+                None => div().into_any_element(),
+            },
+            // Drawn by its `Dock`.
+            NodeType::DockPanel => div().into_any_element(),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).

@@ -1,0 +1,30 @@
+# Section 28: Dock, its DockPanel children, their props and the close event.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Dock","props":{"class":"size-full"}}
+> {"op":"create","id":2,"type":"DockPanel","props":{"title":"Files","placement":"left"}}
+> {"op":"create","id":3,"type":"text","props":{"content":"src/"}}
+> {"op":"create","id":4,"type":"DockPanel","props":{"title":"Notes","closable":true},"events":["close"]}
+> {"op":"create","id":5,"type":"text","props":{"content":"Hello"}}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":4,"child":5}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":4}
+> {"op":"window","root":1}
+> {"op":"commit"}
+# The title changes in place; placement is checked like any prop.
+> {"op":"setProps","id":4,"props":{"title":"Scratch"}}
+> {"op":"commit"}
+> {"op":"setProps","id":2,"props":{"placement":"top"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+# A panel without closable cannot be closed.
+> {"op":"simulate","id":2,"event":"close"}
+< {"type":"error","code":"invalid_operation"}
+# Closing a closable panel reports it once; it stays closed while the node exists.
+> {"op":"simulate","id":4,"event":"close"}
+< {"type":"event","id":4,"event":"close"}
+> {"op":"simulate","id":4,"event":"close"}
+< {"type":"error","code":"invalid_operation"}
+> {"op":"remove","id":4}
+> {"op":"commit"}
