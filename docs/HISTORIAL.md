@@ -2034,7 +2034,7 @@ en 1.
 Ocho nodos de chat y una lista de gpui-kit 0.8: `Bubble`, `Message` (con `MessageHeader` y
 `MessageFooter`), `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`, y `List` con sus
 filas `ListItem`. Todo aditivo: `PROTOCOL_VERSION` sigue en 1 (PROTOCOL.md §26 y §27). Las
-decisiones D1–D7 se aprobaron con el usuario antes de programar (`DECISIONES-M15.md`); lo que
+decisiones D1–D7 se aprobaron con el usuario antes de programar (`DECISIONES-M15.md`, borrado al cerrar); lo que
 cambiaría nodos ya publicados quedó para M18.
 
 - **Fase 1 (presentacionales):** commit `e8b2b05`. Rehecho desde cero un borrador sin commitear
@@ -2088,6 +2088,13 @@ cambiaría nodos ya publicados quedó para M18.
 - **Tamaño del host release:** 20.302.848 → **21.151.232 B** (+848.384 B, +0,85 MB, por debajo del
   umbral de ~1 MB).
 - **Sin probar:** Escape con una `List` dentro de un `Dialog` (la frase se quitó de §27).
+- **Fuera (decidido con el usuario):** `BubbleReactions` y `BubbleGroup`; `MessageGroup` (se
+  agrupa con un `div`); `separator_style` de `Marker`; el renderizador y la transición propios
+  del botón de salto y `bottomFade` de `MessageScroller`; `AttachmentGroup`, la superposición
+  sobre la imagen y los elementos extra de `AttachmentContent` (M18); `QuestionnaireValidator`
+  y los estilos por pieza; en `List`, confirmar con Ctrl+Enter o Ctrl+clic, el resaltado con
+  clic derecho, la vista inicial antes de buscar y un estado vacío propio. `ListSection`, a la
+  cola. `DECISIONES-M15.md` borrado.
 
 **Criterios de aceptación:** un ejemplo de chat con los seis primeros, 10 000 mensajes sin
 retraso perceptible y ventana real; `List` con 10 000 filas, árbol profundo (pila) y teclado;
