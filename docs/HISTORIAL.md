@@ -2144,3 +2144,48 @@ del nodo `DockPanel` es el panel, el contenido son hijos-nodo y el layout vive e
 
 **Criterio de aceptación:** ADR con decisión; paneles con contenido del cliente que el usuario
 arrastra sin que `setProps` y el layout se pisen. Cumplido.
+
+### Fase 49 — M18: ranuras como hijos (2026-10-31)
+
+Segunda fase de la regla de las ranuras: abrir como hijos-nodo las ranuras de gpui-component que
+el host todavía llenaba con texto. Inventario y diseño en `docs/adr/0004-m18-ranuras-e-inventario.md`
+(`bda5142`): de los 76 nodos de §5, **ninguno necesita subir `PROTOCOL_VERSION`** (todas las ranuras
+se abren de forma aditiva: la prop de texto se queda y un hijo-nodo opcional gana) y hay unas 17
+candidatas. El usuario eligió la opción 1, las tres que más valen. Cuatro nodos de marcado nuevos;
+`PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (host):** commit `57b2a78`. `AccordionItem` (hijo de `Accordion`, con `id`, `title`,
+  `open`, `disabled`; si hay alguno, `items` se ignora y `change` manda el mismo `id` en los dos
+  modos), `DialogFooter` (reemplaza el pie de `Dialog`/`AlertDialog`; `okText`/`cancelText` se
+  ignoran, los botones mandan su `click` y Escape, la X y el clic fuera siguen mandando `cancel`)
+  y `StatusBarLeft`/`StatusBarRight` (reemplazan `left`/`right`). El pie del diálogo es una vista
+  viva como el cuerpo. §5, §14, §17 y §24 de `PROTOCOL.md` y `conformance/slots.txt`. Un borrador
+  previo sin commit no compilaba y tenía fallos de diseño; quedó en `git stash` y se rehízo.
+- **Paso 2 (clientes):** commit `cc2d9a2`. Node (`accordionItem()`…, `AccordionItemProps`,
+  `SlotProps`), React (componentes; `Accordion` y `StatusBar` aceptan `children`), Python
+  (`accordion_item()`…) y Go (`AccordionItem()`…), un test cada uno.
+- **Paso 3 (ejemplo):** commit `2e4601b`, `examples/slots.ts`. Ventana real con el host release
+  manejada desde PowerShell: la sección sincroniza su `open`, los pies de `Dialog` y `AlertDialog`
+  mandan `click` y la app cierra con `open: false`, el botón de la barra responde y sale limpio.
+- **Narrator:** commit `499d4a7`. Narrator no leía los títulos del `Accordion` y Tab no llegaba al
+  encabezado (el disparador del crate, en gpui-base, es un `div` con rol de botón y
+  `aria-expanded` pero sin nombre, sin foco y solo con clic; límite anotado en la Fase 42). El
+  usuario eligió «nombre + parada»: el host dibuja el título de cada `AccordionItem` habilitado
+  como botón con nombre y estado, parada de Tab, y Enter/Espacio lo abren y cierran; en modo
+  `items` el título es una etiqueta con nombre, sin parada. §16 actualizado. El usuario repitió
+  Narrator en `slots` y lo dio por bueno.
+- **Pruebas:** host (`cargo test`, `clippy`, conformance) en verde; 30 Node, 28 React, 30 Python
+  y Go en verde.
+- **Tamaño del host release:** 21.371.904 → **21.414.400 B** (+42.496 B) en `2e4601b`;
+  21.417.984 B con el arreglo de Narrator.
+- **Corrección:** la Fase 27 dice que `StatusBar` solo expone texto en `left`/`right`;
+  el crate acepta elementos, y desde esta fase el host también.
+- **Fuera (ADR §3.3 y §6):** las demás candidatas aditivas (`title` de los diálogos, `Sheet`,
+  `GroupBox`, `Field`, `Sidebar`, `prefix`/`suffix` de `Input`, el `overlay` de `Attachment`,
+  `DescriptionList`…) se hacen cuando un ejemplo o un usuario las pida. Quedan como texto a
+  propósito las etiquetas de los controles, `Marker.content`, `Message.avatar`, `Questionnaire`
+  y las listas de datos.
+
+**Criterio de aceptación:** inventario con decisión de protocolo; las ranuras elegidas abiertas
+como hijos sin romper las props de texto, en host, protocolo, conformance, los 4 clientes, un
+ejemplo y Narrator. Cumplido.
