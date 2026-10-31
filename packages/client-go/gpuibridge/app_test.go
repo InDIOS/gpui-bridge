@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -154,6 +155,283 @@ func TestDefaultHostPath(t *testing.T) {
 	if got := defaultHostPath(); got != "an-explicit-host" {
 		t.Fatalf("defaultHostPath ignored GPUI_BRIDGE_HOST: %s", got)
 	}
+}
+
+func TestFormControlsWithStateDispatchValues(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(payload any) {
+		mu.Lock()
+		seen = append(seen, payload.(map[string]any)["value"])
+		mu.Unlock()
+	}
+
+	day := app.DatePicker(Props{"value": "2024-08-03", "placeholder": "Pick a day"}).On("change", add)
+	time_ := app.TimeField(Props{"value": "09:30"}).On("change", add)
+	color := app.ColorPicker(Props{"value": "#3366ff", "palette": []any{"#ff0000", "#00ff0080"}}).On("change", add)
+	langs := app.Combobox(Props{
+		"options": []any{
+			map[string]any{"value": "rs", "label": "Rust"},
+			map[string]any{"value": "go", "label": "Go"},
+		},
+		"value": []any{"rs"}, "placeholder": "Languages", "searchable": true,
+	}).On("change", add)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(day, time_, color, langs)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// `Simulate` puts real JSON on the wire, so the `value` of a `Combobox` change
+	// arrives decoded as []interface{}: the array check that lets Combobox enter M14.
+	steps := []struct {
+		node  NodeID
+		value any
+	}{
+		{day.ID(), "2024-08-10"},
+		{day.ID(), nil}, // clearing the date
+		{time_.ID(), "18:05"},
+		{color.ID(), "#FF0000"},
+		{color.ID(), nil}, // clearing the color
+		{langs.ID(), []any{"rs", "go"}},
+		{langs.ID(), []any{"go"}},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(s.node, "change", s.value, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(steps) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(steps), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	want := []any{"2024-08-10", nil, "18:05", "#FF0000", nil, []any{"rs", "go"}, []any{"go"}}
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
+	}
+}
+
+func TestChatNodesDispatchEvents(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(name string) func(any) {
+		return func(payload any) {
+			mu.Lock()
+			seen = append(seen, []any{name, payload.(map[string]any)["value"]})
+			mu.Unlock()
+		}
+	}
+
+	file := app.Attachment(Props{"status": "failed", "title": "report.pdf"}).
+		On("click", add("click")).On("remove", add("remove")).On("retry", add("retry"))
+	quiz := app.Questionnaire(Props{"items": []any{
+		map[string]any{"name": "plan", "label": "Plan", "choices": []any{map[string]any{"value": "free", "label": "Free"}}},
+	}}).On("change", add("change")).On("submit", add("submit"))
+	message := app.Message(Props{"alignment": "end", "avatarName": "Ada"}).Append(
+		app.MessageHeader(Props{}).Append(app.Text(Props{"content": "Ada"})),
+		app.Bubble(Props{"variant": "secondary"}).Append(app.Text(Props{"content": "Hi"})),
+		app.MessageFooter(Props{}),
+	)
+	scroller := app.MessageScroller(Props{"jumpLabel": "Latest"}).
+		Append(message, app.Marker(Props{"content": "Thinking", "loading": true}), file, quiz)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(scroller)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []struct {
+		node     NodeID
+		event    string
+		value    any
+		hasValue bool
+	}{
+		{file.ID(), "click", nil, false},
+		{file.ID(), "remove", nil, false},
+		{file.ID(), "retry", nil, false},
+		{quiz.ID(), "change", map[string]any{"name": "plan", "choices": []any{"free"}}, true},
+		{quiz.ID(), "submit", nil, false},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(s.node, s.event, s.value, s.hasValue); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(steps) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(steps), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	answer := map[string]any{"name": "plan", "status": "answered", "choices": []any{"free"}, "text": nil}
+	want := []any{
+		[]any{"click", nil}, []any{"remove", nil}, []any{"retry", nil},
+		[]any{"change", answer}, []any{"submit", []any{answer}},
+	}
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
+	}
+}
+
+func TestListDispatchesEvents(t *testing.T) {
+	app := mustApp(t)
+	var (
+		mu   sync.Mutex
+		seen []any
+	)
+	add := func(name string) func(any) {
+		return func(payload any) {
+			mu.Lock()
+			seen = append(seen, []any{name, payload.(map[string]any)["value"]})
+			mu.Unlock()
+		}
+	}
+
+	list := app.List(Props{"value": "a", "searchable": true, "hasMore": true, "loadMoreThreshold": 5}).
+		On("change", add("change")).On("confirm", add("confirm")).
+		On("query", add("query")).On("loadMore", add("loadMore")).
+		Append(
+			app.ListItem(Props{"value": "a"}).Append(app.Text(Props{"content": "Apple"})),
+			app.ListItem(Props{"value": "b"}).Append(app.Text(Props{"content": "Banana"})),
+		)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(list)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []struct {
+		event    string
+		value    any
+		hasValue bool
+	}{
+		{"confirm", "b", true},
+		{"query", "ap", true},
+		{"loadMore", nil, false},
+	}
+	for _, s := range steps {
+		if err := app.Simulate(list.ID(), s.event, s.value, s.hasValue); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Confirming another row selects it first: one more event than steps.
+	want := []any{
+		[]any{"change", "b"}, []any{"confirm", "b"}, []any{"query", "ap"}, []any{"loadMore", nil},
+	}
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(seen)
+		mu.Unlock()
+		if n == len(want) {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d events arrived: %#v", n, len(want), seen)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	app.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	if !reflect.DeepEqual(seen, want) {
+		t.Fatalf("got %#v, want %#v", seen, want)
+	}
+}
+
+func TestDockPanelReportsClose(t *testing.T) {
+	app := mustApp(t)
+	closed := make(chan struct{}, 1)
+	notes := app.DockPanel(Props{"title": "Notes", "closable": true}).
+		On("close", func(any) { closed <- struct{}{} }).
+		Append(app.Text(Props{"content": "Hello"}))
+	dock := app.Dock(Props{"class": "size-full"}).Append(
+		app.DockPanel(Props{"title": "Files", "placement": "left"}).Append(app.Text(Props{"content": "src/"})),
+		notes,
+	)
+	app.Window(WindowOptions{Root: dock})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(notes.ID(), "close", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("close did not arrive")
+	}
+	app.Close()
+}
+
+func TestSlotChildrenAreAcceptedAndReport(t *testing.T) {
+	app := mustApp(t)
+	changed := make(chan any, 1)
+	clicked := make(chan struct{}, 1)
+	accordion := app.Accordion(Props{}).
+		On("change", func(payload any) { changed <- payload.(map[string]any)["value"] }).
+		Append(app.AccordionItem(Props{"id": "a", "title": "First", "open": true}).Append(app.Text(Props{"content": "Body"})))
+	save := app.Button(Props{"label": "Save"}).On("click", func(any) { clicked <- struct{}{} })
+	dialog := app.Dialog(Props{"open": true, "title": "Rename"}).Append(app.DialogFooter(Props{}).Append(save))
+	bar := app.StatusBar(Props{}).Append(
+		app.StatusBarLeft(Props{}).Append(app.Text(Props{"content": "Ready"})),
+		app.StatusBarRight(Props{}).Append(app.Text(Props{"content": "UTF-8"})),
+	)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(accordion, dialog, bar)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(accordion.ID(), "change", "a", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(save.ID(), "click", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case value := <-changed:
+		if value != "a" {
+			t.Fatalf("change sent %v", value)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("change did not arrive")
+	}
+	select {
+	case <-clicked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("click did not arrive")
+	}
+	app.Close()
 }
 
 func TestMissingHostBinaryFails(t *testing.T) {

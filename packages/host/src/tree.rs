@@ -81,9 +81,11 @@ pub struct Tree {
     value_writes: Vec<NodeId>,
     /// Image files to read again: a `src` the client sent, or the bytes it sent as `data`.
     image_reloads: Vec<PathBuf>,
-    /// Files holding the bytes of `Image` nodes that use `data` (one per node).
+    /// Files holding the bytes of `Image` and `Attachment` nodes that use `data` (one per node).
     image_data: image_data::Store,
     warned_props: HashSet<(NodeType, String)>,
+    /// `DockPanel`s the user closed: they stay out of their `Dock` while the node exists.
+    closed_panels: HashSet<NodeId>,
 }
 
 impl Tree {
@@ -126,6 +128,14 @@ impl Tree {
 
     pub fn clear_focus_request(&mut self) {
         self.focus_request = None;
+    }
+
+    pub fn is_panel_closed(&self, id: NodeId) -> bool {
+        self.closed_panels.contains(&id)
+    }
+
+    pub fn close_panel(&mut self, id: NodeId) {
+        self.closed_panels.insert(id);
     }
 
     pub fn tray(&self) -> Option<&TraySpec> {
@@ -202,7 +212,8 @@ impl Tree {
         std::mem::take(&mut self.image_reloads)
     }
 
-    /// The file that holds an `Image` node's `data` bytes, while it has a non-empty `data`.
+    /// The file that holds an `Image`'s or `Attachment`'s `data` bytes, while it has a non-empty
+    /// `data`.
     pub fn image_path(&self, id: NodeId) -> Option<PathBuf> {
         let data = self
             .nodes
@@ -238,7 +249,7 @@ impl Tree {
                 }
                 // Not an error (the file may appear later), but GPUI's own load error omits the path.
                 // A node with bytes (`data`) does not use its `src`, so a missing one is not worth a warning.
-                Some(_) if node_type == NodeType::Image && key == "src" => {
+                Some(_) if node_type.takes_image() && key == "src" => {
                     let src = value.as_str().unwrap_or_default();
                     let bytes = props
                         .get("data")
@@ -260,16 +271,25 @@ impl Tree {
     }
 
     fn track_image_src(&mut self, node_type: NodeType, props: &Props) {
-        if let (NodeType::Image, Some(src)) = (node_type, props.get("src").and_then(Value::as_str))
+        if let Some(src) = props
+            .get("src")
+            .and_then(Value::as_str)
+            .filter(|_| node_type.takes_image())
         {
             self.image_reloads.push(PathBuf::from(src));
         }
     }
 
-    /// Decodes an `Image` node's `data` into its own file, or removes that file when `data` is
-    /// `null` or empty. The value is checked to be a string before this runs; base64 is checked
-    /// here so an invalid payload never reaches the error message (it can be megabytes long).
-    fn store_image_data(&mut self, id: NodeId, props: &Props) -> Result<(), String> {
+    /// Decodes an `Image`'s or `Attachment`'s `data` into its own file, or removes that file when
+    /// `data` is `null` or empty. The value is checked to be a string before this runs; base64 is
+    /// checked here so an invalid payload never reaches the error message (it can be megabytes
+    /// long).
+    fn store_image_data(
+        &mut self,
+        id: NodeId,
+        node_type: NodeType,
+        props: &Props,
+    ) -> Result<(), String> {
         let Some(value) = props.get("data") else {
             return Ok(());
         };
@@ -282,8 +302,12 @@ impl Tree {
             self.image_data.remove(id);
             return Ok(());
         }
-        let bytes = image_data::decode(encoded)
-            .map_err(|_| "Prop 'data' of Image must be standard base64".to_string())?;
+        let bytes = image_data::decode(encoded).map_err(|_| {
+            format!(
+                "Prop 'data' of {} must be standard base64",
+                node_type.name()
+            )
+        })?;
         match self.image_data.write(id, &bytes) {
             Ok(path) => self.image_reloads.push(path),
             // Not a protocol error: the node stays valid and shows nothing, like a missing file.
@@ -426,6 +450,7 @@ impl Tree {
                         | NodeType::Div
                         | NodeType::Table
                         | NodeType::Command
+                        | NodeType::List
                 ) {
                     return Err(fail(
                         ErrorCode::InvalidOperation,
@@ -469,17 +494,21 @@ impl Tree {
                 })?;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                crate::components::check_form_value(node_type, None, &props)
+                    .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 node_type
                     .check_required(&props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
-                if matches!(node_type, NodeType::Input | NodeType::Textarea)
-                    && props.get("value").is_some_and(|v| !v.is_null())
+                if matches!(
+                    node_type,
+                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                ) && props.get("value").is_some_and(|v| !v.is_null())
                 {
                     self.value_writes.push(id);
                 }
                 self.track_image_src(node_type, &props);
-                if node_type == NodeType::Image {
-                    self.store_image_data(id, &props)
+                if node_type.takes_image() {
+                    self.store_image_data(id, node_type, &props)
                         .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 }
                 let props = props
@@ -533,23 +562,40 @@ impl Tree {
                     .node_type;
                 self.check_props(node_type, &props)
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
+                // Against the whole node: `range: true` alone must not leave a single date behind.
+                crate::components::check_form_value(
+                    node_type,
+                    Some(&self.nodes[&id].props),
+                    &props,
+                )
+                .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 // Only when the op touches it: a `Tab` keeps the `value` it was created with.
                 if props.contains_key("value") {
                     node_type
                         .check_required(&props)
                         .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 }
-                if matches!(node_type, NodeType::Input | NodeType::Textarea)
-                    && props.contains_key("value")
+                if matches!(
+                    node_type,
+                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                ) && props.contains_key("value")
                 {
                     self.value_writes.push(id);
                 }
                 self.track_image_src(node_type, &props);
-                if node_type == NodeType::Image {
-                    self.store_image_data(id, &props)
+                if node_type.takes_image() {
+                    self.store_image_data(id, node_type, &props)
                         .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 }
                 let node = self.node_mut(id).expect("checked above");
+                // New questions start over, as the window's state does (PROTOCOL.md section 26).
+                if node_type == NodeType::Questionnaire
+                    && props
+                        .get("items")
+                        .is_some_and(|items| node.props.get("items") != Some(items))
+                {
+                    node.props.remove("answers");
+                }
                 for (key, value) in props {
                     if value.is_null() {
                         node.props.remove(&key);
@@ -574,8 +620,9 @@ impl Tree {
                 self.detach(id);
                 let mut stack = vec![id];
                 while let Some(id) = stack.pop() {
+                    self.closed_panels.remove(&id);
                     if let Some(node) = self.nodes.remove(&id) {
-                        if node.node_type == NodeType::Image {
+                        if node.node_type.takes_image() {
                             self.image_data.remove(id);
                         }
                         stack.extend(node.children);

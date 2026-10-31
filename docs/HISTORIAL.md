@@ -1830,8 +1830,362 @@ cambios de valor, el de «Volume» y el del nodo sin nombre.
   ya solo da `label`. Ahora usa el mismo `keyboard::spec` (probado: slider «Rating», 3, sin foco).
   Un `Slider` deshabilitado no lleva envoltorio, porque ya se informa solo.
 
-**Pendiente:** que el usuario confirme con Narrator que «Volume» se lee. Si sigue sin leerse con
-los dos nodos nombrados, el problema es el nodo repetido. El host no puede quitarlo: está en un
-`Div` privado de gpui-kit y GPUI no tiene `aria-hidden`. Las salidas serían aceptar el doble anuncio
-o parchear gpui-component (la opción b de M10).
+**Cuarta vuelta (2026-10-27).** Narrator lee «Volume» una sola vez. En `components`, a veces su
+recuadro se quedaba alrededor de la ventana y no seguía al Tab. La causa era una flecha pulsada con
+el foco en un botón de `Pagination` (o en la `×` de una pestaña). La flecha subía hasta la parada,
+que cambiaba la página. gpui-kit rehacía los botones y el foco caía a la ventana.
+- La parada solo toma teclas cuando el foco es suyo (`is_focused`). Probado con UIA: una flecha
+  sobre el botón «1» deja la página en 1, y sobre la parada «Pages» la pasa a 2. El usuario
+  confirmó con Narrator que ya va bien. Con esto **M11 queda cerrado**.
 
+### Fase 44 — M12: los siete componentes simples (2026-10-27)
+
+La tanda «S» de componentes sueltos: `Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`,
+`InputGroup` y `Clipboard`. El usuario aprobó antes de programar (regla 5) la propuesta de
+`DECISIONES-M12.md` con sus recomendaciones (A1, B1, C con los extras de la tabla, D1: no versionar
+ese archivo y borrarlo al cerrar). Cuatro commits, de menor a mayor riesgo, como en M10 y M11:
+paso 0 (plan y aprobación), paso 1 (host, protocolo y conformidad), paso 2 (los cuatro clientes),
+paso 3 (ejemplo y cierre). Los siete entraron en un solo hito porque ninguno agrega dependencias.
+
+- **Sin cambio de protocolo.** Son siete tipos de nodo nuevos (`PROTOCOL.md` §5 y §23), así que un
+  host anterior contesta `unknown_type` a ellos y nada más cambia: `PROTOCOL_VERSION` sigue en 1.
+- **Dónde vive cada uno.** `Label`, `Empty` y `Shimmer` en `components/basic.rs`, presentacionales
+  y sin estado (`Shimmer` es `ShimmerText` con `.id(("node", id))`); `Toggle` en
+  `components/toggle.rs`, copiando la forma de `switch.rs`: el `checked` vive en el árbol y un clic
+  lo cambia (`checkbox_clicked`), con los modos sincronizado y controlado de `Checkbox`;
+  `DropdownButton` y `Clipboard` en `components/button.rs`; `InputGroup` en `components/input.rs`.
+- **`Empty` (decisión A1).** La cabecera va por props (`icon` en un recuadro, `title`,
+  `description`) y los hijos son el contenido —la acción, normalmente un `Button`—, que el host
+  mete en `EmptyContent`. Los subnodos `EmptyHeader`/`EmptyContent` quedan para cuando haga falta
+  media rica; A1 es aditivo.
+- **`DropdownButton` reusa lo que ya había.** La mitad izquierda es un `Button` de
+  `button::build` (label, variante, tooltip y `click`) y el menú sale de `menu::builder`, con
+  `items` validado por `menu::check_items` y `simulate menu` resuelto por `menu::find_item`, igual
+  que `contextMenu`; solo hubo que decirle a `simulate` que los items de este tipo están en `items`
+  y no en `contextMenu`. El caret se nombra con `menuLabel` (`menu_accessibility_label`) y el
+  `tooltip` va a la mitad izquierda (lo declaró la revisión del usuario).
+- **`InputGroup` es el cuarto tipo con slot de texto** (B1). Un `HashMap<NodeId,
+  InputSlot<InputMode>>` más en la vista, su `snapshot`/`sync`/`focus` junto a los de
+  `Input`/`Textarea`/`NumberInput`, y `input::build_group` envolviendo `input::build`. El prefijo y
+  el sufijo son texto e icono: un `InputGroupAddon` por lado, con el icono antes o después del
+  texto según el lado, y ninguno si ese lado no tiene nada. `change` y `submit` pasan por el mismo
+  camino que un `Input`. También hubo que sumar el tipo a la lista de `tree.rs` que anota las
+  escrituras de `value` por commit (sin eso, el `value` del cliente nunca llegaba al `InputState`).
+- **`Clipboard` copia con el portapapeles de GPUI** (el mismo de la acción `writeClipboard`) y
+  avisa con `copied` y el texto copiado. En `--no-window` el evento se emite y no se toca el
+  portapapeles; `simulate copied` no tiene la espera de 2 s del componente, así que dos llamadas
+  seguidas mandan dos eventos.
+- **Dos trampas del crate, cerradas en la revisión del usuario (2026-10-27).** Un `duration` de
+  `Shimmer` finito pero mayor que lo que cabe en un `Duration` (`1e20`, que el esquema acepta como
+  número) mataba el host: ahora usa `try_from_secs_f32` y, si no cabe, deja el valor por defecto.
+  Y `Label.highlights` mezcla en la 0.8.1 los desplazamientos del texto en minúsculas con los del
+  original, así que un carácter que cambia de longitud al bajarlo de caja (el signo kelvin `K`,
+  `İ`) lo hacía paniquear: el host descarta el resaltado en ese caso y §23 lo dice. Los dos llevan
+  test unitario.
+- **Accesibilidad: tres nodos se nombran solos.** `Slider` ya estaba en la lista de excepción del
+  envoltorio; se sumaron `Clipboard` (informa un botón cuyo nombre sale de `a11y.label` o del
+  `tooltip`) y `InputGroup` (el `a11y.label` va al `aria_label` del crate). El motivo del
+  `InputGroup` se vio en el volcado UIA: con el envoltorio general quedaban **dos** grupos, uno sin
+  nombre dentro del otro. `Toggle` no tiene nombre propio en el crate, así que va por el camino
+  general y se llama por su `tooltip`. §16 y §23 lo dicen, y avisan de no dar `tooltip` y
+  `a11y.label` a la vez en un `Toggle`.
+- **Pruebas.** Host: 70 unitarios (los de siempre, los siete tipos en `ALL` y dos de los arreglos
+  de la revisión) y las 26 transcripciones de `conformance/` —con `conformance/simple.txt` nueva:
+  props, los dos modos de
+  `Toggle` e `InputGroup`, `click`/`menu` del `DropdownButton`, `copied` repetido, el `Empty` con
+  su `Button` hijo y doce props inválidas— y `no_window`. `cargo fmt --check` y `clippy` limpios.
+  Clientes: un test nuevo por cliente (24 en Node, 22 en React, 24 en Python, Go verde con dos
+  líneas nuevas en su test de conformidad).
+- **Ventana real:** `examples/simple.ts` con el host de depuración. Volcado del árbol UIA de la
+  ventana (como en M10, con `UIAutomationClient`):
+  - `Button 'Bold text' toggle=Off` — el `Toggle` se anuncia **una vez**, sin duplicado.
+  - `Button 'Save'` y `Button 'Save options'` — las dos mitades del `DropdownButton`.
+  - `Group 'Address'` → `Edit 'host' value='example.com'` — el grupo se nombra y el campo se lee
+    por su `placeholder`.
+  - `Button 'Copy the address'` — el `Clipboard`, una sola vez.
+  - `Group 'No files'` y `Button 'Choose a file'` — el `Empty` y su acción.
+  Sin avisos en stderr (ni clases desconocidas ni props rechazadas). El usuario vio la ventana y
+  **pasó Narrator: lee todo**.
+- **Tamaño del host release:** 19.454.464 B antes → **19.719.168 B** después, +264 KB (+0,26 MB),
+  muy por debajo del ~1 MB que la hoja de ruta marca para parar y revisar.
+- **Fuera, a propósito:** `InputGroupButton` y un `Textarea` dentro del grupo, `ToggleGroup`, media
+  rica en `Empty`, el resaltado por prefijo de `Label` y la parada de Tab en
+  `Toggle`/`Checkbox`/`Switch` (es un hito propio, como anotó M11).
+
+**Visto de paso:** un `NumberInput` nunca recibe su `value` impuesto: `tree.rs` solo anota
+escrituras de texto para `Input` y `Textarea` (y ahora `InputGroup`), así que el `value` de un
+`NumberInput` se queda sin aplicar en la ventana. Es de M10 y no se tocó aquí; queda como tarea
+aparte.
+
+
+### Fase 45 — M13: las cuatro superposiciones (2026-10-27)
+
+Las cuatro superposiciones de gpui-kit: `AlertDialog`, `Sheet`, `Popover` y `HoverCard`. El usuario
+aprobó antes de programar (regla 5) la propuesta de `DECISIONES-M13.md` con sus siete decisiones
+(D1–D7, sin cambios). Tres pasos más el cierre, y la revisión del usuario sobre el ejemplo:
+`e18ffa5` (host, `PROTOCOL.md` §24 y `conformance/overlays.txt`), `b1ce660` (los cuatro clientes),
+`28cd758` (`examples/popups.ts`), `a0fb559` (la revisión del ejemplo) y este cierre.
+
+- **Sin cambio de protocolo.** Son cuatro tipos de nodo nuevos (`PROTOCOL.md` §5 y §24), así que un
+  host anterior contesta `unknown_type` a ellos: `PROTOCOL_VERSION` sigue en 1.
+- **Dónde vive cada uno.** `AlertDialog` y `Sheet` son capas de la ventana, como `Dialog` (§14):
+  `render/dialog.rs` ganó la variante de alerta (`open_alert_dialog`, con `title`, `description`,
+  `icon`, `okText`, `cancelText` y `confirm()` solo cuando hay `cancelText`) y comparte el cuerpo con
+  `Dialog`; `render/sheet.rs` es nuevo (`open_sheet_at(Placement)`, `title`/`size`/`on_close`) y
+  `render/mod.rs` guarda `open_sheet` junto a `open_dialog`. `Popover` y `HoverCard` viven en
+  `components/overlays.rs` y se dibujan donde están: el primer hijo es el disparador y el resto el
+  panel (`ParentElement`), con el `open` de `Popover` sincronizado como el `checked` de un
+  `Checkbox`.
+- **D1 — `AlertDialog` como nodo propio** y no un `variant` de `Dialog`: el crate ya trae la
+  variante, un host viejo contesta `unknown_type` en vez de dibujar un diálogo normal en silencio, y
+  el costo fue ~15 líneas de `schema.rs` más compartir `render/dialog.rs`.
+- **D6 — la alerta gana al diálogo.** Una capa de diálogos por ventana, como en §14, pero ahora
+  gana una alerta abierta y, entre iguales, el id más bajo (una línea en el filtro de
+  `sync_dialog_and_focus`, `render/mod.rs`). Al cerrarla, el `Dialog` de debajo vuelve **con su
+  texto intacto** —los slots viven en `RootView` por id de nodo—, que es el uso típico: confirmar
+  encima de un diálogo. Comprobado en ventana real.
+- **D2 — `change` con `checked` en los dos sentidos** en `Popover` (abrir y cerrar). Sin el sentido
+  «abrir», la copia de `open` del cliente quedaría desfasada cuando el usuario lo abre.
+- **D3 — `HoverCard` sin `open` y sin `simulate`**, porque `gpui_base::HoverCard` no tiene modo
+  controlado: solo `on_open_change` y los dos retardos. Su `change` sale únicamente del ratón en
+  ventana real.
+- **Retardos a prueba de números enormes.** `Duration::from_millis(ms.max(0.) as u64)`, que satura
+  en vez de entrar en pánico, con test unitario (`1e300`). Es la trampa que M12 encontró en
+  `Shimmer` con `from_secs_f32`; aquí no se repitió.
+- **Dos trampas del crate, resueltas y documentadas.** `Popover::trigger` exige
+  `Selectable + IntoElement`, así que el host envuelve el primer hijo en un `Trigger(AnyElement)`
+  mínimo cuyo `Selectable` no pinta nada: el disparador conserva su aspecto y sigue siendo el mismo
+  elemento. Y en estos dos nodos `Styled` es la **superficie del panel** mientras `trigger_style`
+  es el **hueco del disparador** (D5): `class` va ahí, por eso un `w-full` ocupa el hueco; solo
+  llegan las utilidades estáticas, porque `hover:` y `transition` necesitan el elemento mismo. §24
+  lo dice en esos términos.
+- **Sin hijos y con un solo hijo.** Un `Popover` o `HoverCard` sin hijos no dibuja nada y el host
+  avisa una vez por stderr; con un solo hijo, el crate abre una caja vacía con relleno (se
+  documenta, sin aviso).
+- **Accesibilidad (§24).** Los cuatro ignoran el `a11y` del nodo: en `AlertDialog`/`Sheet` el nombre
+  sale del `title` y el cuerpo lo estilan los hijos; en `Popover`/`HoverCard` el lector lee el
+  `a11y` del hijo disparador. El foco entra en el contenido de los tres primeros (el `Popover` lo
+  lleva a su contenido); `HoverCard` no mueve el foco. Con teclado, un `Popover` solo se abre si el
+  disparador es enfocable (`Button`, `Input`): un `Text` o un `div` son solo ratón.
+- **Pruebas.** Host: 72 unitarios (los dos nuevos son los ocho `anchor` y el retardo enorme), las 26
+  transcripciones de `conformance/` —con `overlays.txt` ampliada con §24: props de los cuatro, los
+  `simulate` (incluido el `invalid_operation` de repetir y el de un evento ajeno), un `Popover` con
+  `open:false` que no avisa, seis props inválidas y un retardo enorme que se acepta— y `no_window`.
+  `cargo fmt --check` y `clippy` limpios. Clientes: un test nuevo por cliente («the overlays…»), 25
+  en Node, 23 en React, 25 en Python y Go en verde.
+- **Ventana real:** `examples/popups.ts`, con el host de depuración, repasada por el usuario contra
+  la lista de §10: la confirmación encima del diálogo y el diálogo de vuelta con su texto, el panel
+  desde los dos lados con su `size`, el menú anclado con flecha y un disparador `w-full`, la
+  tarjeta con sus retardos, y Escape y Tab en las tres primeras: **todo bien**. **Pasada del
+  lector** (Narrator, 2026-10-28, como en M11/M12): **todo bien**; con ella el criterio de
+  aceptación queda cerrado.
+- **Tamaño del host release:** 19.719.168 B antes → **19.821.056 B** después, +101.888 B (+0,10 MB),
+  muy por debajo del ~1 MB que la hoja de ruta marca para parar y revisar.
+- **Fuera, a propósito:** apilar diálogos de verdad (una capa por ventana), un `Popover` en una
+  posición fija sin disparador, un `Sheet` con pie de botones propio, `resizable`/`overlay`/
+  `overlayClosable` del `Sheet` como props y `controlled` en `Popover` (el modo sincronizado ya
+  avisa en los dos sentidos y el cliente puede cerrar con `open:false`).
+
+### Fase 46 — M14: los cuatro controles de formulario con estado (2026-10-28)
+
+Cuatro controles de gpui-kit que guardan su valor en el host y reportan `change`: `DatePicker`,
+`TimeField`, `ColorPicker` y `Combobox`. Patrón slot de `Select`/`Calendar` (estado en el host,
+`change` sincronizado o `controlled`). `PROTOCOL_VERSION` sigue en 1.
+
+Tres pasos más el cierre, todos aprobados contra la propuesta de `DECISIONES-M14.md` (D1–D10):
+
+- **Paso 2–4 (host + protocolo + conformance):** commit `4fd5757`. Los cuatro adaptadores
+  (`components/date_picker.rs`, `time_field.rs`, `color_picker.rs`, `combobox.rs`) con `Snapshot`
+  + `sync` + `build`; validación con el nodo completo (`check_form_value` en `components/mod.rs`):
+  fecha/hora/hex contra `range`/`seconds`, `#` obligatorio, `palette` validada, separador `/` ISO 8601.
+  `ColorPicker` dibujado como `ColorSelect`, sin `disabled` (el crate no lo permite).
+  `conformance/form-state.txt` con 96 líneas (synced, controlled, `invalid_props` y `invalid_operation`
+  para valores y tipos malos). Host: 72 unitarios + 27 transcripciones + `no_window`, `fmt`/`clippy` limpios.
+  Tamaño release antes del hito: **19.821.056 B**.
+
+- **Paso 5 (cuatro clientes):** commit `967c32a`. Node (`app.datePicker()`, `timeField()`,
+  `colorPicker()`, `combobox()` + tipos y `NodeEvents`; `HostMessage` admite `value: string[]`),
+  Python (`date_picker()`, `time_field()`, `color_picker()`, `combobox()`), Go (constructores
+  idiomáticos `DatePicker`/`TimeField`/`ColorPicker`/`Combobox`; test con `Simulate` verificando
+  que el array de `change` del `Combobox` llega decodificado como `[]interface{}` —el chequeo
+  de «Abiertos» que deja entrar el `Combobox`— y conformance del cliente con las 5 líneas `create`
+  de `form-state.txt`), React (`<DatePicker>`/`<TimeField>`/`<ColorPicker>`/`<Combobox>` con
+  `controlled` automático al pasar `value`). 26 Node, 24 React, 26 Python y Go (`vet`+`gofmt`+`-race`)
+  en verde.
+
+- **Paso 6 (ejemplo):** commit `d8ac89a`. `examples/forms.ts` con los cuatro nodos; el `Combobox`
+  `controlled` (la app confirma como máximo tres). Type-check de ejemplos limpio.
+
+- **Paso 7 (ventana real + Narrator):** `pnpm dev forms` abre y se mantiene con el host de
+  depuración; el usuario comprobó visualmente los cuatro controles, el `Combobox` controlled,
+  teclado y pasó Narrator (lee etiquetas, valores y cambios): **todo bien**.
+
+- **Tamaño del host release:** **20.302.848 B** (+481.792 B, +0,48 MB, por debajo del umbral
+  de ~1 MB). `DECISIONES-M14.md` borrado.
+
+**Criterios de aceptación:** `invalid_props` para valores imposibles en los cuatro, modo
+`controlled` funcionando, `conformance/form-state.txt` verde en host y cuatro clientes,
+ejemplo con ventana real y Narrator, `HISTORIAL.md` con la fase y el tamaño, `PROTOCOL_VERSION`
+en 1.
+
+
+### Fase 47 — M15: chat y listas (2026-10-29)
+
+Ocho nodos de chat y una lista de gpui-kit 0.8: `Bubble`, `Message` (con `MessageHeader` y
+`MessageFooter`), `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`, y `List` con sus
+filas `ListItem`. Todo aditivo: `PROTOCOL_VERSION` sigue en 1 (PROTOCOL.md §26 y §27). Las
+decisiones D1–D7 se aprobaron con el usuario antes de programar (`DECISIONES-M15.md`, borrado al cerrar); lo que
+cambiaría nodos ya publicados quedó para M18.
+
+- **Fase 1 (presentacionales):** commit `e8b2b05`. Rehecho desde cero un borrador sin commitear
+  que no compilaba y no seguía las decisiones. `Bubble`, `Message` con cabecera y pie como
+  hijos-nodo (D2, opción C, patrón `Tab`), `Marker` y `Attachment` presentacional y controlado
+  (el estado lo lleva el cliente; `click`/`remove`/`retry` solo con suscripción) en
+  `components/chat.rs`. `conformance/chat.txt`. Release 20.302.848 → 20.665.344 B.
+- **Fase 2 (`MessageScroller`):** commits `a3a1a3b` y `1554123`. La `list` de GPUI con alto
+  variable y anclada al final; un estado por nodo y, por commit, un `splice` de lo que cambió
+  entre el principio y el final comunes (agregar, anteponer o quitar conserva la posición de
+  lectura). 10 000 mensajes (30 000 nodos) en 242 ms con el host release y streaming sin
+  solapes, sin `remeasure`. Hallazgo del usuario: al arrastrar la barra el contenido da saltos
+  (GPUI cuenta como 0 px las filas no dibujadas y el crate no deja estimarlas); documentado.
+  Release 20.725.760 B.
+- **Fase 3 (`Questionnaire`):** commit `614b2b2`. Preguntas de una en una desde la prop `items`
+  (validada: nombres y valores únicos, un solo `selected` sin `multiple`); el crate lleva el
+  estado, la navegación y `required`; el host reporta `change` con `{name, status, choices,
+  text}` y `submit` con todas. D6 recortado con el usuario: sin respuestas puestas por el
+  cliente, `errors`, `current` ni atajos. Release 21.018.112 B.
+- **Fase 4 (clientes y ejemplo):** commit `8db2d77` y cuatro arreglos tras la ventana real y el
+  Narrator del usuario: `0a2649c` (cada mensaje con `a11y`), `c18f564` (un `Bubble` con `a11y`
+  conserva su lado y su ancho), `0c0df83` (la rueda vuelve a llegar al final: el padding de la
+  lista quedaba fuera del chequeo de GPUI) y `f8fad4e` (un `text` con rol y sin `label` toma su
+  contenido como nombre; el rol `label` pasa su texto como valor, porque AccessKit nombra un
+  `label` desde el valor). `examples/chat.ts`. El usuario leyó la conversación con Narrator en
+  modo de examen.
+- **Fase 5 (`List`):** commits `fece703` y `403e1ee`. Eventos aprobados al empezar (D7 E1–E6,
+  más `loadMoreThreshold` a pedido del usuario): filas como hijos `ListItem` con `value` y
+  `disabled`; `change` con flechas o clic (`null` con Escape) en modo sincronizado o
+  `controlled`; `confirm` con Enter o clic; `query` con el texto del buscador (el cliente manda
+  las filas que coinciden); `loadMore` una vez por número de filas mientras haya `hasMore`. Sin
+  `cancel` y sin `ListSection` (a la cola). `ListState` del crate con un delegate que lee las
+  filas del árbol y las pinta con el mismo pase de `VirtualList`; las flechas saltan filas
+  deshabilitadas; la lista acepta `focus`. `conformance/list.txt`, `simulate`, una prueba por
+  cliente y `examples/list.ts`. Hallazgos en la ventana: el `ListItem` del crate apila sus hijos
+  (el host los pone en fila) y deja su etiqueta en un elemento sin rol, así que el lector leía
+  las filas sin nombre (Narrator del usuario); el host pone el `a11y` de la fila en su contenido
+  y marca la seleccionada como descendiente activo. Con `searchable` el foco queda en el
+  buscador y el lector no sigue a las flechas (limitación del crate, en §27). Va en el mismo
+  commit el arreglo de `scripts/dev.mjs`: `pnpm dev react/todo` compilaba y salía sin abrir el
+  ejemplo.
+- **Ventana real con el host release (`list`):** flechas, Enter, Escape y clic (el clic manda
+  `change` y luego `confirm`), filas deshabilitadas saltadas (c96 → c98), búsqueda de 10 a
+  80 ms por tecla con 10 000 filas, final de las 10 000 filas sin cortes, una fila de 40 niveles
+  sin desbordar la pila, `loadMore` a las 50, 100 y 150 filas. Con el host de depuración la
+  búsqueda tarda segundos: mover una fila ya colocada recorre los hijos del padre (`retain`),
+  coste anterior a `List` que no se tocó. UIA: cada fila con nombre y el foco sigue a las
+  flechas en la lista sin buscador. El usuario repitió con Narrator: todo se lee bien.
+- **Pruebas:** host 74 unitarios + transcripciones + `no_window`, `fmt`/`clippy` limpios;
+  28 Node, 26 React, 28 Python y Go en verde.
+- **Tamaño del host release:** 20.302.848 → **21.151.232 B** (+848.384 B, +0,85 MB, por debajo del
+  umbral de ~1 MB).
+- **Sin probar:** Escape con una `List` dentro de un `Dialog` (la frase se quitó de §27).
+- **Fuera (decidido con el usuario):** `BubbleReactions` y `BubbleGroup`; `MessageGroup` (se
+  agrupa con un `div`); `separator_style` de `Marker`; el renderizador y la transición propios
+  del botón de salto y `bottomFade` de `MessageScroller`; `AttachmentGroup`, la superposición
+  sobre la imagen y los elementos extra de `AttachmentContent` (M18); `QuestionnaireValidator`
+  y los estilos por pieza; en `List`, confirmar con Ctrl+Enter o Ctrl+clic, el resaltado con
+  clic derecho, la vista inicial antes de buscar y un estado vacío propio. `ListSection`, a la
+  cola. `DECISIONES-M15.md` borrado.
+
+**Criterios de aceptación:** un ejemplo de chat con los seis primeros, 10 000 mensajes sin
+retraso perceptible y ventana real; `List` con 10 000 filas, árbol profundo (pila) y teclado;
+`a11y` de cada nodo con Narrator; `HISTORIAL.md` con la fase y el tamaño; `PROTOCOL_VERSION`
+en 1.
+
+### Fase 48 — M16: `Dock` (2026-10-30)
+
+Paneles que el usuario reordena: arrastra una pestaña a otro grupo o a un borde para dividir,
+cambia el tamaño de las divisiones y pliega los docks laterales. Dos nodos nuevos, `Dock` y
+`DockPanel` (PROTOCOL.md §28); `PROTOCOL_VERSION` sigue en 1. Decidido antes de programar en
+`docs/adr/0003-dock.md` (spike `516e4cc`, aprobado en `7d29a94`): el host posee el layout, el id
+del nodo `DockPanel` es el panel, el contenido son hijos-nodo y el layout vive en memoria.
+
+- **Paso 1 (host):** commit `a5f65e0`. `components/dock.rs`: un `DockArea` del crate por `Dock`
+  y una entidad por `DockPanel` que dibuja sus hijos con el mismo `RenderItem` de `List`. En cada
+  commit el host solo añade los paneles nuevos (en el primer grupo de su `placement`) y quita los
+  que ya no están; `setProps` nunca deshace lo que el usuario movió. `closable` + evento `close`
+  (como `Alert`), detectado por `Panel::on_removed`, que mover un panel no dispara; el panel
+  cerrado no vuelve mientras exista su nodo. Extra: el host quita el dock lateral que se queda
+  sin paneles (el crate lo dejaba como franja vacía). `conformance/dock.txt` y `simulate close`.
+  Ventana real manejada desde PowerShell: contenido y `setProps` en vivo, título en caliente,
+  añadir y quitar, arrastrar a un split con `setProps` corriendo y cerrar desde el menú.
+- **Paso 2 (clientes):** commit `9edb973`. Node (`dock`/`dockPanel`), React (`<Dock>`,
+  `<DockPanel onClose>`), Python (`dock`/`dock_panel`) y Go (`Dock`/`DockPanel`), una prueba
+  cada uno.
+- **Paso 3 (ejemplo):** commit `152ca19`, `examples/dock.ts` (Files a la izquierda, Notes y los
+  archivos abiertos en pestañas, Output abajo con una línea por segundo por `setProps`). Dos
+  arreglos tras la prueba del usuario: `a74cffd` (al cerrar la ventana el temporizador seguía
+  haciendo `commit` y lanzaba `HostExitedError`; ahora se para con `exit`) y `d8d9c97` (Narrator
+  leía los botones pero no las pestañas: el crate pone el título como hijo de `Tab` sin
+  `.label()` y AccessKit no nombra una pestaña por sus hijos; como en `List`, el título es un
+  `label` con nombre propio). El usuario probó a mano abrir, cerrar y mover paneles y lo
+  confirmó con Narrator.
+- **Pruebas:** host 74 unitarios + transcripciones + `no_window`, `fmt`/`clippy` limpios;
+  29 Node, 27 React, 29 Python y Go en verde.
+- **Tamaño del host release:** 21.151.232 → **21.371.904 B** (+220.672 B), medido en `152ca19`.
+- **Pendiente en el crate:** la pestaña (`TabItem`) sigue sin nombre propio y los botones de
+  cerrar y plegar no tienen nombre; al hacer clic en un panel sale el aviso «focused element …
+  has no accessibility node» (probablemente el marco con foco del grupo de pestañas en
+  gpui-base, sin confirmar). La prueba automática con ratón se dejó: con el escritorio del
+  usuario en uso los clics caían en otra ventana.
+- **Fuera (ADR §7):** persistencia en disco, operaciones de layout desde el cliente (mover,
+  seleccionar, tamaños), eventos de pestaña activa y de plegar, vetar un cierre, tamaño inicial
+  de los docks laterales, bloqueo, las ranuras `title_suffix`/`toolbar_buttons`/`dropdown_menu` y
+  `Dock` dentro de un `DockPanel`.
+
+**Criterio de aceptación:** ADR con decisión; paneles con contenido del cliente que el usuario
+arrastra sin que `setProps` y el layout se pisen. Cumplido.
+
+### Fase 49 — M18: ranuras como hijos (2026-10-31)
+
+Segunda fase de la regla de las ranuras: abrir como hijos-nodo las ranuras de gpui-component que
+el host todavía llenaba con texto. Inventario y diseño en `docs/adr/0004-m18-ranuras-e-inventario.md`
+(`bda5142`): de los 76 nodos de §5, **ninguno necesita subir `PROTOCOL_VERSION`** (todas las ranuras
+se abren de forma aditiva: la prop de texto se queda y un hijo-nodo opcional gana) y hay unas 17
+candidatas. El usuario eligió la opción 1, las tres que más valen. Cuatro nodos de marcado nuevos;
+`PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (host):** commit `57b2a78`. `AccordionItem` (hijo de `Accordion`, con `id`, `title`,
+  `open`, `disabled`; si hay alguno, `items` se ignora y `change` manda el mismo `id` en los dos
+  modos), `DialogFooter` (reemplaza el pie de `Dialog`/`AlertDialog`; `okText`/`cancelText` se
+  ignoran, los botones mandan su `click` y Escape, la X y el clic fuera siguen mandando `cancel`)
+  y `StatusBarLeft`/`StatusBarRight` (reemplazan `left`/`right`). El pie del diálogo es una vista
+  viva como el cuerpo. §5, §14, §17 y §24 de `PROTOCOL.md` y `conformance/slots.txt`. Un borrador
+  previo sin commit no compilaba y tenía fallos de diseño; quedó en `git stash` y se rehízo.
+- **Paso 2 (clientes):** commit `cc2d9a2`. Node (`accordionItem()`…, `AccordionItemProps`,
+  `SlotProps`), React (componentes; `Accordion` y `StatusBar` aceptan `children`), Python
+  (`accordion_item()`…) y Go (`AccordionItem()`…), un test cada uno.
+- **Paso 3 (ejemplo):** commit `2e4601b`, `examples/slots.ts`. Ventana real con el host release
+  manejada desde PowerShell: la sección sincroniza su `open`, los pies de `Dialog` y `AlertDialog`
+  mandan `click` y la app cierra con `open: false`, el botón de la barra responde y sale limpio.
+- **Narrator:** commit `499d4a7`. Narrator no leía los títulos del `Accordion` y Tab no llegaba al
+  encabezado (el disparador del crate, en gpui-base, es un `div` con rol de botón y
+  `aria-expanded` pero sin nombre, sin foco y solo con clic; límite anotado en la Fase 42). El
+  usuario eligió «nombre + parada»: el host dibuja el título de cada `AccordionItem` habilitado
+  como botón con nombre y estado, parada de Tab, y Enter/Espacio lo abren y cierran; en modo
+  `items` el título es una etiqueta con nombre, sin parada. §16 actualizado. El usuario repitió
+  Narrator en `slots` y lo dio por bueno.
+- **Pruebas:** host (`cargo test`, `clippy`, conformance) en verde; 30 Node, 28 React, 30 Python
+  y Go en verde.
+- **Tamaño del host release:** 21.371.904 → **21.414.400 B** (+42.496 B) en `2e4601b`;
+  21.417.984 B con el arreglo de Narrator.
+- **Corrección:** la Fase 27 dice que `StatusBar` solo expone texto en `left`/`right`;
+  el crate acepta elementos, y desde esta fase el host también.
+- **Fuera (ADR §3.3 y §6):** las demás candidatas aditivas (`title` de los diálogos, `Sheet`,
+  `GroupBox`, `Field`, `Sidebar`, `prefix`/`suffix` de `Input`, el `overlay` de `Attachment`,
+  `DescriptionList`…) se hacen cuando un ejemplo o un usuario las pida. Quedan como texto a
+  propósito las etiquetas de los controles, `Marker.content`, `Message.avatar`, `Questionnaire`
+  y las listas de datos.
+
+**Criterio de aceptación:** inventario con decisión de protocolo; las ranuras elegidas abiertas
+como hijos sin romper las props de texto, en host, protocolo, conformance, los 4 clientes, un
+ejemplo y Narrator. Cumplido.

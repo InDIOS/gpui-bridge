@@ -6,12 +6,14 @@ use std::collections::{HashMap, HashSet};
 use gpui_kit::base::input::{InputBaseState, InputModeKind};
 use gpui_kit::component::Disableable;
 use gpui_kit::component::input::{
-    Input, InputEvent, InputMode, InputState, NumberInput, Textarea, TextareaMode, TextareaState,
+    Input, InputEvent, InputGroup, InputGroupAddon, InputGroupAddonAlignment, InputMode,
+    InputState, NumberInput, Textarea, TextareaMode, TextareaState,
 };
 use gpui_kit::*;
 
-use super::{input_edited, input_submitted, prop_bool, prop_str};
+use super::{basic, input_edited, input_submitted, prop_bool, prop_str};
 use crate::Session;
+use crate::a11y;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
 use crate::tree::{Node, Tree};
@@ -159,6 +161,55 @@ fn on_user_edit<M: TextKind>(
 /// Props: `value` (applied by `sync`), `placeholder`, `disabled`, `controlled`.
 pub fn build(node: &Node, slot: &InputSlot<InputMode>) -> Input {
     Input::new(&slot.state).disabled(prop_bool(node, "disabled"))
+}
+
+/// Props like `Input`, plus `prefix`/`prefixIcon` and `suffix`/`suffixIcon` (text and an icon on
+/// either side of the frame), `readonly` and `invalid`. Events: `change`, `submit`.
+/// `a11y.label` names the group itself, so the host does not wrap it (see `node_raw`).
+pub fn build_group(id: NodeId, node: &Node, slot: &InputSlot<InputMode>) -> InputGroup {
+    let mut group = InputGroup::new(("node", id))
+        .input(build(node, slot))
+        .disabled(prop_bool(node, "disabled"))
+        .readonly(prop_bool(node, "readonly"))
+        .invalid(prop_bool(node, "invalid"));
+    if let Some(label) = a11y::of(node).and_then(|spec| spec.label) {
+        group = group.aria_label(label);
+    }
+    // A side reads icon then text on the left, text then icon on the right; with neither it adds
+    // no addon at all.
+    for (text_key, icon_key, align, icon_first) in [
+        (
+            "prefix",
+            "prefixIcon",
+            InputGroupAddonAlignment::InlineStart,
+            true,
+        ),
+        (
+            "suffix",
+            "suffixIcon",
+            InputGroupAddonAlignment::InlineEnd,
+            false,
+        ),
+    ] {
+        let text = prop_str(node, text_key)
+            .filter(|text| !text.is_empty())
+            .map(|text| SharedString::from(text.to_owned()).into_any_element());
+        let icon = basic::icon(node, icon_key).map(IntoElement::into_any_element);
+        let children: Vec<AnyElement> = if icon_first {
+            [icon, text].into_iter().flatten().collect()
+        } else {
+            [text, icon].into_iter().flatten().collect()
+        };
+        if children.is_empty() {
+            continue;
+        }
+        group = group.addon(
+            InputGroupAddon::new((text_key, id))
+                .align(align)
+                .children(children),
+        );
+    }
+    group
 }
 
 /// Props like `Input`; it adds the increment and decrement buttons of gpui-component.

@@ -1,6 +1,6 @@
 {
   "name": "gpui-bridge-react",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "React renderer for gpui-bridge native UIs",
   "license": "MIT",
   "author": "gpui-bridge contributors",
@@ -34,7 +34,7 @@
     "node": ">=22.6"
   },
   "peerDependencies": {
-    "gpui-bridge": "^0.2.0",
+    "gpui-bridge": "^0.3.0",
     "react": "^19.3.0"
   },
   "dependencies": {

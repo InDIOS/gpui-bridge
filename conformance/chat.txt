@@ -1,0 +1,146 @@
+# Section 26: chat components (Bubble, Message with MessageHeader/MessageFooter, Marker,
+# Attachment), their props and their events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"class":"flex flex-col gap-4"}}
+> {"op":"create","id":2,"type":"Message","props":{"alignment":"end","avatarName":"Ada","avatarSrc":"","a11y":{"role":"listitem","label":"Ada"}}}
+> {"op":"create","id":3,"type":"MessageHeader","props":{"class":"gap-2"}}
+> {"op":"create","id":4,"type":"text","props":{"content":"Ada · 10:42"}}
+> {"op":"create","id":5,"type":"Bubble","props":{"variant":"tinted","alignment":"end"}}
+> {"op":"create","id":6,"type":"text","props":{"content":"Here is the report."}}
+> {"op":"create","id":7,"type":"MessageFooter"}
+> {"op":"create","id":8,"type":"Button","props":{"label":"Copy","variant":"ghost"},"events":["click"]}
+> {"op":"append","parent":3,"child":4}
+> {"op":"append","parent":5,"child":6}
+> {"op":"append","parent":7,"child":8}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":2,"child":5}
+> {"op":"append","parent":2,"child":7}
+> {"op":"append","parent":1,"child":2}
+> {"op":"create","id":9,"type":"Marker","props":{"content":"Thinking","icon":"loader-circle","variant":"separator","alignment":"start","loading":true,"loadingStyle":"shimmer","a11y":{"role":"status"}}}
+> {"op":"create","id":10,"type":"Attachment","props":{"status":"uploading","progress":45,"title":"report.pdf","description":"2.4 MB","tooltip":"Uploading","axis":"horizontal"},"events":["click","remove","retry"]}
+> {"op":"create","id":11,"type":"Button","props":{"label":"Open"},"events":["click"]}
+> {"op":"append","parent":10,"child":11}
+> {"op":"create","id":12,"type":"Attachment","props":{"status":"complete","axis":"vertical","data":"aGVsbG8="}}
+> {"op":"append","parent":1,"child":9}
+> {"op":"append","parent":1,"child":10}
+> {"op":"append","parent":1,"child":12}
+# A MessageScroller's rows are its children; it has no events.
+> {"op":"create","id":13,"type":"MessageScroller","props":{"class":"flex-1","scrollbar":false,"jumpButton":true,"jumpLabel":"Ir al último"}}
+> {"op":"create","id":14,"type":"Marker","props":{"content":"Today","variant":"separator"}}
+> {"op":"append","parent":13,"child":14}
+> {"op":"append","parent":1,"child":13}
+> {"op":"window","root":1}
+> {"op":"commit"}
+# The card and its corner button report a click and a remove, with no value.
+> {"op":"simulate","id":10,"event":"click"}
+< {"type":"event","id":10,"event":"click"}
+> {"op":"simulate","id":10,"event":"remove"}
+< {"type":"event","id":10,"event":"remove"}
+# Retry only exists while the attachment is failed; the client changes the status.
+> {"op":"simulate","id":10,"event":"retry"}
+> {"op":"setProps","id":10,"props":{"status":"failed","description":"Network error"}}
+> {"op":"commit"}
+> {"op":"simulate","id":10,"event":"retry"}
+< {"type":"event","id":10,"event":"retry"}
+# An action child is a Button of its own: its click is its own, not the card's.
+> {"op":"simulate","id":11,"event":"click"}
+< {"type":"event","id":11,"event":"click"}
+# Without the opt-in, nothing is sent (and the control is not drawn).
+> {"op":"simulate","id":12,"event":"click"}
+> {"op":"setEvents","id":10,"events":[]}
+> {"op":"commit"}
+> {"op":"simulate","id":10,"event":"retry"}
+# Bubble, Message, its header and footer, and Marker are presentational: they have no events.
+> {"op":"simulate","id":5,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":2,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":9,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":10,"event":"change"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":13,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Rows come and go like any children (the host tells the list what changed).
+> {"op":"insertBefore","parent":13,"child":2,"before":14}
+> {"op":"remove","id":14}
+> {"op":"commit"}
+# Malformed props are invalid_props.
+> {"op":"create","id":20,"type":"Bubble","props":{"variant":"primary"}}
+> {"op":"create","id":21,"type":"Bubble","props":{"alignment":"center"}}
+> {"op":"create","id":22,"type":"Message","props":{"avatarName":5}}
+> {"op":"create","id":23,"type":"Marker","props":{"icon":"Nope"}}
+> {"op":"create","id":24,"type":"Marker","props":{"loadingStyle":"dots"}}
+> {"op":"create","id":25,"type":"Marker","props":{"loading":"yes"}}
+> {"op":"create","id":26,"type":"Attachment","props":{"status":"done"}}
+> {"op":"create","id":27,"type":"Attachment","props":{"progress":"45"}}
+> {"op":"create","id":28,"type":"Attachment","props":{"data":"not base64!"}}
+> {"op":"create","id":29,"type":"MessageScroller","props":{"jumpButton":"yes"}}
+> {"op":"create","id":30,"type":"MessageScroller","props":{"jumpLabel":5}}
+> {"op":"setProps","id":10,"props":{"axis":"diagonal"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+# A Questionnaire: one question at a time from `items`; the answers stay in the host.
+> {"op":"create","id":40,"type":"Questionnaire","props":{"items":[{"name":"plan","label":"Which plan?","required":true,"choices":[{"value":"free","label":"Free"},{"value":"pro","label":"Pro","description":"Billed yearly","disabled":true}]},{"name":"tools","label":"Which tools?","description":"Pick any","multiple":true,"input":true,"choices":[{"value":"cli","label":"CLI"},{"value":"ide","label":"IDE"}]},{"name":"notes","label":"Anything else?","input":true}]},"events":["change","submit"]}
+> {"op":"commit"}
+# Each answer is reported with its status; free text is `text`.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["free"]}}
+< {"type":"event","id":40,"event":"change","value":{"name":"plan","status":"answered","choices":["free"],"text":null}}
+# Submit needs every question answered (in a window an optional one can also be skipped).
+> {"op":"simulate","id":40,"event":"submit"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"tools","choices":["cli","ide"],"text":"vim"}}
+< {"type":"event","id":40,"event":"change","value":{"name":"tools","status":"answered","choices":["cli","ide"],"text":"vim"}}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"notes","text":"  "}}
+< {"type":"event","id":40,"event":"change","value":{"name":"notes","status":"unanswered","choices":[],"text":"  "}}
+> {"op":"simulate","id":40,"event":"submit"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"notes","text":"Thanks"}}
+< {"type":"event","id":40,"event":"change","value":{"name":"notes","status":"answered","choices":[],"text":"Thanks"}}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"plan","status":"answered","choices":["free"],"text":null},{"name":"tools","status":"answered","choices":["cli","ide"],"text":"vim"},{"name":"notes","status":"answered","choices":[],"text":"Thanks"}]}
+# An answer the user could not give is an error: a disabled or unknown choice, two choices in a
+# single-choice question, text where there is no field, an unknown question.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["pro"]}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","choices":["free","nope"]}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"plan","text":"free"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":40,"event":"change","value":{"name":"age"}}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# New `items` start over; a `selected` choice is an answer from the start.
+> {"op":"setProps","id":40,"props":{"items":[{"name":"theme","label":"Theme","choices":[{"value":"dark","label":"Dark","selected":true},{"value":"light","label":"Light"}]}]}}
+> {"op":"commit"}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"theme","status":"answered","choices":["dark"],"text":null}]}
+# The same `items` again keep the answers.
+> {"op":"simulate","id":40,"event":"change","value":{"name":"theme","choices":["light"]}}
+< {"type":"event","id":40,"event":"change","value":{"name":"theme","status":"answered","choices":["light"],"text":null}}
+> {"op":"setProps","id":40,"props":{"items":[{"name":"theme","label":"Theme","choices":[{"value":"dark","label":"Dark","selected":true},{"value":"light","label":"Light"}]}]}}
+> {"op":"commit"}
+> {"op":"simulate","id":40,"event":"submit"}
+< {"type":"event","id":40,"event":"submit","value":[{"name":"theme","status":"answered","choices":["light"],"text":null}]}
+# Malformed items are invalid_props: a repeated name or choice, two `selected` in a
+# single-choice question, a question without `label`.
+> {"op":"create","id":41,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A"},{"name":"a","label":"B"}]}}
+> {"op":"create","id":42,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A","choices":[{"value":"x","label":"X"},{"value":"x","label":"Y"}]}]}}
+> {"op":"create","id":43,"type":"Questionnaire","props":{"items":[{"name":"a","label":"A","choices":[{"value":"x","label":"X","selected":true},{"value":"y","label":"Y","selected":true}]}]}}
+> {"op":"create","id":44,"type":"Questionnaire","props":{"items":[{"name":"a"}]}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

@@ -113,14 +113,14 @@ pub fn description_list(node: &Node) -> DescriptionList {
     list
 }
 
-/// Props: `left`, `right`.
-pub fn status_bar(node: &Node) -> StatusBar {
+/// Its two sides: the `left`/`right` text or a `StatusBarLeft`/`StatusBarRight` child.
+pub fn status_bar(left: Option<AnyElement>, right: Option<AnyElement>) -> StatusBar {
     let mut bar = StatusBar::new();
-    if let Some(left) = prop_str(node, "left") {
-        bar = bar.left(SharedString::from(left.to_owned()));
+    if let Some(left) = left {
+        bar = bar.left(left);
     }
-    if let Some(right) = prop_str(node, "right") {
-        bar = bar.right(SharedString::from(right.to_owned()));
+    if let Some(right) = right {
+        bar = bar.right(right);
     }
     bar
 }

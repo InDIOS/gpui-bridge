@@ -55,7 +55,38 @@ export type NodeType =
   | "Chart"
   | "Canvas"
   | "Command"
-  | "Settings";
+  | "Settings"
+  | "Toggle"
+  | "DropdownButton"
+  | "Label"
+  | "Empty"
+  | "Shimmer"
+  | "InputGroup"
+  | "Clipboard"
+  | "AlertDialog"
+  | "Sheet"
+  | "Popover"
+  | "HoverCard"
+  | "DatePicker"
+  | "TimeField"
+  | "ColorPicker"
+  | "Combobox"
+  | "Bubble"
+  | "Message"
+  | "MessageHeader"
+  | "MessageFooter"
+  | "Marker"
+  | "Attachment"
+  | "MessageScroller"
+  | "Questionnaire"
+  | "List"
+  | "ListItem"
+  | "Dock"
+  | "DockPanel"
+  | "AccordionItem"
+  | "DialogFooter"
+  | "StatusBarLeft"
+  | "StatusBarRight";
 export type WindowTheme = "light" | "dark";
 
 /** Events a window can report (PROTOCOL.md section 3); `window.events` opts in. */
@@ -148,7 +179,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | TableSort | DiffSelection | CanvasPoint | SettingsChange; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | SettingsChange | QuestionnaireAnswer | QuestionnaireAnswer[]; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -358,7 +389,7 @@ export interface DialogProps {
   title?: string;
   /** Default "OK". */
   okText?: string;
-  /** Adds a cancel button. */
+  /** Adds a cancel button. A `DialogFooter` child replaces both buttons. */
   cancelText?: string;
   /** In pixels. */
   width?: number;
@@ -520,7 +551,7 @@ export interface PaginationProps {
   class?: string;
 }
 
-/** A section of an `Accordion`; its content is text. */
+/** An `items` entry of an `Accordion`; its content is text. */
 export interface AccordionItem {
   id: string;
   title: string;
@@ -530,6 +561,7 @@ export interface AccordionItem {
 }
 
 export interface AccordionProps {
+  /** Ignored when the Accordion has `AccordionItem` children. */
   items?: AccordionItem[];
   /** Several sections open at once; default false. */
   multiple?: boolean;
@@ -625,7 +657,9 @@ export interface DescriptionListProps {
 }
 
 export interface StatusBarProps {
+  /** Replaced by a `StatusBarLeft` child. */
   left?: string;
+  /** Replaced by a `StatusBarRight` child. */
   right?: string;
   class?: string;
 }
@@ -899,6 +933,380 @@ export interface SettingsProps {
   class?: string;
 }
 
+// Simple components (PROTOCOL.md section 23).
+
+export interface ToggleProps {
+  checked?: boolean;
+  label?: string;
+  /** A bundled icon name, drawn before the label. */
+  icon?: string;
+  /** Default "ghost". */
+  variant?: "ghost" | "outline";
+  /** A hint; it is also the name a screen reader reads. */
+  tooltip?: string;
+  disabled?: boolean;
+  /** The host only reports clicks; the client confirms them with `checked`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface DropdownButtonProps {
+  label?: string;
+  /** A bundled icon name, drawn before the label. */
+  icon?: string;
+  /** Default: gpui-component's own look. */
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  outline?: boolean;
+  disabled?: boolean;
+  /** The menu, in the format of `contextMenu` (`PROTOCOL.md` section 10). */
+  items?: MenuItem[];
+  /** The name a screen reader reads for the caret; default: a translated "More options". */
+  menuLabel?: string;
+  /** A hint on the left half. */
+  tooltip?: string;
+  class?: string;
+}
+
+export interface LabelProps {
+  content?: string;
+  /** A muted text after the content. */
+  secondary?: string;
+  /** Dots instead of the characters. */
+  masked?: boolean;
+  /** Marks every occurrence of this substring, ignoring case. */
+  highlight?: string;
+  class?: string;
+}
+
+export interface EmptyProps {
+  /** A bundled icon name, in a muted box above the title. */
+  icon?: string;
+  title?: string;
+  description?: string;
+  /** It fills its box (`flex-1`), so size the parent. */
+  class?: string;
+}
+
+export interface ShimmerProps {
+  content?: string;
+  /** One sweep, in seconds; default 2. */
+  duration?: number;
+  /** The highlight half-width; default 0.3, kept within 0.05–1. */
+  spread?: number;
+  reverse?: boolean;
+  /** One sweep instead of a loop. */
+  once?: boolean;
+  class?: string;
+}
+
+export interface InputGroupProps {
+  value?: string;
+  placeholder?: string;
+  /** Text on the left of the field. */
+  prefix?: string;
+  /** Text on the right. */
+  suffix?: string;
+  /** A bundled icon name on the left. */
+  prefixIcon?: string;
+  /** A bundled icon name on the right. */
+  suffixIcon?: string;
+  disabled?: boolean;
+  readonly?: boolean;
+  /** The caller's validation result; it does not reject edits. */
+  invalid?: boolean;
+  /** The host only reports edits; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ClipboardProps {
+  /** The text copied on click. */
+  value?: string;
+  /** A hint; `a11y.label` is the button's name. */
+  tooltip?: string;
+  class?: string;
+}
+
+// Overlays (PROTOCOL.md section 24).
+
+/** The eight corners a `Popover` or a `HoverCard` can open from. */
+export type OverlayAnchor =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "left-center"
+  | "right-center"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
+
+export interface AlertDialogProps {
+  /** Shown while true; the host sets it to false when the user answers. */
+  open?: boolean;
+  title?: string;
+  description?: string;
+  /** A bundled icon name, before the title. */
+  icon?: string;
+  /** Default "OK". */
+  okText?: string;
+  /** Adds the Cancel button. A `DialogFooter` child replaces both buttons. */
+  cancelText?: string;
+  /** Classes of the body that holds the children. */
+  class?: string;
+}
+
+export interface SheetProps {
+  /** Shown while true; the host sets it to false when the panel closes. */
+  open?: boolean;
+  /** The edge it slides in from. Default "right". */
+  side?: "left" | "right" | "top" | "bottom";
+  title?: string;
+  /** Pixels: the width on the sides, the height above and below. Default 350. */
+  size?: number;
+  /** Classes of the body that holds the children. */
+  class?: string;
+}
+
+export interface PopoverProps {
+  /**
+   * The panel's state, kept in the host as a synced `Checkbox`'s `checked`: the user opening or
+   * closing it reports `change` and updates it, and a `setProps` with another `open` wins.
+   */
+  open?: boolean;
+  /** Where the panel goes. Default "top-left" (below the trigger, left-aligned). */
+  anchor?: OverlayAnchor;
+  /** A triangle pointing at the trigger. */
+  arrow?: boolean;
+  /** Classes of the trigger's slot (the first child), not of the panel. */
+  class?: string;
+}
+
+export interface HoverCardProps {
+  /** Milliseconds before it opens. Default 600. */
+  openDelay?: number;
+  /** Milliseconds before it closes. Default 300. */
+  closeDelay?: number;
+  /** Where the card goes. Default "top-center". */
+  anchor?: OverlayAnchor;
+  /** Classes of the trigger's slot (the first child), not of the card. */
+  class?: string;
+}
+
+// Form controls with state (PROTOCOL.md section 25).
+
+export interface DatePickerProps {
+  /** The chosen day, `YYYY-MM-DD`; with `range: true`, an ISO interval `YYYY-MM-DD/YYYY-MM-DD`. `null` clears it. */
+  value?: string | null;
+  /** A start-to-end range; the form of `value` is fixed by this (the picker rebuilds when it changes). */
+  range?: boolean;
+  /** Shown while the field is empty. */
+  placeholder?: string;
+  disabled?: boolean;
+  /** The host only reports picks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface TimeFieldProps {
+  /** The time shown, `HH:MM`; with `seconds: true`, `HH:MM:SS`. It has no empty state: without `value` the field shows `00:00`. */
+  value?: string;
+  /** Include seconds; the form of `value` is fixed by this (the field rebuilds when it changes). */
+  seconds?: boolean;
+  disabled?: boolean;
+  /** The host only reports edits; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ColorPickerProps {
+  /** `#RRGGBB` or `#RRGGBBAA`; the `#` is required. `null` clears it. It has no `disabled`: gpui-component cannot disable its color pickers. */
+  value?: string | null;
+  /** Colors shown first, in the same form. */
+  palette?: string[];
+  /** The host only reports picks; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+export interface ComboboxProps {
+  /** The choices, as in a `Select`. */
+  options?: Option[];
+  /** The chosen options' values; always a list. */
+  value?: string[];
+  /** Shown while nothing is chosen. */
+  placeholder?: string;
+  /** A search box at the top of the list. */
+  searchable?: boolean;
+  disabled?: boolean;
+  /** The host only reports toggles; the client confirms them with `value`. */
+  controlled?: boolean;
+  class?: string;
+}
+
+// Chat (PROTOCOL.md section 26).
+
+export interface BubbleProps {
+  /** The surface; default `filled`. `ghost` has no surface or padding and takes the whole width. */
+  variant?: "filled" | "secondary" | "muted" | "tinted" | "outline" | "ghost" | "destructive";
+  /** Unset, it follows the `Message` that holds it. */
+  alignment?: "start" | "end";
+  class?: string;
+}
+
+export interface MessageProps {
+  /** Default `start`; `end` moves the avatar to that side too. */
+  alignment?: "start" | "end";
+  /** An `Avatar`'s `name` and `src`; without either there is no avatar. */
+  avatarName?: string;
+  avatarSrc?: string;
+  class?: string;
+}
+
+/** A `MessageHeader`/`MessageFooter` lays out its children in a row; outside a `Message` it draws nothing. */
+export interface MessagePartProps {
+  class?: string;
+}
+
+export interface MarkerProps {
+  content?: string;
+  /** A bundled icon before the text; it replaces the loading spinner. */
+  icon?: string;
+  /** Default `plain`. */
+  variant?: "plain" | "separator" | "border";
+  alignment?: "start" | "center" | "end";
+  loading?: boolean;
+  /** Default `spinner`; `shimmer` moves a highlight over `content`. */
+  loadingStyle?: "spinner" | "shimmer";
+  class?: string;
+}
+
+export interface AttachmentProps {
+  /** Default `complete`. */
+  status?: "pending" | "uploading" | "processing" | "failed" | "complete";
+  /** 0–100, shown only while `uploading`. */
+  progress?: number;
+  title?: string;
+  description?: string;
+  /** Shown while the card is hovered. */
+  tooltip?: string;
+  /** The picture, as in an `Image`; `data` (standard base64) wins over `src`. */
+  src?: string;
+  data?: string;
+  /** Default `horizontal`; `vertical` puts the picture on top. */
+  axis?: "horizontal" | "vertical";
+  class?: string;
+}
+
+export interface MessageScrollerProps {
+  /** Default true. */
+  scrollbar?: boolean;
+  /** The round button that goes back to the end; default true. */
+  jumpButton?: boolean;
+  /** That button's tooltip and name; the crate's default is "Jump to latest". */
+  jumpLabel?: string;
+  class?: string;
+}
+
+export interface QuestionnaireChoice {
+  /** Unique within its question. */
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+  /** An answer from the start; at most one without `multiple`. */
+  selected?: boolean;
+}
+
+export interface QuestionnaireItem {
+  /** Unique; it names the answer. */
+  name: string;
+  label: string;
+  description?: string;
+  /** It cannot be skipped. */
+  required?: boolean;
+  /** Checkboxes instead of radio buttons. */
+  multiple?: boolean;
+  disabled?: boolean;
+  /** A free-text field. */
+  input?: boolean;
+  choices?: QuestionnaireChoice[];
+}
+
+/** One answer, as `change` and `submit` report it. */
+export interface QuestionnaireAnswer {
+  name: string;
+  /** `unanswered` when it was cleared. */
+  status: "answered" | "skipped" | "unanswered";
+  choices: string[];
+  text: string | null;
+}
+
+export interface QuestionnaireProps {
+  /** Setting different `items` starts over; the same ones again keep the answers. */
+  items?: QuestionnaireItem[];
+  class?: string;
+}
+
+// List (PROTOCOL.md section 27).
+
+export interface ListProps {
+  /** The selected row's `value`; one that is not among the rows selects nothing. */
+  value?: string;
+  /** The host only reports selections; the client confirms them with `value`. */
+  controlled?: boolean;
+  /** A search field above the rows: each edit sends `query`, and the client sends the matching rows. */
+  searchable?: boolean;
+  placeholder?: string;
+  /** Near the end, the list sends `loadMore` (once per row count). */
+  hasMore?: boolean;
+  /** How many rows before the end `loadMore` is sent; default 20. */
+  loadMoreThreshold?: number;
+  /** Shows a skeleton instead of the rows. */
+  loading?: boolean;
+  class?: string;
+}
+
+/** A screen reader reads a row by its `a11y.label` (PROTOCOL.md section 27). */
+export interface ListItemProps {
+  /** What the List's events report. Required: the host rejects a `ListItem` without it. */
+  value?: string;
+  /** Neither selected nor confirmed; the arrow keys pass over it. */
+  disabled?: boolean;
+}
+
+// Dock (PROTOCOL.md section 28).
+
+export interface DockProps {
+  class?: string;
+}
+
+export interface DockPanelProps {
+  /** The tab's text. */
+  title?: string;
+  /** Where the panel starts; read only when it is added (the layout is the user's after that). */
+  placement?: "center" | "left" | "right" | "bottom";
+  /** The tab offers to close it: `close` is sent, and the app removes the node. */
+  closable?: boolean;
+}
+
+// Slots as children (PROTOCOL.md sections 14, 17 and 24).
+
+/** A section of an `Accordion`; its children are the content. */
+export interface AccordionItemProps {
+  /** What the Accordion's `change` reports. Required: the host rejects an `AccordionItem` without it. */
+  id?: string;
+  title?: string;
+  /** The host keeps it in synced mode. */
+  open?: boolean;
+  disabled?: boolean;
+  class?: string;
+}
+
+/** A `Dialog`'s or `AlertDialog`'s footer instead of OK/Cancel; outside one it draws nothing. */
+export interface SlotProps {
+  class?: string;
+}
+
 export interface NodeProps {
   div: DivProps & SharedProps;
   text: TextProps & SharedProps;
@@ -949,6 +1357,37 @@ export interface NodeProps {
   Canvas: CanvasProps & SharedProps;
   Command: CommandProps & SharedProps;
   Settings: SettingsProps & SharedProps;
+  Toggle: ToggleProps & SharedProps;
+  DropdownButton: DropdownButtonProps & SharedProps;
+  Label: LabelProps & SharedProps;
+  Empty: EmptyProps & SharedProps;
+  Shimmer: ShimmerProps & SharedProps;
+  InputGroup: InputGroupProps & SharedProps;
+  Clipboard: ClipboardProps & SharedProps;
+  AlertDialog: AlertDialogProps & SharedProps;
+  Sheet: SheetProps & SharedProps;
+  Popover: PopoverProps & SharedProps;
+  HoverCard: HoverCardProps & SharedProps;
+  DatePicker: DatePickerProps & SharedProps;
+  TimeField: TimeFieldProps & SharedProps;
+  ColorPicker: ColorPickerProps & SharedProps;
+  Combobox: ComboboxProps & SharedProps;
+  Bubble: BubbleProps & SharedProps;
+  Message: MessageProps & SharedProps;
+  MessageHeader: MessagePartProps & SharedProps;
+  MessageFooter: MessagePartProps & SharedProps;
+  Marker: MarkerProps & SharedProps;
+  Attachment: AttachmentProps & SharedProps;
+  MessageScroller: MessageScrollerProps & SharedProps;
+  Questionnaire: QuestionnaireProps & SharedProps;
+  List: ListProps & SharedProps;
+  ListItem: ListItemProps & SharedProps;
+  Dock: DockProps & SharedProps;
+  DockPanel: DockPanelProps & SharedProps;
+  AccordionItem: AccordionItemProps & SharedProps;
+  DialogFooter: SlotProps & SharedProps;
+  StatusBarLeft: SlotProps & SharedProps;
+  StatusBarRight: SlotProps & SharedProps;
 }
 
 // Event payloads per node type (PROTOCOL.md section 6).
@@ -1016,4 +1455,49 @@ export interface NodeEvents {
   Command: { confirm: { value: string } };
   /** `value` is the field set by the user and its new value. */
   Settings: { change: { value: SettingsChange } };
+  Toggle: { change: { checked: boolean } };
+  /** `value` is the chosen item's `id`. */
+  DropdownButton: { click: {}; menu: { item: string } };
+  Label: {};
+  Empty: {};
+  Shimmer: {};
+  InputGroup: { change: { value: string }; submit: { value: string } };
+  /** `value` is the text that was copied. */
+  Clipboard: { copied: { value: string } };
+  /** OK and Cancel close it, as in a `Dialog`; it shows over an open one. */
+  AlertDialog: { ok: {}; cancel: {} };
+  /** The user closed the panel with its X, Escape or a click on the overlay. */
+  Sheet: { close: {} };
+  /** `checked` is true when it opened, false when it closed. */
+  Popover: { change: { checked: boolean } };
+  /** The mouse is the only way in: no `open` and no `simulate`. */
+  HoverCard: { change: { checked: boolean } };
+  /** `value` is the chosen day, `null` when cleared. */
+  DatePicker: { change: { value: string | null } };
+  /** `value` is the time, `HH:MM[:SS]`; it has no empty state. */
+  TimeField: { change: { value: string } };
+  /** `value` is the color, `null` when cleared. */
+  ColorPicker: { change: { value: string | null } };
+  /** `value` is the whole selection: toggling one sends the full list. */
+  Combobox: { change: { value: string[] } };
+  Bubble: {};
+  Message: {};
+  MessageHeader: {};
+  MessageFooter: {};
+  Marker: {};
+  /** The card's controls exist only while their event is subscribed; `retry` only while `failed`. */
+  Attachment: { click: {}; remove: {}; retry: {} };
+  MessageScroller: {};
+  /** `change` sends one answer; `submit` all of them, in question order. */
+  Questionnaire: { change: { value: QuestionnaireAnswer }; submit: { value: QuestionnaireAnswer[] } };
+  /** `change` sends the selected row's `value` (`null`: Escape); `query` the search text; `loadMore` nothing. */
+  List: { change: { value: string | null }; confirm: { value: string }; query: { value: string }; loadMore: {} };
+  ListItem: {};
+  Dock: {};
+  /** `close`: the user closed the panel; it has left the layout. */
+  DockPanel: { close: {} };
+  AccordionItem: {};
+  DialogFooter: {};
+  StatusBarLeft: {};
+  StatusBarRight: {};
 }

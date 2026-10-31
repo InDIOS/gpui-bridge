@@ -556,6 +556,161 @@ export class App {
     return this.create("Settings", props);
   }
 
+  /** A button that stays pressed: `change` with `checked`. */
+  toggle(props: NodeProps["Toggle"] = {}) {
+    return this.create("Toggle", props);
+  }
+
+  /** An action with a menu: `click` for the left half, `menu` with the chosen item's id. */
+  dropdownButton(props: NodeProps["DropdownButton"] = {}) {
+    return this.create("DropdownButton", props);
+  }
+
+  /** Text with an optional secondary text and a highlighted substring. */
+  label(props: NodeProps["Label"] = {}) {
+    return this.create("Label", props);
+  }
+
+  /** A centered empty state; append the action (usually a `Button`). */
+  empty(props: NodeProps["Empty"] = {}) {
+    return this.create("Empty", props);
+  }
+
+  /** Loading text with a moving highlight. */
+  shimmer(props: NodeProps["Shimmer"] = {}) {
+    return this.create("Shimmer", props);
+  }
+
+  /** A text field with text and an icon on either side: `change` and `submit` like an `Input`. */
+  inputGroup(props: NodeProps["InputGroup"] = {}) {
+    return this.create("InputGroup", props);
+  }
+
+  /** Copies `value` on click: `copied` with that text. */
+  clipboard(props: NodeProps["Clipboard"] = {}) {
+    return this.create("Clipboard", props);
+  }
+
+  /** A confirmation with a title, a description and an icon: `ok` and `cancel`, as in a `Dialog`. */
+  alertDialog(props: NodeProps["AlertDialog"] = {}) {
+    return this.create("AlertDialog", props);
+  }
+
+  /** A panel that slides in from `side`: `close` with its X, Escape or a click on the overlay. */
+  sheet(props: NodeProps["Sheet"] = {}) {
+    return this.create("Sheet", props);
+  }
+
+  /** A panel anchored to its first child (the trigger): `change` with `checked` both ways. */
+  popover(props: NodeProps["Popover"] = {}) {
+    return this.create("Popover", props);
+  }
+
+  /** A card on hover, opened by the mouse alone: `change` with `checked`. */
+  hoverCard(props: NodeProps["HoverCard"] = {}) {
+    return this.create("HoverCard", props);
+  }
+
+  /** A day picker: `change` with the chosen day (`null` when cleared). */
+  datePicker(props: NodeProps["DatePicker"] = {}) {
+    return this.create("DatePicker", props);
+  }
+
+  /** A time typed by segments: `change` with the time. */
+  timeField(props: NodeProps["TimeField"] = {}) {
+    return this.create("TimeField", props);
+  }
+
+  /** A color swatch and hex box: `change` with the color (`null` when cleared). */
+  colorPicker(props: NodeProps["ColorPicker"] = {}) {
+    return this.create("ColorPicker", props);
+  }
+
+  /** A list that picks several options: `change` with the whole selection. */
+  combobox(props: NodeProps["Combobox"] = {}) {
+    return this.create("Combobox", props);
+  }
+
+  /** A chat bubble; its children are the content. */
+  bubble(props: NodeProps["Bubble"] = {}) {
+    return this.create("Bubble", props);
+  }
+
+  /** A message row: `MessageHeader`/`MessageFooter` children, the rest is the content. */
+  message(props: NodeProps["Message"] = {}) {
+    return this.create("Message", props);
+  }
+
+  /** A `Message`'s header (sender, time). */
+  messageHeader(props: NodeProps["MessageHeader"] = {}) {
+    return this.create("MessageHeader", props);
+  }
+
+  /** A `Message`'s footer (state, actions). */
+  messageFooter(props: NodeProps["MessageFooter"] = {}) {
+    return this.create("MessageFooter", props);
+  }
+
+  /** A compact status row in a conversation. */
+  marker(props: NodeProps["Marker"] = {}) {
+    return this.create("Marker", props);
+  }
+
+  /** A file or picture card: `click`, `remove` and `retry` show its controls. */
+  attachment(props: NodeProps["Attachment"] = {}) {
+    return this.create("Attachment", props);
+  }
+
+  /** A virtual list of messages anchored at the end; each child is a row. */
+  messageScroller(props: NodeProps["MessageScroller"] = {}) {
+    return this.create("MessageScroller", props);
+  }
+
+  /** Questions one at a time: `change` with each answer, `submit` with all of them. */
+  questionnaire(props: NodeProps["Questionnaire"] = {}) {
+    return this.create("Questionnaire", props);
+  }
+
+  /** A selectable list over its `ListItem` children: `change`, `confirm`, `query` and `loadMore`. */
+  list(props: NodeProps["List"] = {}) {
+    return this.create("List", props);
+  }
+
+  /** A `List` row: `value` is what the events report; its children are the content. */
+  listItem(props: NodeProps["ListItem"] = {}) {
+    return this.create("ListItem", props);
+  }
+
+  /** Panels the user rearranges: its `DockPanel` children. The host owns the layout. */
+  dock(props: NodeProps["Dock"] = {}) {
+    return this.create("Dock", props);
+  }
+
+  /** A `Dock` panel: `title`, `placement` (read once) and `closable` (`close`); its children are the content. */
+  dockPanel(props: NodeProps["DockPanel"] = {}) {
+    return this.create("DockPanel", props);
+  }
+
+  /** An `Accordion` section: `id` (what `change` reports), `title`, `open`, `disabled`; its children are the content. */
+  accordionItem(props: NodeProps["AccordionItem"] = {}) {
+    return this.create("AccordionItem", props);
+  }
+
+  /** A `Dialog`'s or `AlertDialog`'s footer: its children (buttons) replace OK/Cancel. */
+  dialogFooter(props: NodeProps["DialogFooter"] = {}) {
+    return this.create("DialogFooter", props);
+  }
+
+  /** A `StatusBar`'s left side: its children replace the `left` text. */
+  statusBarLeft(props: NodeProps["StatusBarLeft"] = {}) {
+    return this.create("StatusBarLeft", props);
+  }
+
+  /** A `StatusBar`'s right side: its children replace the `right` text. */
+  statusBarRight(props: NodeProps["StatusBarRight"] = {}) {
+    return this.create("StatusBarRight", props);
+  }
+
   /** A node of any type; the specific methods below only add typing. */
   create<T extends NodeType>(type: T, props: NodeProps[T] = {} as NodeProps[T]): UINode<T> {
     return new UINode(this, this.wire.create(type, { ...props }), type);
@@ -701,7 +856,11 @@ export class App {
                 ? { paths: message.paths ?? [] }
               : message.event === "sort"
                 ? (message.value as TableSort)
-            : type === "Checkbox" || type === "Switch"
+            : type === "Checkbox" ||
+                type === "Switch" ||
+                type === "Toggle" ||
+                type === "Popover" ||
+                type === "HoverCard"
               ? { checked: message.checked ?? false }
               : message.value !== undefined
                 ? { value: message.value }

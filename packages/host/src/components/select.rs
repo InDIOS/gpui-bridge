@@ -37,7 +37,21 @@ impl SelectItem for Choice {
 }
 
 type State = SelectState<SearchableVec<Choice>>;
-type Options = Vec<(String, String, bool)>;
+pub type Options = Vec<(String, String, bool)>;
+
+/// The list a Select or a Combobox shows for `options`.
+pub fn choices(options: &Options) -> SearchableVec<Choice> {
+    SearchableVec::new(
+        options
+            .iter()
+            .map(|(value, label, disabled)| Choice {
+                value: value.clone(),
+                label: label.clone().into(),
+                disabled: *disabled,
+            })
+            .collect::<Vec<_>>(),
+    )
+}
 
 pub struct SelectSlot {
     state: Entity<State>,
@@ -81,17 +95,8 @@ pub fn sync<V: 'static>(
             .get(&id)
             .is_none_or(|slot| slot.options != options || slot.searchable != searchable);
         if stale {
-            let choices: Vec<Choice> = options
-                .iter()
-                .map(|(value, label, disabled)| Choice {
-                    value: value.clone(),
-                    label: label.clone().into(),
-                    disabled: *disabled,
-                })
-                .collect();
-            let state = cx.new(|cx| {
-                State::new(SearchableVec::new(choices), None, window, cx).searchable(searchable)
-            });
+            let state =
+                cx.new(|cx| State::new(choices(&options), None, window, cx).searchable(searchable));
             let session = session.clone();
             let _confirm = cx.subscribe_in(
                 &state,

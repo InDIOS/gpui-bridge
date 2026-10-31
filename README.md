@@ -68,17 +68,25 @@ window on Windows so far. Protocol version 1.
 ## What it has
 
 - **Nodes:** `div`, `text`, `Button`, `Input`, `Textarea`, `Checkbox`, `Switch`,
-  `RadioGroup`, `Select`, `Slider`, `Icon` (Lucide), `Image` (a file path or bytes), `MenuBar`, `Dialog`,
+  `RadioGroup`, `Select`, `Slider`, `Icon` (Lucide), `Image` (a file path or bytes), `MenuBar`,
+  `Dialog`, `AlertDialog`, `Sheet`, `Popover`, `HoverCard`,
   `VirtualList`, `Table`, `Tabs`, and most of gpui-kit's Basic, Form and Layout groups:
   `Alert`, `Badge`, `Tag`, `Kbd`, `Progress`, `Spinner`, `Skeleton`, `Rating`, `Pagination`,
   `Collapsible`, `Accordion`, `Avatar`, `Stepper`, `NumberInput`, `OtpInput`, `Form`/`Field`,
   `Tab` inside `Tabs`, `GroupBox`, `DescriptionList`, `StatusBar`, `Toolbar`, `Resizable`, plus
-  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar` and `Chart` (line, bar and pie).
-  `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
-  `Dock` and `List` are not mapped yet.
+  `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (line, bar and pie), `Command`,
+  `Settings` (typed field pages) and the simple ones: `Toggle`, `DropdownButton`, `Label`,
+  `Empty`, `Shimmer`, `InputGroup` (a text field with a prefix and a suffix) and `Clipboard`.
+  Form controls that keep their value: `DatePicker`, `TimeField`, `ColorPicker`, `Combobox`.
+  Chat: `Bubble`, `Message` (with `MessageHeader`/`MessageFooter`), `Marker`, `Attachment`,
+  `MessageScroller`, `Questionnaire`. `List` (with `ListItem` rows) and `Dock` (with
+  `DockPanel` children). Slots as child nodes: `AccordionItem`, `DialogFooter`,
+  `StatusBarLeft`/`StatusBarRight`. `Editor` and `Speech` are left out (they need `tree-sitter`
+  and the system recognizer).
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
-  readers through AccessKit; the window root and the controls name themselves too.
+  readers through AccessKit; the window root and the controls name themselves too. `Slider`,
+  `Rating`, `Tabs`, `Pagination` and `Accordion` titles are Tab stops driven by the keyboard.
 - **Windows:** several windows, frameless windows with a custom title bar, initial position,
   minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
   `visibility`), light/dark and custom themes.
@@ -159,6 +167,10 @@ example; they import `gpui-bridge` like an installed package does):
 | `tray.ts` | Tray icon; closing the window keeps the app in the tray |
 | `animations.ts` | Spinner, pulse and color transitions |
 | `forms.ts` | Switch, RadioGroup, Select, Slider, Textarea; a controlled slider |
+| `chat.ts` | Messages in a MessageScroller, a streamed answer, an Attachment that fails and is retried, a Questionnaire |
+| `list.ts` | A List of 10,000 rows with search and the keyboard, a second one that loads rows as it scrolls, a row 40 nodes deep |
+| `dock.ts` | A Dock: panels the user drags into tabs and splits while the app updates them, files that open as closable panels |
+| `slots.ts` | Slots as children: Accordion sections that hold controls, a Dialog and an AlertDialog with their own footer buttons, a StatusBar built from nodes |
 | `keyboard.ts` | Shortcuts, a list moved with the arrow keys, focus |
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |
@@ -170,6 +182,8 @@ example; they import `gpui-bridge` like an installed package does):
 | `canvas.ts` | A `Canvas` drawn with `rect`, `line` and `path`; each press adds a square where it happened |
 | `command.ts` | A `Command` palette inline and inside a `Dialog`; confirming an entry shows its id |
 | `settings.ts` | `Settings` with two pages and the five field types; each change shows its key and value |
+| `simple.ts` | The seven simple components: a toggle, a split button with a menu, a highlighted label, an empty state with its action, loading text, a framed text field and a copy button |
+| `popups.ts` | The four overlays: a confirmation on top of a dialog (and the dialog back), a filters panel from either side, a menu anchored to a full-width trigger and a card on hover |
 
 In [`examples/react/`](examples/react/): `todo.tsx` (`pnpm dev react/todo`) and a file browser,
 `files.tsx` (`pnpm dev react/files`).

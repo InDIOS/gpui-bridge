@@ -1,17 +1,19 @@
 //! `Accordion` (PROTOCOL.md section 17): a list of collapsible sections.
 //!
-//! The tree model has no per-item nodes, so the sections are the `items` prop
-//! (`{id, title, content?}`), and their content is text. A client that needs rich content
-//! inside a section uses `Collapsible` with its own children.
+//! The sections are `AccordionItem` children, whose children are the content, or else the
+//! `items` prop (`{id, title, content?}`), whose content is text.
+
+use std::sync::Once;
 
 use gpui_kit::component::accordion::Accordion;
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::{emit, prop_bool};
+use super::{emit, prop_bool, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
-use crate::tree::Node;
+use crate::schema::NodeType;
+use crate::tree::{Node, Tree};
 
 /// An `items` entry: `(id, title, content, open, disabled)`.
 type Item = (String, String, String, bool, bool);
@@ -41,6 +43,45 @@ pub fn items(node: &Node) -> Vec<Item> {
         .collect()
 }
 
+static WARN_ITEMS: Once = Once::new();
+
+/// The sections of an Accordion, each with the `AccordionItem` it comes from: its
+/// `AccordionItem` children if it has any (their `content` is empty: it is their children),
+/// else `items`.
+pub fn sections(tree: &Tree, node: &Node) -> Vec<(Item, Option<NodeId>)> {
+    let parts: Vec<(Item, Option<NodeId>)> = node
+        .children
+        .iter()
+        .filter_map(|&child| {
+            let part = tree
+                .node(child)
+                .filter(|part| part.node_type == NodeType::AccordionItem)?;
+            let text = |key| prop_str(part, key).unwrap_or("").to_owned();
+            let item = (
+                text("id"),
+                text("title"),
+                String::new(),
+                prop_bool(part, "open"),
+                prop_bool(part, "disabled"),
+            );
+            Some((item, Some(child)))
+        })
+        .collect();
+    if parts.is_empty() {
+        return items(node).into_iter().map(|item| (item, None)).collect();
+    }
+    if node
+        .props
+        .get("items")
+        .is_some_and(|items| !items.is_null())
+    {
+        WARN_ITEMS.call_once(|| {
+            log::warn!("an Accordion with AccordionItem children ignores its 'items'")
+        });
+    }
+    parts
+}
+
 /// Checks an `items` list: objects with `id` and `title` strings, an optional `content` string
 /// and optional `open` and `disabled` booleans.
 pub fn check_items(value: &Value) -> Result<(), String> {
@@ -68,13 +109,18 @@ pub fn check_items(value: &Value) -> Result<(), String> {
 
 /// Props: `items`, `multiple`, `bordered` (default true), `disabled`, `controlled`.
 /// Events: `change` with the id of the section the user opened or closed.
-pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Accordion {
-    let items = items(node);
-    let ids: Vec<String> = items.iter().map(|(id, ..)| id.clone()).collect();
-    let open: Vec<usize> = items
+/// `sections` are the `sections` of the node, each with its title and content already built.
+pub fn build(
+    id: NodeId,
+    node: &Node,
+    session: &Entity<Session>,
+    sections: Vec<(Item, AnyElement, AnyElement)>,
+) -> Accordion {
+    let ids: Vec<String> = sections.iter().map(|((id, ..), ..)| id.clone()).collect();
+    let open: Vec<usize> = sections
         .iter()
         .enumerate()
-        .filter(|(_, item)| item.3)
+        .filter(|(_, (item, ..))| item.3)
         .map(|(ix, _)| ix)
         .collect();
     let controlled = prop_bool(node, "controlled");
@@ -83,12 +129,12 @@ pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Accordion {
         .multiple(prop_bool(node, "multiple"))
         .bordered(node.props.get("bordered") != Some(&Value::Bool(false)))
         .disabled(prop_bool(node, "disabled"));
-    for (_, title, content, is_open, disabled) in items {
+    for ((_, _, _, is_open, disabled), title, content) in sections {
         accordion = accordion.item(move |item| {
-            item.title(SharedString::from(title))
+            item.title(title)
                 .open(is_open)
                 .disabled(disabled)
-                .child(SharedString::from(content))
+                .child(content)
         });
     }
     accordion.on_toggle_click(move |now, _, cx| {
@@ -102,7 +148,7 @@ pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Accordion {
         };
         let (toggled, is_open) = (toggled.clone(), now.contains(&ix));
         session.update(cx, |session, cx| {
-            // Synced: the host keeps the new state in `items`; controlled: only reports it.
+            // Synced: the host keeps the new state; controlled: only reports it.
             if !controlled {
                 set_open(&mut session.tree, id, ix, is_open);
             }
@@ -118,8 +164,15 @@ pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Accordion {
     })
 }
 
-/// Rewrites the `open` of one entry of the `items` prop.
-pub fn set_open(tree: &mut crate::tree::Tree, id: NodeId, ix: usize, open: bool) {
+/// Rewrites the `open` of one section: its `AccordionItem`'s prop, or its entry in `items`.
+pub fn set_open(tree: &mut Tree, id: NodeId, ix: usize, open: bool) {
+    let part = tree
+        .node(id)
+        .and_then(|node| sections(tree, node).get(ix).map(|section| section.1));
+    if let Some(Some(part)) = part {
+        tree.set_host_prop(part, "open", Value::Bool(open));
+        return;
+    }
     let Some(items) = tree
         .node(id)
         .and_then(|node| node.props.get("items"))
@@ -141,11 +194,14 @@ pub fn set_open(tree: &mut crate::tree::Tree, id: NodeId, ix: usize, open: bool)
 
 /// The user opened or closed a section (`simulate`): the state follows unless the node is
 /// `controlled`, and the `change` event is reported either way.
-pub fn toggled(tree: &mut crate::tree::Tree, id: NodeId, item: &str) -> Result<(), String> {
+pub fn toggled(tree: &mut Tree, id: NodeId, item: &str) -> Result<(), String> {
     let Some(node) = tree.node(id) else {
         return Ok(());
     };
-    let list = items(node);
+    let list: Vec<Item> = sections(tree, node)
+        .into_iter()
+        .map(|(item, _)| item)
+        .collect();
     let (controlled, all_disabled) = (prop_bool(node, "controlled"), prop_bool(node, "disabled"));
     let Some(ix) = list.iter().position(|entry| entry.0 == item) else {
         return Err(format!("Accordion {id} has no item '{item}'"));

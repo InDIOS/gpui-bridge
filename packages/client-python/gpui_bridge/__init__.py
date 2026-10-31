@@ -5,6 +5,9 @@ them in one batch. `run()` blocks and calls event handlers on the calling thread
 until the host exits.
 """
 
+# App.list() shadows the builtin in the class body; defer annotations so `list[str]` stays the type (eager before 3.14).
+from __future__ import annotations
+
 import json
 import os
 import queue
@@ -262,7 +265,8 @@ class App:
         return self._create("Textarea", props)
 
     def dialog(self, **props) -> Node:
-        """A modal dialog shown while `open=True`; append its body as children. Events `ok`, `cancel`."""
+        """A modal dialog shown while `open=True`; append its body as children. Events `ok`, `cancel`.
+        A `dialog_footer` child replaces the OK/Cancel buttons."""
         return self._create("Dialog", props)
 
     def virtual_list(self, **props) -> Node:
@@ -334,9 +338,15 @@ class App:
         return self._create("Collapsible", props)
 
     def accordion(self, **props) -> Node:
-        """Sections as `items=[{"id", "title", "content", "open", "disabled"}]`, `multiple`,
-        `bordered`, `controlled`. `change` passes the id of the section toggled."""
+        """Sections as `items=[{"id", "title", "content", "open", "disabled"}]`, or as
+        `accordion_item` children (then `items` is ignored); `multiple`, `bordered`,
+        `controlled`. `change` passes the id of the section toggled."""
         return self._create("Accordion", props)
+
+    def accordion_item(self, **props) -> Node:
+        """An `accordion` section: `id` (required; what `change` passes), `title`, `open`,
+        `disabled`. The children are the content."""
+        return self._create("AccordionItem", props)
 
     def avatar(self, **props) -> Node:
         """A picture from `src`, or the initial of `name`."""
@@ -372,8 +382,17 @@ class App:
         return self._create("DescriptionList", props)
 
     def status_bar(self, **props) -> Node:
-        """A status bar: `left` and `right` text."""
+        """A status bar: `left` and `right` text, or a `status_bar_left` and a
+        `status_bar_right` child in their place."""
         return self._create("StatusBar", props)
+
+    def status_bar_left(self, **props) -> Node:
+        """A `status_bar`'s left side: its children replace the `left` text."""
+        return self._create("StatusBarLeft", props)
+
+    def status_bar_right(self, **props) -> Node:
+        """A `status_bar`'s right side: its children replace the `right` text."""
+        return self._create("StatusBarRight", props)
 
     def toolbar(self, **props) -> Node:
         """A toolbar; append its content."""
@@ -437,6 +456,156 @@ class App:
         with `type` one of switch, checkbox, input, dropdown, number. The host keeps each value the
         user sets; `change` passes {"key", "value"}."""
         return self._create("Settings", props)
+
+    def toggle(self, **props) -> Node:
+        """A button that stays pressed: `checked`, `label`, `icon`, `variant` (ghost, outline),
+        `tooltip`, `disabled`, `controlled`. `change` passes the new `checked`."""
+        return self._create("Toggle", props)
+
+    def dropdown_button(self, **props) -> Node:
+        """An action with a menu: `label`, `icon`, `variant`, `outline`, `tooltip`, `disabled`,
+        `items` (a menu list) and `menuLabel`. `click` is the left half; `menu` passes the chosen item's id."""
+        return self._create("DropdownButton", props)
+
+    def label(self, **props) -> Node:
+        """Text: `content`, `secondary` (a muted text after it), `masked`, `highlight` (marks
+        every occurrence of the substring, ignoring case)."""
+        return self._create("Label", props)
+
+    def empty(self, **props) -> Node:
+        """A centered empty state: `icon`, `title`, `description`; append the action (a button)."""
+        return self._create("Empty", props)
+
+    def shimmer(self, **props) -> Node:
+        """Loading text: `content`, `duration` in seconds, `spread`, `reverse`, `once`."""
+        return self._create("Shimmer", props)
+
+    def input_group(self, **props) -> Node:
+        """A framed text field: `value`, `placeholder`, `prefix`, `suffix`, `prefixIcon`,
+        `suffixIcon`, `disabled`, `readonly`, `invalid`, `controlled`. `change` and `submit` pass
+        the text, like an `Input`."""
+        return self._create("InputGroup", props)
+
+    def clipboard(self, **props) -> Node:
+        """Copies `value` on click: `tooltip`. `copied` passes the text that was copied."""
+        return self._create("Clipboard", props)
+
+    # Form controls with state (PROTOCOL.md section 25).
+
+    def date_picker(self, **props) -> Node:
+        """A day picker: `value` ("YYYY-MM-DD", or "YYYY-MM-DD/YYYY-MM-DD" with `range`),
+        `range`, `placeholder`, `disabled`, `controlled`. `change` passes the chosen day
+        (None when cleared)."""
+        return self._create("DatePicker", props)
+
+    def time_field(self, **props) -> Node:
+        """A time typed by segments: `value` ("HH:MM", or "HH:MM:SS" with `seconds`),
+        `seconds`, `disabled`, `controlled`. It has no empty state; `change` passes the time."""
+        return self._create("TimeField", props)
+
+    def color_picker(self, **props) -> Node:
+        """A color swatch and hex box: `value` ("#RRGGBB" or "#RRGGBBAA", `#` required),
+        `palette`, `controlled`. No `disabled`. `change` passes the color (None when cleared)."""
+        return self._create("ColorPicker", props)
+
+    def combobox(self, **props) -> Node:
+        """A list that picks several options: `options` ([{"value", "label", "disabled"}]),
+        `value` (the list of chosen values), `placeholder`, `searchable`, `disabled`,
+        `controlled`. `change` passes the whole selection."""
+        return self._create("Combobox", props)
+
+    # Chat (PROTOCOL.md section 26).
+
+    def bubble(self, **props) -> Node:
+        """A chat bubble: `variant`, `alignment`. The children are the content."""
+        return self._create("Bubble", props)
+
+    def message(self, **props) -> Node:
+        """A message row: `alignment`, `avatarName`, `avatarSrc`. A `message_header` and a
+        `message_footer` child are its header and footer; the other children are the content."""
+        return self._create("Message", props)
+
+    def message_header(self, **props) -> Node:
+        """A `message`'s header (sender, time); outside a message it draws nothing."""
+        return self._create("MessageHeader", props)
+
+    def message_footer(self, **props) -> Node:
+        """A `message`'s footer (state, actions); outside a message it draws nothing."""
+        return self._create("MessageFooter", props)
+
+    def marker(self, **props) -> Node:
+        """A status row: `content`, `icon`, `variant`, `alignment`, `loading`, `loadingStyle`."""
+        return self._create("Marker", props)
+
+    def attachment(self, **props) -> Node:
+        """A file or picture card: `status`, `progress`, `title`, `description`, `tooltip`,
+        `src`/`data`, `axis`. Subscribing to `click`, `remove` or `retry` shows that control
+        (`retry` only while `failed`); none passes a value. The children are actions."""
+        return self._create("Attachment", props)
+
+    def message_scroller(self, **props) -> Node:
+        """A virtual list of messages that stays at the end: `scrollbar`, `jumpButton`,
+        `jumpLabel`. Each child is a row."""
+        return self._create("MessageScroller", props)
+
+    def questionnaire(self, **props) -> Node:
+        """Questions one at a time: `items` ([{"name", "label", "choices", "input", ...}]).
+        `change` passes one answer ({"name", "status", "choices", "text"}); `submit` passes
+        the list of answers."""
+        return self._create("Questionnaire", props)
+
+    # List (PROTOCOL.md section 27).
+
+    def list(self, **props) -> Node:
+        """A selectable list over its `list_item` children: `value`, `controlled`, `searchable`,
+        `placeholder`, `hasMore`, `loadMoreThreshold`, `loading`. `change` passes the selected
+        row's value (None: Escape), `confirm` the confirmed one, `query` the search text (send
+        the matching rows); `loadMore` asks for more rows."""
+        return self._create("List", props)
+
+    def list_item(self, **props) -> Node:
+        """A `list` row: `value` (required) is what the list reports, `disabled`. The children
+        are the content."""
+        return self._create("ListItem", props)
+
+    # Dock (PROTOCOL.md section 28).
+
+    def dock(self, **props) -> Node:
+        """Panels the user rearranges: its `dock_panel` children. The host owns the layout."""
+        return self._create("Dock", props)
+
+    def dock_panel(self, **props) -> Node:
+        """A `dock` panel: `title`, `placement` (`center`, `left`, `right`, `bottom`; read only
+        when it is added), `closable`. The children are the content. `close` means the user
+        closed it: remove the node."""
+        return self._create("DockPanel", props)
+
+    def alert_dialog(self, **props) -> Node:
+        """A confirmation: `open`, `title`, `description`, `icon`, `okText`, `cancelText`. The
+        children are the body. `ok` and `cancel` close it, like a `Dialog`, and it shows over one.
+        A `dialog_footer` child replaces its buttons."""
+        return self._create("AlertDialog", props)
+
+    def dialog_footer(self, **props) -> Node:
+        """A `dialog`'s or `alert_dialog`'s footer: its children (buttons, each with its own
+        `click`) replace OK/Cancel. Close the dialog with `open=False`."""
+        return self._create("DialogFooter", props)
+
+    def sheet(self, **props) -> Node:
+        """A panel from `side` (left, right, top, bottom): `open`, `title`, `size` in pixels. The
+        children are the scrollable body. `close` is its X, Escape or a click on the overlay."""
+        return self._create("Sheet", props)
+
+    def popover(self, **props) -> Node:
+        """A panel anchored to the first child (the trigger): `open`, `anchor` (top-left,
+        top-center, top-right, left-center, right-center, bottom-left, bottom-center,
+        bottom-right), `arrow`. `change` passes the new `open`, and the host keeps it."""
+        return self._create("Popover", props)
+
+    def hover_card(self, **props) -> Node:
+        """A card on hover: `openDelay` and `closeDelay` in milliseconds, `anchor`. The mouse is
+        the only way in (there is no `open`); `change` passes the new state."""
+        return self._create("HoverCard", props)
 
     def window(self, *, root: Node | None = None, **options) -> "App":
         """Creates or updates the main window (window 1). It opens on the first commit that sets `root`."""
@@ -623,7 +792,7 @@ class App:
                 if not handler:
                     return
                 # A menu choice passes the item id; a Slider, a number.
-                if record.type in ("Checkbox", "Switch"):
+                if record.type in ("Checkbox", "Switch", "Toggle", "Popover", "HoverCard"):
                     handler(message.get("checked", False))
                 elif "paths" in message:
                     handler(message["paths"])

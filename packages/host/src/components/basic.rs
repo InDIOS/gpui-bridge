@@ -4,15 +4,22 @@
 //! They are stateless except where a user choice is reported (`Rating`, `Pagination`, `Stepper`),
 //! which work like the other choices: the host keeps the value unless the node is `controlled`.
 
+use std::time::Duration;
+
 use gpui_kit::component::Icon;
 use gpui_kit::component::alert::{Alert, AlertVariant};
 use gpui_kit::component::avatar::Avatar;
 use gpui_kit::component::badge::Badge;
 use gpui_kit::component::collapsible::Collapsible;
+use gpui_kit::component::empty::{
+    Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyMediaVariant, EmptyTitle,
+};
 use gpui_kit::component::kbd::Kbd;
+use gpui_kit::component::label::Label;
 use gpui_kit::component::pagination::Pagination;
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::rating::Rating;
+use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::skeleton::Skeleton;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::stepper::{Stepper, StepperItem};
@@ -28,7 +35,7 @@ use crate::protocol::NodeId;
 use crate::tree::Node;
 
 /// An icon by its bundled name.
-fn icon(node: &Node, key: &str) -> Option<Icon> {
+pub fn icon(node: &Node, key: &str) -> Option<Icon> {
     prop_str(node, key).map(|name| Icon::default().path(icon_path(name)))
 }
 
@@ -255,4 +262,119 @@ pub fn stepper(id: NodeId, node: &Node, session: &Entity<Session>) -> Stepper {
             }
         });
     })
+}
+
+// Simple presentational components (PROTOCOL.md section 23): label, empty, shimmer.
+
+/// Props: `content`, `secondary`, `masked`, `highlight`. With `highlight`, every occurrence of
+/// the substring is highlighted, case-insensitively.
+pub fn label(node: &Node) -> Label {
+    let label = Label::new(prop_str(node, "content").unwrap_or("").to_owned())
+        .masked(prop_bool(node, "masked"));
+    let label = match prop_str(node, "secondary") {
+        Some(secondary) => label.secondary(secondary.to_owned()),
+        None => label,
+    };
+    match highlight(node) {
+        Some(highlight) => label.highlights(highlight.to_owned()),
+        None => label,
+    }
+}
+
+/// `highlight`, unless a character of the label or of `highlight` changes its UTF-8 length when
+/// lowercased (the Kelvin sign `K` becomes `k`, three bytes to one).
+/// shortcut: gpui-component 0.8.1 mixes offsets of the lowercased and the original text and
+/// panics then, so the highlight is dropped; remove this when upstream fixes `highlight_ranges`.
+fn highlight(node: &Node) -> Option<&str> {
+    let keeps_len = |key| {
+        prop_str(node, key).is_none_or(|text| {
+            text.chars()
+                .all(|c| c.to_lowercase().map(char::len_utf8).sum::<usize>() == c.len_utf8())
+        })
+    };
+    prop_str(node, "highlight").filter(|_| {
+        ["content", "secondary", "highlight"]
+            .into_iter()
+            .all(keeps_len)
+    })
+}
+
+/// Props: `icon`, `title`, `description`; `content` is the children (an action, usually), which
+/// go in the component's content slot.
+pub fn empty(node: &Node, content: Vec<AnyElement>) -> Empty {
+    let mut header = EmptyHeader::new();
+    if let Some(icon) = icon(node, "icon") {
+        header = header.media(
+            EmptyMedia::new()
+                .with_variant(EmptyMediaVariant::Icon)
+                .child(icon),
+        );
+    }
+    if let Some(title) = prop_str(node, "title") {
+        header = header.title(EmptyTitle::new().child(SharedString::from(title.to_owned())));
+    }
+    if let Some(description) = prop_str(node, "description") {
+        header = header
+            .description(EmptyDescription::new().child(SharedString::from(description.to_owned())));
+    }
+    Empty::new()
+        .header(header)
+        .content(EmptyContent::new().children(content))
+}
+
+/// Props: `content`, `duration` (seconds, default 2), `spread` (default 0.3), `reverse`, `once`.
+/// It animates on its own, without an `animate-*` class; the crate clamps `spread` to 0.05–1 and
+/// a negative `duration` to 1 ms. A `duration` too big for a `Duration` keeps the default.
+pub fn shimmer(id: NodeId, node: &Node) -> ShimmerText {
+    let mut shimmer = ShimmerText::new(prop_str(node, "content").unwrap_or("").to_owned())
+        .id(("node", id))
+        .reverse(prop_bool(node, "reverse"))
+        .once(prop_bool(node, "once"));
+    // `from_secs_f32` would panic on 1e20, which the schema accepts as a finite number.
+    if let Some(duration) =
+        prop_f32(node, "duration").and_then(|secs| Duration::try_from_secs_f32(secs.max(0.)).ok())
+    {
+        shimmer = shimmer.duration(duration);
+    }
+    if let Some(spread) = prop_f32(node, "spread") {
+        shimmer = shimmer.spread(spread);
+    }
+    shimmer
+}
+
+#[cfg(test)]
+mod tests {
+    // Not `super::*`: gpui's own `test` attribute would shadow the standard one.
+    use super::{highlight, shimmer};
+    use crate::schema::NodeType;
+    use crate::tree::Node;
+    use serde_json::{Value, json};
+
+    fn node(node_type: NodeType, props: Value) -> Node {
+        Node {
+            node_type,
+            props: props.as_object().cloned().unwrap_or_default(),
+            events: Default::default(),
+            children: vec![],
+            parent: None,
+        }
+    }
+
+    #[test]
+    fn a_highlight_that_would_panic_the_crate_is_dropped() {
+        let label = |props| highlight(&node(NodeType::Label, props)).is_some();
+        assert!(label(json!({"content": "Ünïcode Σ", "highlight": "σ"})));
+        assert!(!label(json!({"content": "\u{212A}a", "highlight": "a"})));
+        // The total length is kept (İ grows, Å shrinks), but the offsets still drift.
+        assert!(!label(
+            json!({"content": "x", "secondary": "İ\u{212B}", "highlight": "x"})
+        ));
+        assert!(!label(json!({"content": "x", "highlight": "\u{2126}"})));
+    }
+
+    #[test]
+    fn a_huge_shimmer_duration_does_not_panic() {
+        shimmer(1, &node(NodeType::Shimmer, json!({"duration": 1e20})));
+        shimmer(1, &node(NodeType::Shimmer, json!({"duration": 1e300})));
+    }
 }

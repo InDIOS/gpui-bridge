@@ -161,6 +161,151 @@ test("form controls are accepted by the host and report typed values", async () 
   assert.deepEqual(seen, [["switch", false], ["radio", "a"], ["select", "a"], ["slider", 0.3], ["notes", "1\n2"]]);
 });
 
+test("the chat nodes are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const file = app
+    .attachment({ status: "failed", title: "report.pdf", description: "2.4 MB" })
+    .on("click", () => seen.push("click"))
+    .on("remove", () => seen.push("remove"))
+    .on("retry", () => seen.push("retry"));
+  const quiz = app
+    .questionnaire({ items: [{ name: "plan", label: "Plan", choices: [{ value: "free", label: "Free" }] }, { name: "notes", label: "Notes", input: true }] })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("submit", ({ value }) => seen.push(["submit", value]));
+  const message = app
+    .message({ alignment: "end", avatarName: "Ada" })
+    .append(
+      app.messageHeader().append(app.text({ content: "Ada" })),
+      app.bubble({ variant: "secondary" }).append(app.text({ content: "Hi" })),
+      app.messageFooter(),
+    );
+  const scroller = app
+    .messageScroller({ jumpLabel: "Latest" })
+    .append(message, app.marker({ content: "Thinking", loading: true, loadingStyle: "shimmer" }), file, quiz);
+  app.window({ root: app.div({ class: "size-full flex flex-col" }).append(scroller) });
+  app.commit();
+
+  const answer = { name: "plan", status: "answered" as const, choices: ["free"], text: null };
+  app.handleMessage({ type: "event", id: file.id, event: "click" });
+  app.handleMessage({ type: "event", id: file.id, event: "remove" });
+  app.handleMessage({ type: "event", id: file.id, event: "retry" });
+  app.handleMessage({ type: "event", id: quiz.id, event: "change", value: answer });
+  app.handleMessage({ type: "event", id: quiz.id, event: "submit", value: [answer] });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
+});
+
+test("a List with ListItem rows is accepted and reports its events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const list = app
+    .list({ value: "a", searchable: true, placeholder: "Search", hasMore: true, loadMoreThreshold: 5 })
+    .on("change", ({ value }) => seen.push(["change", value]))
+    .on("confirm", ({ value }) => seen.push(["confirm", value]))
+    .on("query", ({ value }) => seen.push(["query", value]))
+    .on("loadMore", () => seen.push("loadMore"))
+    .append(
+      app.listItem({ value: "a" }).append(app.text({ content: "Apple" })),
+      app.listItem({ value: "b", disabled: true }).append(app.icon({ name: "star" }), app.text({ content: "Banana" })),
+    );
+  app.window({ root: app.div({ class: "size-full flex flex-col" }).append(list) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: list.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: list.id, event: "confirm", value: "a" });
+  app.handleMessage({ type: "event", id: list.id, event: "query", value: "ap" });
+  app.handleMessage({ type: "event", id: list.id, event: "loadMore" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["change", null], ["confirm", "a"], ["query", "ap"], "loadMore"]);
+});
+
+test("a Dock with DockPanel children is accepted and reports close", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const notes = app.dockPanel({ title: "Notes", closable: true }).on("close", () => seen.push("close"));
+  const dock = app
+    .dock({ class: "size-full" })
+    .append(app.dockPanel({ title: "Files", placement: "left" }).append(app.text({ content: "src/" })), notes.append(app.text({ content: "Hello" })));
+  app.window({ root: dock });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: notes.id, event: "close" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["close"]);
+});
+
+test("slot children (AccordionItem, DialogFooter, StatusBar sides) are accepted", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const accordion = app
+    .accordion()
+    .on("change", ({ value }) => seen.push(value))
+    .append(app.accordionItem({ id: "a", title: "First", open: true }).append(app.text({ content: "Body" })));
+  const dialog = app.dialog({ open: true, title: "Rename" }).append(app.dialogFooter().append(app.button({ label: "Save" })));
+  const bar = app
+    .statusBar()
+    .append(app.statusBarLeft().append(app.text({ content: "Ready" })), app.statusBarRight().append(app.text({ content: "UTF-8" })));
+  app.window({ root: app.div().append(accordion, dialog, bar) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: accordion.id, event: "change", value: "a" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, ["a"]);
+});
+
+test("the form controls with state are accepted and report typed values", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const options = [{ value: "rs", label: "Rust" }, { value: "go", label: "Go" }, { value: "py", label: "Python", disabled: true }];
+  const day = app.datePicker({ value: "2024-08-03", placeholder: "Pick a day" }).on("change", ({ value }) => seen.push(["day", value]));
+  const range = app.datePicker({ range: true }).on("change", ({ value }) => seen.push(["range", value]));
+  const time = app.timeField({ value: "09:30" }).on("change", ({ value }) => seen.push(["time", value]));
+  const color = app
+    .colorPicker({ value: "#3366ff", palette: ["#ff0000", "#00ff0080"] })
+    .on("change", ({ value }) => seen.push(["color", value]));
+  const langs = app
+    .combobox({ options, value: ["rs"], placeholder: "Languages", searchable: true })
+    .on("change", ({ value }) => seen.push(["langs", value]));
+  app.window({ root: app.div().append(day, range, time, color, langs) });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: day.id, event: "change", value: "2024-08-10" });
+  app.handleMessage({ type: "event", id: day.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: range.id, event: "change", value: "2024-08-01/2024-08-15" });
+  app.handleMessage({ type: "event", id: time.id, event: "change", value: "18:05" });
+  app.handleMessage({ type: "event", id: color.id, event: "change", value: "#FF0000" });
+  app.handleMessage({ type: "event", id: color.id, event: "change", value: null });
+  app.handleMessage({ type: "event", id: langs.id, event: "change", value: ["rs", "go"] });
+  app.handleMessage({ type: "event", id: langs.id, event: "change", value: ["go"] });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["day", "2024-08-10"],
+    ["day", null],
+    ["range", "2024-08-01/2024-08-15"],
+    ["time", "18:05"],
+    ["color", "#FF0000"],
+    ["color", null],
+    ["langs", ["rs", "go"]],
+    ["langs", ["go"]],
+  ]);
+});
+
 test("the basic, form and layout components are accepted and report their events", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];
@@ -239,6 +384,106 @@ test("the basic, form and layout components are accepted and report their events
     ["otp", "123456"],
     ["day", "2024-09-01"],
   ]);
+});
+
+test("the simple components are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  const seen: unknown[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  const toggle = app
+    .toggle({ label: "Bold", icon: "asterisk", variant: "outline", tooltip: "Bold" })
+    .on("change", ({ checked }) => seen.push(["toggle", checked]));
+  const dropdown = app
+    .dropdownButton({ label: "Save", variant: "primary", items: [{ id: "save-as", label: "Save as" }], menuLabel: "Save options" })
+    .on("click", () => seen.push(["save"]))
+    .on("menu", ({ item }) => seen.push(["menu", item]));
+  const group = app
+    .inputGroup({ value: "example.com", placeholder: "host", prefix: "https://", suffixIcon: "check" })
+    .on("change", ({ value }) => seen.push(["group", value]))
+    .on("submit", ({ value }) => seen.push(["submit", value]));
+  const clipboard = app
+    .clipboard({ value: "https://example.com", a11y: { label: "Copy the address" } })
+    .on("copied", ({ value }) => seen.push(["copied", value]));
+
+  app.window({
+    root: app.div({ class: "flex flex-col gap-2 p-4" }).append(
+      toggle,
+      dropdown,
+      app.label({ content: "Total", secondary: "(12)", highlight: "12" }),
+      app
+        .empty({ icon: "folder-open", title: "No files", description: "Drop a file here" })
+        .append(app.button({ label: "Choose a file" })),
+      app.shimmer({ content: "Loading...", duration: 3, spread: 0.4, reverse: true, once: true }),
+      group,
+      clipboard,
+    ),
+  });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: toggle.id, event: "change", checked: true });
+  app.handleMessage({ type: "event", id: dropdown.id, event: "click" });
+  app.handleMessage({ type: "event", id: dropdown.id, event: "menu", value: "save-as" });
+  app.handleMessage({ type: "event", id: group.id, event: "change", value: "example.org" });
+  app.handleMessage({ type: "event", id: group.id, event: "submit", value: "example.org" });
+  app.handleMessage({ type: "event", id: clipboard.id, event: "copied", value: "https://example.com" });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [
+    ["toggle", true],
+    ["save"],
+    ["menu", "save-as"],
+    ["group", "example.org"],
+    ["submit", "example.org"],
+    ["copied", "https://example.com"],
+  ]);
+});
+
+test("the overlays are accepted and report their events", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  const seen: unknown[] = [];
+  app.on("error", (error) => errors.push(error));
+
+  const alert = app
+    .alertDialog({
+      open: true,
+      title: "Delete 3 files?",
+      description: "This cannot be undone.",
+      icon: "circle-alert",
+      okText: "Delete",
+      cancelText: "Cancel",
+    })
+    .on("ok", () => seen.push(["ok"]))
+    .on("cancel", () => seen.push(["cancel"]));
+  const sheet = app
+    .sheet({ open: true, side: "left", title: "Filters", size: 320 })
+    .on("close", () => seen.push(["close"]));
+  const popover = app
+    .popover({ open: false, anchor: "bottom-right", arrow: true })
+    .on("change", ({ checked }) => seen.push(["popover", checked]));
+  const card = app
+    .hoverCard({ openDelay: 300, closeDelay: 200, anchor: "top-center" })
+    .on("change", ({ checked }) => seen.push(["card", checked]));
+
+  app.window({
+    root: app.div({ class: "flex flex-col gap-2 p-4" }).append(
+      alert.append(app.text({ content: "3 files" })),
+      sheet.append(app.input({ value: "*.png" })),
+      popover.append(app.button({ label: "Sort" }), app.text({ content: "By name" })),
+      card.append(app.button({ label: "Info" }), app.text({ content: "Hovered" })),
+    ),
+  });
+  app.commit();
+
+  app.handleMessage({ type: "event", id: alert.id, event: "ok" });
+  app.handleMessage({ type: "event", id: sheet.id, event: "close" });
+  app.handleMessage({ type: "event", id: popover.id, event: "change", checked: true });
+  app.handleMessage({ type: "event", id: card.id, event: "change", checked: false });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
 });
 
 test("an a11y prop is validated by the host", async () => {

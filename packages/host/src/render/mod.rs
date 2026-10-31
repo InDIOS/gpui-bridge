@@ -7,8 +7,10 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::time::{Duration, Instant};
 
+use gpui_kit::component::dialog::DialogFooter;
 use gpui_kit::component::form::Field;
 use gpui_kit::component::menu::ContextMenuExt;
+use gpui_kit::component::message::{MessageFooter, MessageHeader};
 use gpui_kit::component::scroll::{ScrollableElement, Scrollbar};
 use gpui_kit::component::theme::{ActiveTheme, Theme};
 use gpui_kit::component::tooltip::Tooltip;
@@ -22,16 +24,23 @@ use crate::animation::{self, Timing, Transition, Visual};
 use crate::components::calendar::{self, CalendarSlot};
 use crate::components::carousel::{self, CarouselSlot};
 use crate::components::chart::{self, ChartSlot};
+use crate::components::color_picker::{self, ColorPickerSlot};
+use crate::components::combobox::{self, ComboboxSlot};
 use crate::components::command::{self, CommandSlot};
+use crate::components::date_picker::{self, DatePickerSlot};
 use crate::components::diff::{self, DiffSlot};
+use crate::components::dock::{self, DockSlot};
 use crate::components::input::{self, InputSlot};
+use crate::components::list::{self, ListSlot};
 use crate::components::otp::{self, OtpSlot};
+use crate::components::questionnaire::{self, QuestionnaireSlot};
 use crate::components::select::{self, SelectSlot};
 use crate::components::slider::{self, SliderSlot};
 use crate::components::table::{self, TableSlot};
+use crate::components::time_field::{self, TimeFieldSlot};
 use crate::components::{
-    self, accordion, basic, button, canvas, checkbox, keyboard, layout, menu, radio, settings,
-    sidebar, switch, tabs, tree,
+    self, accordion, basic, button, canvas, chat, checkbox, keyboard, layout, menu, overlays,
+    radio, settings, sidebar, switch, tabs, toggle, tree,
 };
 use crate::keys;
 use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
@@ -49,8 +58,15 @@ pub struct RootView {
     textareas: HashMap<NodeId, InputSlot<TextareaMode>>,
     /// Number inputs share the text machinery; only the element differs.
     numbers: HashMap<NodeId, InputSlot<InputMode>>,
+    /// An `InputGroup` owns the state of its text control, like an `Input`.
+    groups: HashMap<NodeId, InputSlot<InputMode>>,
     selects: HashMap<NodeId, SelectSlot>,
     sliders: HashMap<NodeId, SliderSlot>,
+    /// One per DatePicker / TimeField / ColorPicker / Combobox: their state keeps the chosen value.
+    date_pickers: HashMap<NodeId, DatePickerSlot>,
+    time_fields: HashMap<NodeId, TimeFieldSlot>,
+    color_pickers: HashMap<NodeId, ColorPickerSlot>,
+    combos: HashMap<NodeId, ComboboxSlot>,
     tables: HashMap<NodeId, TableSlot>,
     /// One per OtpInput and per Calendar: their state keeps what the user typed or chose.
     otps: HashMap<NodeId, OtpSlot>,
@@ -62,6 +78,12 @@ pub struct RootView {
     charts: HashMap<NodeId, ChartSlot>,
     /// One per Command: the query and highlight the user typed and moved.
     commands: HashMap<NodeId, CommandSlot>,
+    /// One per List: its selection, scroll position and search field.
+    list_states: HashMap<NodeId, ListSlot>,
+    docks: HashMap<NodeId, DockSlot>,
+    questionnaires: HashMap<NodeId, QuestionnaireSlot>,
+    /// One per MessageScroller: its scroll state and the rows it was last given.
+    scrollers: HashMap<NodeId, chat::ScrollerSlot>,
     /// One per VirtualList: the list keeps its scroll position across frames.
     lists: HashMap<NodeId, VirtualListScrollHandle>,
     /// Commit whose `value_writes` this window already applied.
@@ -96,8 +118,10 @@ pub struct RootView {
     focus: FocusHandle,
     /// Divs with `keyDown`, which can take the focus.
     focusables: HashMap<NodeId, FocusHandle>,
-    /// The Dialog node shown in gpui-component's dialog layer, if any.
+    /// The Dialog or AlertDialog node shown in gpui-component's dialog layer, if any.
     open_dialog: Option<NodeId>,
+    /// The Sheet node shown in gpui-component's sheet layer, if any.
+    open_sheet: Option<NodeId>,
     /// Last window state reported to the client, so `focus`/`blur` and friends are only sent on
     /// changes. `None` until the first observer call, which primes it (see `track_window`).
     window_active: Option<bool>,
@@ -126,16 +150,25 @@ impl RootView {
             inputs: HashMap::new(),
             textareas: HashMap::new(),
             numbers: HashMap::new(),
+            groups: HashMap::new(),
             selects: HashMap::new(),
             sliders: HashMap::new(),
             tables: HashMap::new(),
             otps: HashMap::new(),
             calendars: HashMap::new(),
+            date_pickers: HashMap::new(),
+            time_fields: HashMap::new(),
+            color_pickers: HashMap::new(),
+            combos: HashMap::new(),
+            questionnaires: HashMap::new(),
             trees: HashMap::new(),
             diffs: HashMap::new(),
             carousels: HashMap::new(),
             charts: HashMap::new(),
             commands: HashMap::new(),
+            list_states: HashMap::new(),
+            docks: HashMap::new(),
+            scrollers: HashMap::new(),
             lists: HashMap::new(),
             applied_commit: 0,
             transitions: HashMap::new(),
@@ -152,6 +185,7 @@ impl RootView {
             focus: cx.focus_handle(),
             focusables: HashMap::new(),
             open_dialog: None,
+            open_sheet: None,
             window_active: None,
             window_visible: None,
             window_bounds: None,
@@ -278,9 +312,15 @@ impl RootView {
         let inputs = input::snapshot(tree, NodeType::Input, &members, writes);
         let textareas = input::snapshot(tree, NodeType::Textarea, &members, writes);
         let numbers = input::snapshot(tree, NodeType::NumberInput, &members, writes);
+        let groups = input::snapshot(tree, NodeType::InputGroup, &members, writes);
         let otps = otp::snapshot(tree, &members);
         let calendars = calendar::snapshot(tree, &members);
         let selects = select::snapshot(tree, &members);
+        let date_pickers = date_picker::snapshot(tree, &members);
+        let time_fields = time_field::snapshot(tree, &members);
+        let color_pickers = color_picker::snapshot(tree, &members);
+        let combos = combobox::snapshot(tree, &members);
+        let questionnaires = questionnaire::snapshot(tree, &members);
         let sliders = slider::snapshot(tree, &members);
         let tables = table::snapshot(tree, &members);
         let trees = tree::snapshot(tree, &members);
@@ -288,6 +328,19 @@ impl RootView {
         let carousels = carousel::snapshot(tree, &members);
         let charts = chart::snapshot(tree, &members);
         let commands = command::snapshot(tree, &members);
+        let list_snapshot = list::snapshot(tree, &members);
+        let dock_snapshot = dock::snapshot(tree, &members);
+        // Only a commit changes the rows of a MessageScroller.
+        let scrollers = (tree.commits() != self.applied_commit).then(|| {
+            members
+                .iter()
+                .filter_map(|&id| {
+                    tree.node(id)
+                        .filter(|node| node.node_type == NodeType::MessageScroller)
+                        .map(|node| (id, node.children.clone()))
+                })
+                .collect::<Vec<_>>()
+        });
         let lists: HashSet<NodeId> = members
             .iter()
             .copied()
@@ -303,6 +356,7 @@ impl RootView {
                 tree.node(id).is_some_and(|node| {
                     (node.node_type == NodeType::Div && node.events.contains("keyDown"))
                         || keyboard::takes_stop(node)
+                        || node.node_type == NodeType::AccordionItem
                 })
             })
             .collect();
@@ -320,15 +374,48 @@ impl RootView {
                 .or_insert_with(VirtualListScrollHandle::new);
         }
         self.texts.retain(|id, _| tree.node(*id).is_some());
+        if let Some(scrollers) = scrollers {
+            chat::sync_scrollers(&mut self.scrollers, scrollers, cx);
+        }
         if let Some(loops) = loops {
             self.sync_animated(loops, cx);
         }
         input::sync(&mut self.inputs, inputs, &self.session, window, cx);
         input::sync(&mut self.textareas, textareas, &self.session, window, cx);
         input::sync(&mut self.numbers, numbers, &self.session, window, cx);
+        input::sync(&mut self.groups, groups, &self.session, window, cx);
         otp::sync(&mut self.otps, otps, &self.session, window, cx);
         calendar::sync(&mut self.calendars, calendars, &self.session, window, cx);
         select::sync(&mut self.selects, selects, &self.session, window, cx);
+        date_picker::sync(
+            &mut self.date_pickers,
+            date_pickers,
+            &self.session,
+            window,
+            cx,
+        );
+        time_field::sync(
+            &mut self.time_fields,
+            time_fields,
+            &self.session,
+            window,
+            cx,
+        );
+        color_picker::sync(
+            &mut self.color_pickers,
+            color_pickers,
+            &self.session,
+            window,
+            cx,
+        );
+        combobox::sync(&mut self.combos, combos, &self.session, window, cx);
+        questionnaire::sync(
+            &mut self.questionnaires,
+            questionnaires,
+            &self.session,
+            window,
+            cx,
+        );
         slider::sync(&mut self.sliders, sliders, &self.session, window, cx);
         table::sync(&mut self.tables, tables, &self.session, window, cx);
         tree::sync(&mut self.trees, trees, &self.session, cx);
@@ -336,10 +423,33 @@ impl RootView {
         carousel::sync(&mut self.carousels, carousels, &self.session, cx);
         chart::sync(&mut self.charts, charts, &self.session, cx);
         command::sync(&mut self.commands, commands, window, cx);
+        // Weak: the list states live in this view, so a strong handle would never be dropped.
+        let view = cx.weak_entity();
+        // Also draws a DockPanel's children, from the panel's own view.
+        let render: list::RenderItem = Rc::new(move |item, window, cx| {
+            view.update(cx, |view, cx| view.render_item(item, window, cx))
+                .unwrap_or_default()
+        });
+        list::sync(
+            &mut self.list_states,
+            list_snapshot,
+            &self.session,
+            &render,
+            window,
+            cx,
+        );
+        dock::sync(
+            &mut self.docks,
+            dock_snapshot,
+            &self.session,
+            &render,
+            window,
+            cx,
+        );
         // Deferred: the dialog layer and the focus need the whole window, which does not exist
         // yet while `RootView::new` runs (gpui-component's Root wraps the view afterwards).
         cx.defer_in(window, |this, window, cx| {
-            this.sync_dialog_and_focus(window, cx)
+            this.sync_overlays_and_focus(window, cx)
         });
     }
 
@@ -360,26 +470,45 @@ impl RootView {
         }
     }
 
-    /// Opens or closes the Dialog the tree asks for, then applies a pending `focus` (after the
-    /// dialog, so a field inside it can take the focus).
-    fn sync_dialog_and_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens or closes the Dialog, AlertDialog and Sheet the tree asks for, then applies a pending
+    /// `focus` (after them, so a field inside one can take the focus).
+    fn sync_overlays_and_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tree = &self.session.read(cx).tree;
         let members = self
             .root(tree)
             .map(|root| tree.subtree(root))
             .unwrap_or_default();
         let focus_request = tree.focus_request().filter(|id| members.contains(id));
-        // One Dialog at a time: the open one with the lowest id.
+        let open_of = |types: &[NodeType], id: NodeId| {
+            tree.node(id).is_some_and(|node| {
+                types.contains(&node.node_type)
+                    && node.props.get("open") == Some(&Value::Bool(true))
+            })
+        };
+        // One dialog layer per window: an open AlertDialog wins over a Dialog, then the lowest id
+        // (PROTOCOL.md section 24), so an alert confirms on top of the dialog that opened it.
         let wanted_dialog = members
             .iter()
             .copied()
-            .filter(|&id| {
-                tree.node(id).is_some_and(|node| {
-                    node.node_type == NodeType::Dialog
-                        && node.props.get("open") == Some(&Value::Bool(true))
-                })
-            })
+            .filter(|&id| open_of(&[NodeType::AlertDialog, NodeType::Dialog], id))
+            .min_by_key(|&id| {
+                let alert = tree
+                    .node(id)
+                    .is_some_and(|node| node.node_type == NodeType::AlertDialog);
+                (!alert, id)
+            });
+        let alert = wanted_dialog.is_some_and(|id| {
+            tree.node(id)
+                .is_some_and(|node| node.node_type == NodeType::AlertDialog)
+        });
+        // One sheet per window: the open one with the lowest id.
+        let wanted_sheet = members
+            .iter()
+            .copied()
+            .filter(|&id| open_of(&[NodeType::Sheet], id))
             .min();
+        // Both layers are read above: from here on the tree is not borrowed again, so the window
+        // (and the app it borrows) can be used mutably.
         if self.open_dialog != wanted_dialog {
             // Forgotten first, so closing it from here is not reported as the user's answer.
             if self.open_dialog.take().is_some() {
@@ -387,7 +516,19 @@ impl RootView {
             }
             if let Some(id) = wanted_dialog {
                 self.open_dialog = Some(id);
-                dialog::open(id, &self.session, window, cx);
+                match alert {
+                    true => dialog::open_alert(id, &self.session, window, cx),
+                    false => dialog::open(id, &self.session, window, cx),
+                }
+            }
+        }
+        if self.open_sheet != wanted_sheet {
+            if self.open_sheet.take().is_some() {
+                window.close_sheet(cx);
+            }
+            if let Some(id) = wanted_sheet {
+                self.open_sheet = Some(id);
+                sheet::open(id, &self.session, window, cx);
             }
         }
         if let Some(id) = focus_request {
@@ -396,6 +537,8 @@ impl RootView {
             } else if let Some(slot) = self.textareas.get(&id) {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.numbers.get(&id) {
+                slot.focus(window, cx);
+            } else if let Some(slot) = self.groups.get(&id) {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.otps.get(&id) {
                 slot.focus(window, cx);
@@ -408,6 +551,8 @@ impl RootView {
             } else if let Some(slot) = self.tables.get(&id) {
                 slot.focus(window, cx);
             } else if let Some(slot) = self.commands.get(&id) {
+                slot.focus(window, cx);
+            } else if let Some(slot) = self.list_states.get(&id) {
                 slot.focus(window, cx);
             }
             self.session
@@ -441,13 +586,22 @@ impl RootView {
             sliders: &self.sliders,
             tables: &self.tables,
             numbers: &self.numbers,
+            groups: &self.groups,
             otps: &self.otps,
             calendars: &self.calendars,
+            date_pickers: &self.date_pickers,
+            time_fields: &self.time_fields,
+            color_pickers: &self.color_pickers,
+            combos: &self.combos,
+            questionnaires: &self.questionnaires,
             trees: &self.trees,
             diffs: &self.diffs,
             carousels: &self.carousels,
             charts: &self.charts,
             commands: &self.commands,
+            list_states: &self.list_states,
+            docks: &self.docks,
+            scrollers: &self.scrollers,
             lists: &self.lists,
             texts: &mut self.texts,
             animated: &self.animated,
@@ -472,20 +626,46 @@ impl RootView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
+        // A one-cell grid stretches each row to the list's width and `rowHeight`, as a list item is.
+        self.list_pass(window, cx, |ctx| {
+            rows.iter()
+                .map(|&row| {
+                    div()
+                        .grid()
+                        .size_full()
+                        .child(ctx.node(row))
+                        .into_any_element()
+                })
+                .collect()
+        })
+    }
+
+    /// The content of one List row: its `ListItem`'s children (the crate's item lays them out).
+    fn render_item(
+        &mut self,
+        item: NodeId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        self.list_pass(window, cx, |ctx| {
+            let tree = ctx.tree;
+            tree.node(item)
+                .map(|node| ctx.children(node))
+                .unwrap_or_default()
+        })
+    }
+
+    /// Builds rows for the list being drawn now, and keeps their animations running.
+    fn list_pass<T>(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        build: impl FnOnce(&mut RenderCx) -> T,
+    ) -> T {
         // The view this pass belongs to: the list's, which draws its rows.
         let owner = window.current_view();
         let mut ctx = self.render_cx(cx, owner);
-        // A one-cell grid stretches each row to the list's width and `rowHeight`, as a list item is.
-        let rows = rows
-            .iter()
-            .map(|&row| {
-                div()
-                    .grid()
-                    .size_full()
-                    .child(ctx.node(row))
-                    .into_any_element()
-            })
-            .collect();
+        let rows = build(&mut ctx);
         let animating = ctx.animating;
         drop(ctx);
         if animating {
@@ -510,10 +690,12 @@ impl RootView {
 
     /// A Dialog's children, for its body in the dialog layer, with the Dialog's classes on the
     /// container. Built like `render`, as a separate pass. `owner` is the body's own view, which is
-    /// the one that has to re-render when a `hover:` inside it changes.
+    /// the one that has to re-render when a `hover:` inside it changes. With `footer`, the
+    /// children of its `DialogFooter` (the last one wins, styled by its own `class`).
     fn render_dialog_body(
         &mut self,
         id: NodeId,
+        footer: bool,
         owner: EntityId,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -522,14 +704,40 @@ impl RootView {
         let Some(node) = ctx.tree.node(id) else {
             return div().into_any_element();
         };
+        if footer {
+            let tree = ctx.tree;
+            let part = node
+                .children
+                .iter()
+                .rev()
+                .find(|&&child| dialog::is_footer(tree, child))
+                .and_then(|&child| tree.node(child));
+            let footer = match part {
+                Some(part) => ctx
+                    .message_part(part, DialogFooter::new())
+                    .into_any_element(),
+                None => div().into_any_element(),
+            };
+            let animating = ctx.animating;
+            drop(ctx);
+            if animating {
+                self.clock.borrow_mut().next_frame(window, cx, owner);
+            }
+            return footer;
+        }
         let classes = ctx.styles.classes(
             node.props
                 .get("class")
                 .and_then(Value::as_str)
                 .unwrap_or(""),
         );
-        let children: Vec<AnyElement> =
-            node.children.iter().map(|&child| ctx.node(child)).collect();
+        // A `DialogFooter` is drawn in the footer (`render_dialog_footer`), not in the body.
+        let children: Vec<AnyElement> = node
+            .children
+            .iter()
+            .filter(|&&child| !dialog::is_footer(ctx.tree, child))
+            .map(|&child| ctx.node(child))
+            .collect();
         let body = ctx
             .style(id, div().flex().flex_col().gap_2(), &classes, false)
             .children(children);
@@ -543,6 +751,7 @@ impl RootView {
 }
 
 mod dialog;
+mod sheet;
 
 /// One animation frame every 60th of a second, at most: a spinner or a fade does not need more, and
 /// GPUI asks for the next frame as fast as the loop allows when a frame is cheap.
@@ -758,13 +967,22 @@ struct RenderCx<'a> {
     sliders: &'a HashMap<NodeId, SliderSlot>,
     tables: &'a HashMap<NodeId, TableSlot>,
     numbers: &'a HashMap<NodeId, InputSlot<InputMode>>,
+    groups: &'a HashMap<NodeId, InputSlot<InputMode>>,
     otps: &'a HashMap<NodeId, OtpSlot>,
     calendars: &'a HashMap<NodeId, CalendarSlot>,
+    date_pickers: &'a HashMap<NodeId, DatePickerSlot>,
+    time_fields: &'a HashMap<NodeId, TimeFieldSlot>,
+    color_pickers: &'a HashMap<NodeId, ColorPickerSlot>,
+    combos: &'a HashMap<NodeId, ComboboxSlot>,
+    questionnaires: &'a HashMap<NodeId, QuestionnaireSlot>,
     trees: &'a HashMap<NodeId, tree::TreeSlot>,
     diffs: &'a HashMap<NodeId, DiffSlot>,
     carousels: &'a HashMap<NodeId, CarouselSlot>,
     charts: &'a HashMap<NodeId, ChartSlot>,
     commands: &'a HashMap<NodeId, CommandSlot>,
+    list_states: &'a HashMap<NodeId, ListSlot>,
+    docks: &'a HashMap<NodeId, DockSlot>,
+    scrollers: &'a HashMap<NodeId, chat::ScrollerSlot>,
     lists: &'a HashMap<NodeId, VirtualListScrollHandle>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: &'a mut HashMap<NodeId, SharedString>,
@@ -843,19 +1061,24 @@ impl RenderCx<'_> {
             NodeType::Button => self.button_node(id, node, &classes),
             NodeType::Checkbox => self.checkbox_node(id, node, &classes),
             NodeType::Switch => self.switch_node(id, node, &classes),
+            NodeType::Toggle => self.toggle_node(id, node, &classes),
             NodeType::Tabs => self.tabs_node(id, node, &classes, accessibility.as_ref()),
             // Drawn by its `Tabs`: on its own a `Tab` is not a chip (PROTOCOL.md section 15).
             NodeType::Tab => div().into_any_element(),
             NodeType::Table => self.table_node(id, node, &classes),
             NodeType::VirtualList => self.virtual_list_node(id, node, &classes),
             // Drawn in gpui-component's dialog layer (`dialog::open`), not where it sits in the tree.
-            NodeType::Dialog => div().into_any_element(),
+            NodeType::Dialog | NodeType::AlertDialog => div().into_any_element(),
+            // Drawn in gpui-component's sheet layer (`sheet::open`), not where it sits either.
+            NodeType::Sheet => div().into_any_element(),
+            NodeType::Popover | NodeType::HoverCard => self.overlay_node(id, node, &classes),
             NodeType::RadioGroup => self.radio_group_node(id, node, &classes),
             NodeType::Select => self.select_node(id, node, &classes),
             NodeType::Slider => self.slider_node(id, node, &classes),
             NodeType::Textarea => self.textarea_node(id, node, &classes),
             NodeType::Input => self.input_node(id, node, &classes),
             NodeType::NumberInput => self.number_input_node(id, node, &classes),
+            NodeType::InputGroup => self.input_group_node(id, node, &classes),
             NodeType::OtpInput => self.otp_input_node(id, node, &classes),
             NodeType::Alert => self.component(id, basic::alert(id, node, self.session), &classes),
             NodeType::Badge => self.badge_node(id, node, &classes),
@@ -869,9 +1092,7 @@ impl RenderCx<'_> {
                 self.component(id, basic::pagination(id, node, self.session), &classes)
             }
             NodeType::Collapsible => self.collapsible_node(id, node, &classes),
-            NodeType::Accordion => {
-                self.component(id, accordion::build(id, node, self.session), &classes)
-            }
+            NodeType::Accordion => self.accordion_node(id, node, &classes),
             NodeType::Avatar => self.component(id, basic::avatar(node), &classes),
             NodeType::Stepper => {
                 self.component(id, basic::stepper(id, node, self.session), &classes)
@@ -882,10 +1103,14 @@ impl RenderCx<'_> {
             NodeType::DescriptionList => {
                 self.component(id, layout::description_list(node), &classes)
             }
-            NodeType::StatusBar => self.component(id, layout::status_bar(node), &classes),
+            NodeType::StatusBar => self.status_bar_node(id, node, &classes),
             NodeType::Toolbar => self.toolbar_node(id, node, &classes),
             NodeType::Resizable => self.resizable_node(id, node, &classes),
             NodeType::Calendar => self.calendar_node(id, node, &classes),
+            NodeType::DatePicker => self.date_picker_node(id, node, &classes),
+            NodeType::TimeField => self.time_field_node(id, node, &classes),
+            NodeType::ColorPicker => self.color_picker_node(id, node, &classes),
+            NodeType::Combobox => self.combobox_node(id, node, &classes),
             NodeType::Tree => self.tree_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Diff => self.diff_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Carousel => self.carousel_node(id, node, &classes, accessibility.as_ref()),
@@ -893,18 +1118,71 @@ impl RenderCx<'_> {
             NodeType::Chart => self.chart_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Canvas => self.canvas_node(id, node, &classes, accessibility.as_ref()),
             NodeType::Command => self.command_node(id, node, &classes),
+            NodeType::Label => self.component(id, basic::label(node), &classes),
+            NodeType::Empty => self.empty_node(id, node, &classes),
+            NodeType::Shimmer => self.component(id, basic::shimmer(id, node), &classes),
+            NodeType::DropdownButton => {
+                self.component(id, button::dropdown(id, node, self.session), &classes)
+            }
+            NodeType::Clipboard => {
+                self.component(id, button::clipboard(id, node, self.session), &classes)
+            }
             NodeType::Settings => {
                 let element = settings::build(id, node, self.session);
                 self.component_a11y(id, element, &classes, accessibility.as_ref())
             }
+            NodeType::Bubble => {
+                let children = self.children(node);
+                let bubble = self.style(id, chat::bubble(node).children(children), &classes, false);
+                match accessibility.as_ref() {
+                    Some(spec) => chat::bubble_a11y(self.tree, node, a11y::apply(spec, id, div()))
+                        .child(bubble)
+                        .into_any_element(),
+                    None => bubble.into_any_element(),
+                }
+            }
+            NodeType::Message => self.message_node(id, node, &classes),
+            // Drawn by the node that holds them, like a `Tab` by its `Tabs`.
+            NodeType::MessageHeader
+            | NodeType::MessageFooter
+            | NodeType::AccordionItem
+            | NodeType::DialogFooter
+            | NodeType::StatusBarLeft
+            | NodeType::StatusBarRight => div().into_any_element(),
+            NodeType::Marker => {
+                let children = self.children(node);
+                self.style(id, chat::marker(node, children), &classes, false)
+                    .into_any_element()
+            }
+            NodeType::Attachment => self.attachment_node(id, node, &classes),
+            NodeType::MessageScroller => self.message_scroller_node(id, node, &classes),
+            NodeType::Questionnaire => match self.questionnaires.get(&id) {
+                Some(slot) => self.blocking(id, questionnaire::build(node, slot), &classes),
+                None => div().into_any_element(),
+            },
+            NodeType::List => match self.list_states.get(&id) {
+                Some(slot) => self.blocking(id, list::build(node, slot), &classes),
+                None => div().into_any_element(),
+            },
+            // Drawn by its `List`, like a `Tab` by its `Tabs`.
+            NodeType::ListItem => div().into_any_element(),
+            NodeType::Dock => match self.docks.get(&id) {
+                Some(slot) => self.blocking(id, div().child(slot.area()), &classes),
+                None => div().into_any_element(),
+            },
+            // Drawn by its `Dock`.
+            NodeType::DockPanel => div().into_any_element(),
         };
         // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
         // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // The overlays ignore the node's `a11y` (PROTOCOL.md section 24): in a `Popover`/`HoverCard`
+        // the trigger child carries its own, and an `AlertDialog`/`Sheet` is named by its title.
         // Any other component cannot take an id or a role from outside, so it gets a wrapper
         // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
-        // still reads as what it is; a Slider reports itself, so a wrapper would repeat it.
+        // still reads as what it is; a Slider reports itself, and so do a Clipboard (a named
+        // button) and an InputGroup (a named group), so a wrapper would repeat them.
         let accessibility = match node.node_type {
-            NodeType::Slider => None,
+            NodeType::Slider | NodeType::Clipboard | NodeType::InputGroup => None,
             NodeType::Rating | NodeType::Pagination => {
                 Some(keyboard::spec(self.tree, node, accessibility))
             }
@@ -916,6 +1194,7 @@ impl RenderCx<'_> {
                     node.node_type,
                     NodeType::Div
                         | NodeType::Text
+                        | NodeType::Bubble
                         | NodeType::Tabs
                         | NodeType::Tree
                         | NodeType::Diff
@@ -923,6 +1202,10 @@ impl RenderCx<'_> {
                         | NodeType::Sidebar
                         | NodeType::Chart
                         | NodeType::Canvas
+                        | NodeType::AlertDialog
+                        | NodeType::Sheet
+                        | NodeType::Popover
+                        | NodeType::HoverCard
                 ) =>
             {
                 a11y::wrap(&spec, id, element)
@@ -978,22 +1261,21 @@ impl RenderCx<'_> {
         } else {
             div()
         };
-        // Inset: an outer shadow fills the transparent wrapper instead of drawing a ring.
-        let ring = BoxShadow {
-            color: self.theme.ring,
-            offset: point(px(0.), px(0.)),
-            blur_radius: px(0.),
-            spread_radius: px(2.),
-            inset: true,
-        };
+        let ring = self.ring();
         let session = self.session.clone();
+        let own = handle.clone();
         let stop = a11y::apply(
             &spec,
             id,
             wrapper.rounded(self.theme.radius).track_focus(handle),
         )
         .focus(move |style| style.shadow(vec![ring]))
-        .on_key_down(move |event: &KeyDownEvent, _, cx| {
+        .on_key_down(move |event: &KeyDownEvent, window, cx| {
+            // A key bubbling from a focused button inside (Pagination's, a Tab's) is that button's:
+            // taking it would rebuild the buttons and drop the focus to the window.
+            if !own.is_focused(window) {
+                return;
+            }
             let taken = session.update(cx, |session, cx| {
                 let taken = keyboard::key_down(&mut session.tree, id, &event.keystroke);
                 if taken {
@@ -1008,6 +1290,18 @@ impl RenderCx<'_> {
         self.style(id, stop, classes, false)
             .child(element)
             .into_any_element()
+    }
+
+    /// The focus ring of a host Tab stop. Inset: an outer shadow fills a transparent wrapper
+    /// instead of drawing a ring.
+    fn ring(&self) -> BoxShadow {
+        BoxShadow {
+            color: self.theme.ring,
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+            inset: true,
+        }
     }
 
     /// `component` for a node whose `a11y` goes on the same sized wrapper. The general
@@ -1036,6 +1330,25 @@ impl RenderCx<'_> {
         }
     }
 
+    /// A `Popover` or a `HoverCard`: the first child is the trigger and the rest the panel, so the
+    /// node draws where it sits. `class` styles the trigger's slot, not the panel (PROTOCOL.md
+    /// section 24).
+    fn overlay_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let children = self.children(node);
+        let trigger = styles::apply(StyleRefinement::default(), classes, self.theme);
+        let element = match node.node_type {
+            NodeType::Popover => {
+                overlays::popover(id, node, children, trigger, self.session).into_any_element()
+            }
+            _ => overlays::hover_card(id, node, children, trigger, self.session).into_any_element(),
+        };
+        // No classes go on a wrapper here: they are the trigger's slot, and a wrapper would keep a
+        // `w-full` trigger from filling the space its parent gives it.
+        // shortcut: the slot takes static classes only (`hover:` and `transition` need the element
+        // itself, which a `StyleRefinement` is not); upgrade if a client wants a moving trigger slot.
+        element
+    }
+
     fn badge_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let children = self.children(node);
         self.component(id, basic::badge(node).children(children), classes)
@@ -1053,6 +1366,167 @@ impl RenderCx<'_> {
         let children = self.children(node);
         let content = div().flex().flex_col().children(children);
         self.component(id, basic::collapsible(id, node).content(content), classes)
+    }
+
+    // `Empty` splits into a header (props) and a content slot, which holds the children.
+    fn empty_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let content = self.children(node);
+        self.component(id, basic::empty(node, content), classes)
+    }
+
+    /// A `Message` takes its header and footer from `MessageHeader`/`MessageFooter` children (the
+    /// last of each wins, styled by its own `class`) and every other child as content.
+    fn message_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let (mut header, mut footer, mut content, mut ghost) = (None, None, Vec::new(), false);
+        for &child in &node.children {
+            let Some(part) = self.tree.node(child) else {
+                continue;
+            };
+            match part.node_type {
+                NodeType::MessageHeader => {
+                    header = Some(self.message_part(part, MessageHeader::new()))
+                }
+                NodeType::MessageFooter => {
+                    footer = Some(self.message_part(part, MessageFooter::new()))
+                }
+                _ => {
+                    ghost |= part.node_type == NodeType::Bubble && chat::is_ghost(part);
+                    content.push(self.node(child));
+                }
+            }
+        }
+        let message = chat::message(node, header, content, footer, ghost);
+        self.style(id, message, classes, false).into_any_element()
+    }
+
+    /// An `Accordion`'s sections: an `AccordionItem`'s children, styled by its `class`, or an
+    /// `items` entry's text.
+    fn accordion_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let tree = self.tree;
+        let ring = self.ring();
+        let sections = accordion::sections(tree, node)
+            .into_iter()
+            .enumerate()
+            .map(|(ix, (item, part))| {
+                // shortcut: the crate's header button has no name and no Tab stop, so the title is
+                // a named label, and an enabled AccordionItem's title a button of its own that
+                // Enter and Space toggle; drop this when gpui-component names and focuses it.
+                let handle = part
+                    .filter(|_| !item.4 && node.props.get("disabled") != Some(&Value::Bool(true)))
+                    .and_then(|part| self.focusables.get(&part).cloned());
+                let spec = a11y::A11y {
+                    role: Some(if handle.is_some() {
+                        Role::Button
+                    } else {
+                        Role::Label
+                    }),
+                    label: Some(item.1.clone()),
+                    expanded: handle.is_some().then_some(item.3),
+                    ..Default::default()
+                };
+                let title = a11y::apply_stateful(
+                    &spec,
+                    div()
+                        .id(("accordion-title", ix))
+                        .flex_1()
+                        .child(SharedString::from(item.1.clone())),
+                );
+                let title = match handle {
+                    Some(handle) => {
+                        let (session, value, ring) =
+                            (self.session.clone(), item.0.clone(), ring.clone());
+                        title
+                            .rounded(self.theme.radius)
+                            .track_focus(&handle)
+                            .focus(move |style| style.shadow(vec![ring.clone()]))
+                            .on_key_down(move |event: &KeyDownEvent, _, cx| {
+                                if !matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    return;
+                                }
+                                session.update(cx, |session, cx| {
+                                    // The item is this render's, so it is there.
+                                    let _ = accordion::toggled(&mut session.tree, id, &value);
+                                    cx.notify();
+                                });
+                                cx.stop_propagation();
+                            })
+                    }
+                    None => title,
+                };
+                let content = match part.and_then(|part| tree.node(part)) {
+                    Some(part) => self.message_part(part, div()).into_any_element(),
+                    None => SharedString::from(item.2.clone()).into_any_element(),
+                };
+                (item, title.into_any_element(), content)
+            })
+            .collect();
+        let accordion = accordion::build(id, node, self.session, sections);
+        self.component(id, accordion, classes)
+    }
+
+    /// A `StatusBar` takes each side from a `StatusBarLeft`/`StatusBarRight` child (the last of
+    /// each wins, styled by its own `class`), else from the `left`/`right` text.
+    fn status_bar_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let (mut left, mut right) = (None, None);
+        for &child in &node.children {
+            match self.tree.node(child) {
+                Some(part) if part.node_type == NodeType::StatusBarLeft => left = Some(part),
+                Some(part) if part.node_type == NodeType::StatusBarRight => right = Some(part),
+                _ => {}
+            }
+        }
+        let side = |this: &mut Self, part: Option<&Node>, key| match part {
+            Some(part) => {
+                let row = div().flex().items_center().gap_2();
+                Some(this.message_part(part, row).into_any_element())
+            }
+            None => node
+                .props
+                .get(key)
+                .and_then(Value::as_str)
+                .map(|text| SharedString::from(text.to_owned()).into_any_element()),
+        };
+        let (left, right) = (side(self, left, "left"), side(self, right, "right"));
+        self.component(id, layout::status_bar(left, right), classes)
+    }
+
+    fn message_part<E: ParentElement + Styled>(&mut self, node: &Node, part: E) -> E {
+        let class = node
+            .props
+            .get("class")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let classes = self.styles.classes(class);
+        let children = self.children(node);
+        styles::apply(part.children(children), &classes, self.theme)
+    }
+
+    // The children are the actions; the card's own controls block a `windowControl` area.
+    fn attachment_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let image = self.image_file(id, node);
+        let actions = self.children(node);
+        let attachment = chat::attachment(id, node, image, actions, self.session);
+        self.blocking(id, attachment, classes)
+    }
+
+    // Only the rows in view are built, one at a time (`render_rows`), as in a VirtualList; the
+    // scroller fills its container.
+    fn message_scroller_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let Some((state, _)) = self.scrollers.get(&id) else {
+            return div().into_any_element();
+        };
+        let rows = node.children.clone();
+        let view = self.view.clone();
+        let row = move |ix: usize, window: &mut Window, cx: &mut App| {
+            let row = rows.get(ix..=ix).unwrap_or_default();
+            let row = view
+                .update(cx, |view, cx| view.render_rows(row, window, cx))
+                .pop()
+                .unwrap_or_else(|| div().into_any_element());
+            chat::scroller_row(ix, rows.len(), row)
+        };
+        let scroller = chat::message_scroller(id, node, state, row);
+        self.blocking(id, scroller, classes)
     }
 
     fn number_input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -1319,14 +1793,15 @@ impl RenderCx<'_> {
         self.style(id, bar, classes, false).into_any_element()
     }
 
-    fn image_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
-        // Bytes sent as `data` win over `src`; the host keeps them in a file per node.
+    /// The picture of an `Image` or an `Attachment`. Bytes sent as `data` win over `src`; the
+    /// host keeps them in a file per node.
+    fn image_file(&self, id: NodeId, node: &Node) -> Option<PathBuf> {
         let has_data = node
             .props
             .get("data")
             .and_then(Value::as_str)
             .is_some_and(|data| !data.is_empty());
-        let path = if has_data {
+        if has_data {
             self.tree.image_path(id)
         } else {
             node.props
@@ -1334,8 +1809,11 @@ impl RenderCx<'_> {
                 .and_then(Value::as_str)
                 .filter(|src| !src.is_empty())
                 .map(PathBuf::from)
-        };
-        let Some(path) = path else {
+        }
+    }
+
+    fn image_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let Some(path) = self.image_file(id, node) else {
             return self.style(id, div(), classes, false).into_any_element();
         };
         let fit = match node.props.get("fit").and_then(Value::as_str) {
@@ -1362,9 +1840,16 @@ impl RenderCx<'_> {
 
     fn text_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let content = self.text(id, node);
-        let element = self.style(id, div(), classes, false).child(content);
+        let element = self.style(id, div(), classes, false).child(content.clone());
         match a11y::of(node) {
-            Some(spec) => a11y::apply(&spec, id, element).into_any_element(),
+            Some(mut spec) => {
+                // GPUI's text reaches the reader through no node of its own: without a `label`,
+                // the content names it (a `label` role then reads like text on a page).
+                if spec.label.is_none() && spec.role.is_some() {
+                    spec.label = Some(content.to_string());
+                }
+                a11y::apply(&spec, id, element).into_any_element()
+            }
             None => element.into_any_element(),
         }
     }
@@ -1393,6 +1878,12 @@ impl RenderCx<'_> {
     fn switch_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let switch = switch::build(id, node, self.session);
         self.blocking(id, switch, classes)
+    }
+
+    fn toggle_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        let children = self.children(node);
+        let toggle = toggle::build(id, node, self.session).children(children);
+        self.blocking(id, toggle, classes)
     }
 
     /// A `Tabs` with `Tab` children takes its tabs from the tree and ignores `tabs`. Its `a11y`
@@ -1523,6 +2014,41 @@ impl RenderCx<'_> {
     fn slider_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.sliders.get(&id) {
             Some(slot) => self.blocking(id, slider::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn date_picker_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.date_pickers.get(&id) {
+            Some(slot) => self.blocking(id, date_picker::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn time_field_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.time_fields.get(&id) {
+            Some(slot) => self.blocking(id, time_field::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn color_picker_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.color_pickers.get(&id) {
+            Some(slot) => self.blocking(id, color_picker::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn combobox_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.combos.get(&id) {
+            Some(slot) => self.blocking(id, combobox::build(node, slot), classes),
+            None => div().into_any_element(),
+        }
+    }
+
+    fn input_group_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
+        match self.groups.get(&id) {
+            Some(slot) => self.blocking(id, input::build_group(id, node, slot), classes),
             None => div().into_any_element(),
         }
     }

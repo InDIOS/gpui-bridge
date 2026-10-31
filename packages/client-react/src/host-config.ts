@@ -184,6 +184,11 @@ const EVENT_PROPS: Record<string, string> = {
   onCollapse: "collapse",
   onPointerDown: "pointerDown",
   onConfirm: "confirm",
+  onCopied: "copied",
+  onRemove: "remove",
+  onRetry: "retry",
+  onQuery: "query",
+  onLoadMore: "loadMore",
 };
 
 function isTextChildren(children: unknown): boolean {
@@ -215,27 +220,29 @@ function split(type: ElementType, props: Record<string, unknown>): { wire: Wire;
   if (type === "Input" || type === "RadioGroup" || type === "Select" || type === "Slider" || type === "Tabs") wire.controlled = props.value !== undefined;
   if (type === "Rating" || type === "Stepper" || type === "Calendar") wire.controlled = props.value !== undefined;
   if (type === "Pagination") wire.controlled = props.page !== undefined;
-  if (type === "NumberInput" || type === "OtpInput") wire.controlled = props.value !== undefined;
+  if (type === "NumberInput" || type === "OtpInput" || type === "InputGroup") wire.controlled = props.value !== undefined;
   if (type === "Table") wire.controlled = props.selected !== undefined;
-  if (type === "Tree" || type === "Carousel" || type === "Sidebar") wire.controlled = props.value !== undefined;
-  if (type === "Checkbox" || type === "Switch") wire.controlled = props.checked !== undefined;
+  if (type === "Tree" || type === "Carousel" || type === "Sidebar" || type === "List") wire.controlled = props.value !== undefined;
+  if (type === "Checkbox" || type === "Switch" || type === "Toggle") wire.controlled = props.checked !== undefined;
+  if (type === "DatePicker" || type === "TimeField" || type === "ColorPicker" || type === "Combobox") wire.controlled = props.value !== undefined;
   return { wire, handlers };
 }
 
 /** Host event payloads become plain handler arguments. */
 function subscribe(instance: Instance, event: string): void {
   const node = instance.node as UINode<any>;
-  node.on(event, (payload: { value?: string | number | null; checked?: boolean; item?: string; key?: string; paths?: string[] }) => {
+  node.on(event, (payload: { value?: string | number | null | string[]; checked?: boolean; item?: string; key?: string; paths?: string[] }) => {
     const handler = instance.handlers.get(event);
     if (!handler) return;
-    if (event === "click" || event === "ok" || event === "cancel" || event === "close") handler();
+    if (event === "click" || event === "ok" || event === "cancel" || event === "close" || event === "loadMore") handler();
     // A Table's double click carries the row.
     else if (event === "doubleClick") instance.type === "Table" ? handler(payload.value) : handler();
     else if (event === "sort") handler(payload);
     else if (event === "menu") handler(payload.item);
     else if (event === "keyDown") handler(payload.key);
     else if (event === "drop") handler(payload.paths);
-    else if (instance.type === "Checkbox" || instance.type === "Switch") handler(payload.checked);
+    else if (instance.type === "Checkbox" || instance.type === "Switch" || instance.type === "Toggle") handler(payload.checked);
+    else if (instance.type === "Popover" || instance.type === "HoverCard") handler(payload.checked);
     else handler(payload.value);
   });
 }
@@ -340,6 +347,68 @@ function createNode(app: App, type: NodeType, wire: Wire): UINode<NodeType> {
       return app.command(wire);
     case "Settings":
       return app.settings(wire);
+    case "Toggle":
+      return app.toggle(wire);
+    case "DropdownButton":
+      return app.dropdownButton(wire);
+    case "Label":
+      return app.label(wire);
+    case "Empty":
+      return app.empty(wire);
+    case "Shimmer":
+      return app.shimmer(wire);
+    case "InputGroup":
+      return app.inputGroup(wire);
+    case "Clipboard":
+      return app.clipboard(wire);
+    case "AlertDialog":
+      return app.alertDialog(wire);
+    case "Sheet":
+      return app.sheet(wire);
+    case "Popover":
+      return app.popover(wire);
+    case "HoverCard":
+      return app.hoverCard(wire);
+    case "DatePicker":
+      return app.datePicker(wire);
+    case "TimeField":
+      return app.timeField(wire);
+    case "ColorPicker":
+      return app.colorPicker(wire);
+    case "Combobox":
+      return app.combobox(wire);
+    case "Bubble":
+      return app.bubble(wire);
+    case "Message":
+      return app.message(wire);
+    case "MessageHeader":
+      return app.messageHeader(wire);
+    case "MessageFooter":
+      return app.messageFooter(wire);
+    case "Marker":
+      return app.marker(wire);
+    case "Attachment":
+      return app.attachment(wire);
+    case "MessageScroller":
+      return app.messageScroller(wire);
+    case "Questionnaire":
+      return app.questionnaire(wire);
+    case "List":
+      return app.list(wire);
+    case "ListItem":
+      return app.listItem(wire);
+    case "Dock":
+      return app.dock(wire);
+    case "DockPanel":
+      return app.dockPanel(wire);
+    case "AccordionItem":
+      return app.accordionItem(wire);
+    case "DialogFooter":
+      return app.dialogFooter(wire);
+    case "StatusBarLeft":
+      return app.statusBarLeft(wire);
+    case "StatusBarRight":
+      return app.statusBarRight(wire);
     default:
       throw new Error(`gpui-bridge-react: unknown element type '${type}'`);
   }

@@ -16,6 +16,8 @@ pub enum PropKind {
     Menus,
     /// A finite number.
     Number,
+    /// A finite number from 0.
+    NonNegative,
     /// A finite number above 0.
     Positive,
     /// Standard base64 (an `Image`'s bytes); the value is decoded when the op is applied, so a
@@ -51,6 +53,10 @@ pub enum PropKind {
     CommandSections,
     /// A Settings' `pages`: pages of groups of typed fields (PROTOCOL.md section 22).
     SettingsPages,
+    /// A Questionnaire's `items`: questions with choices or free text (PROTOCOL.md section 26).
+    Questions,
+    /// A list of plain strings (`Combobox`'s `value`, `ColorPicker`'s `palette`).
+    StringList,
 }
 
 impl PropKind {
@@ -75,8 +81,13 @@ impl PropKind {
             | Self::Series
             | Self::Commands
             | Self::CommandSections
-            | Self::SettingsPages => self.check(value).is_ok(),
+            | Self::SettingsPages
+            | Self::Questions => self.check(value).is_ok(),
+            Self::StringList => value
+                .as_array()
+                .is_some_and(|arr| arr.iter().all(Value::is_string)),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
+            Self::NonNegative => value.as_f64().is_some_and(|n| n.is_finite() && n >= 0.),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
             Self::Index => value.is_u64(),
@@ -117,6 +128,8 @@ impl PropKind {
                 .map_err(|err| format!("a list of canvas commands ({err})")),
             Self::CommandSections => crate::components::command::check_items(value)
                 .map_err(|err| format!("a list of command sections ({err})")),
+            Self::Questions => crate::components::questionnaire::check_items(value)
+                .map_err(|err| format!("a list of questions ({err})")),
             Self::SettingsPages => crate::components::settings::check_pages(value)
                 .map_err(|err| format!("a list of settings pages ({err})")),
             _ if self.accepts(value) => Ok(()),
@@ -134,6 +147,7 @@ impl PropKind {
             Self::Options => "a list of options".into(),
             Self::Number => "a number".into(),
             Self::Positive => "a number above 0".into(),
+            Self::NonNegative => "a number from 0".into(),
             Self::Base64 => "a base64-encoded string".into(),
             Self::Index => "a whole number from 0".into(),
             Self::Columns => "a list of columns".into(),
@@ -149,6 +163,8 @@ impl PropKind {
             Self::Commands => "a list of canvas command objects".into(),
             Self::CommandSections => "a list of command sections".into(),
             Self::SettingsPages => "a list of settings pages".into(),
+            Self::Questions => "a list of questions".into(),
+            Self::StringList => "a list of strings".into(),
         }
     }
 }
@@ -214,7 +230,59 @@ pub enum NodeType {
     Command,
     // Settings pages (PROTOCOL.md section 22).
     Settings,
+    // Simple components (PROTOCOL.md section 23).
+    Toggle,
+    DropdownButton,
+    Label,
+    Empty,
+    Shimmer,
+    InputGroup,
+    Clipboard,
+    // Overlays (PROTOCOL.md section 24).
+    AlertDialog,
+    Sheet,
+    Popover,
+    HoverCard,
+    // Form components with state (PROTOCOL.md section 25).
+    DatePicker,
+    TimeField,
+    ColorPicker,
+    Combobox,
+    // Chat (PROTOCOL.md section 26).
+    Bubble,
+    Message,
+    MessageHeader,
+    MessageFooter,
+    Marker,
+    Attachment,
+    MessageScroller,
+    Questionnaire,
+    List,
+    ListItem,
+    // Dock (PROTOCOL.md section 28).
+    Dock,
+    DockPanel,
+    // Slots as children (ADR 0004): drawn by the node that holds them.
+    AccordionItem,
+    DialogFooter,
+    StatusBarLeft,
+    StatusBarRight,
 }
+
+/// Where a `Popover` or `HoverCard` opens from its trigger (PROTOCOL.md section 24).
+const ANCHORS: &[&str] = &[
+    "top-left",
+    "top-center",
+    "top-right",
+    "left-center",
+    "right-center",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+];
+
+/// The edge a `Sheet` slides in from.
+const SIDES: &[&str] = &["left", "right", "top", "bottom"];
 
 impl NodeType {
     pub fn parse(name: &str) -> Option<Self> {
@@ -268,6 +336,37 @@ impl NodeType {
             "Canvas" => Some(Self::Canvas),
             "Command" => Some(Self::Command),
             "Settings" => Some(Self::Settings),
+            "Toggle" => Some(Self::Toggle),
+            "DropdownButton" => Some(Self::DropdownButton),
+            "Label" => Some(Self::Label),
+            "Empty" => Some(Self::Empty),
+            "Shimmer" => Some(Self::Shimmer),
+            "InputGroup" => Some(Self::InputGroup),
+            "Clipboard" => Some(Self::Clipboard),
+            "AlertDialog" => Some(Self::AlertDialog),
+            "Sheet" => Some(Self::Sheet),
+            "Popover" => Some(Self::Popover),
+            "HoverCard" => Some(Self::HoverCard),
+            "DatePicker" => Some(Self::DatePicker),
+            "TimeField" => Some(Self::TimeField),
+            "ColorPicker" => Some(Self::ColorPicker),
+            "Combobox" => Some(Self::Combobox),
+            "Bubble" => Some(Self::Bubble),
+            "Message" => Some(Self::Message),
+            "MessageHeader" => Some(Self::MessageHeader),
+            "MessageFooter" => Some(Self::MessageFooter),
+            "Marker" => Some(Self::Marker),
+            "Attachment" => Some(Self::Attachment),
+            "MessageScroller" => Some(Self::MessageScroller),
+            "Questionnaire" => Some(Self::Questionnaire),
+            "List" => Some(Self::List),
+            "ListItem" => Some(Self::ListItem),
+            "Dock" => Some(Self::Dock),
+            "DockPanel" => Some(Self::DockPanel),
+            "AccordionItem" => Some(Self::AccordionItem),
+            "DialogFooter" => Some(Self::DialogFooter),
+            "StatusBarLeft" => Some(Self::StatusBarLeft),
+            "StatusBarRight" => Some(Self::StatusBarRight),
             _ => None,
         }
     }
@@ -280,10 +379,12 @@ impl NodeType {
             (_, "a11y") => Some(Accessibility),
             (Self::Text, "content") => Some(Str),
             (Self::Button, "label") => Some(Str),
-            (Self::Button, "variant") => Some(OneOf(&["primary", "secondary", "ghost", "danger"])),
+            (Self::Button | Self::DropdownButton, "variant") => {
+                Some(OneOf(&["primary", "secondary", "ghost", "danger"]))
+            }
             (Self::Input | Self::Textarea, "value" | "placeholder") => Some(Str),
-            (Self::Checkbox | Self::Switch, "label") => Some(Str),
-            (Self::Checkbox | Self::Switch, "checked") => Some(Bool),
+            (Self::Checkbox | Self::Switch | Self::Toggle, "label") => Some(Str),
+            (Self::Checkbox | Self::Switch | Self::Toggle, "checked") => Some(Bool),
             (Self::RadioGroup | Self::Select, "options") => Some(Options),
             (Self::RadioGroup | Self::Select, "value") => Some(Str),
             (Self::RadioGroup, "direction") => Some(OneOf(&["vertical", "horizontal"])),
@@ -291,10 +392,22 @@ impl NodeType {
             (Self::Select, "searchable") => Some(Bool),
             (Self::Slider, "value" | "min" | "max") => Some(Number),
             (Self::Slider, "step") => Some(Positive),
-            (Self::Div | Self::Button, "tooltip") => Some(Str),
-            (Self::Dialog, "open") => Some(Bool),
+            (
+                Self::Div | Self::Button | Self::Toggle | Self::DropdownButton | Self::Clipboard,
+                "tooltip",
+            ) => Some(Str),
+            (Self::Dialog | Self::AlertDialog, "open") => Some(Bool),
             (Self::Dialog, "title" | "okText" | "cancelText") => Some(Str),
             (Self::Dialog, "width") => Some(Positive),
+            (Self::AlertDialog, "title" | "description" | "okText" | "cancelText") => Some(Str),
+            (Self::AlertDialog, "icon") => Some(Icon),
+            (Self::Sheet, "open") => Some(Bool),
+            (Self::Sheet, "side") => Some(OneOf(SIDES)),
+            (Self::Sheet, "title") => Some(Str),
+            (Self::Sheet, "size") => Some(Positive),
+            (Self::Popover, "open" | "arrow") => Some(Bool),
+            (Self::Popover | Self::HoverCard, "anchor") => Some(OneOf(ANCHORS)),
+            (Self::HoverCard, "openDelay" | "closeDelay") => Some(NonNegative),
             (Self::VirtualList, "rowHeight") => Some(Positive),
             (Self::Table, "columns") => Some(Columns),
             (Self::Table, "rows") => Some(Rows),
@@ -345,6 +458,8 @@ impl NodeType {
             (Self::Collapsible, "open") => Some(Bool),
             (Self::Accordion, "items") => Some(Items),
             (Self::Accordion, "multiple" | "bordered") => Some(Bool),
+            (Self::AccordionItem, "id" | "title") => Some(Str),
+            (Self::AccordionItem, "open" | "disabled") => Some(Bool),
             (Self::Avatar, "name" | "src") => Some(Str),
             (Self::Stepper, "items") => Some(Options),
             (Self::Stepper, "value") => Some(Str),
@@ -357,6 +472,19 @@ impl NodeType {
             (Self::Form, "direction") => Some(OneOf(&["vertical", "horizontal"])),
             (Self::Field, "label" | "description") => Some(Str),
             (Self::Field, "required") => Some(Bool),
+            // Form components with state (PROTOCOL.md section 25).
+            (Self::DatePicker, "value" | "placeholder") => Some(Str),
+            (Self::DatePicker, "range" | "disabled" | "controlled") => Some(Bool),
+            (Self::TimeField, "value") => Some(Str),
+            (Self::TimeField, "seconds" | "disabled" | "controlled") => Some(Bool),
+            (Self::ColorPicker, "value") => Some(Str),
+            (Self::ColorPicker, "palette") => Some(StringList),
+            // No `disabled`: neither of the crate's color pickers can be disabled.
+            (Self::ColorPicker, "controlled") => Some(Bool),
+            (Self::Combobox, "options") => Some(Options),
+            (Self::Combobox, "value") => Some(StringList),
+            (Self::Combobox, "placeholder") => Some(Str),
+            (Self::Combobox, "searchable" | "disabled" | "controlled") => Some(Bool),
             // Layout components.
             (Self::GroupBox, "title") => Some(Str),
             (Self::GroupBox, "variant") => Some(OneOf(&["normal", "fill", "outline"])),
@@ -399,6 +527,61 @@ impl NodeType {
             (Self::Command, "items") => Some(CommandSections),
             (Self::Command, "placeholder") => Some(Str),
             (Self::Settings, "pages") => Some(SettingsPages),
+            // Simple components (PROTOCOL.md section 23).
+            (Self::Toggle | Self::DropdownButton | Self::Empty, "icon") => Some(Icon),
+            (Self::Toggle, "variant") => Some(OneOf(&["ghost", "outline"])),
+            (Self::DropdownButton, "items") => Some(Menu),
+            (Self::DropdownButton, "outline") => Some(Bool),
+            (Self::DropdownButton, "menuLabel") => Some(Str),
+            (Self::Label, "content" | "secondary" | "highlight") => Some(Str),
+            (Self::Label, "masked") => Some(Bool),
+            (Self::Empty, "title" | "description") => Some(Str),
+            (Self::Shimmer, "content") => Some(Str),
+            (Self::Shimmer, "duration" | "spread") => Some(Number),
+            (Self::Shimmer, "reverse" | "once") => Some(Bool),
+            (Self::InputGroup, "value" | "placeholder" | "prefix" | "suffix") => Some(Str),
+            (Self::InputGroup, "prefixIcon" | "suffixIcon") => Some(Icon),
+            (Self::InputGroup, "readonly" | "invalid") => Some(Bool),
+            (Self::Clipboard, "value") => Some(Str),
+            (Self::Bubble, "variant") => Some(OneOf(&[
+                "filled",
+                "secondary",
+                "muted",
+                "tinted",
+                "outline",
+                "ghost",
+                "destructive",
+            ])),
+            (Self::Bubble | Self::Message, "alignment") => Some(OneOf(&["start", "end"])),
+            (Self::Message, "avatarName" | "avatarSrc") => Some(Str),
+            (Self::Marker, "content") => Some(Str),
+            (Self::Marker, "icon") => Some(Icon),
+            (Self::Marker, "variant") => Some(OneOf(&["plain", "separator", "border"])),
+            (Self::Marker, "alignment") => Some(OneOf(&["start", "center", "end"])),
+            (Self::Marker, "loading") => Some(Bool),
+            (Self::Marker, "loadingStyle") => Some(OneOf(&["spinner", "shimmer"])),
+            (Self::Attachment, "status") => Some(OneOf(&[
+                "pending",
+                "uploading",
+                "processing",
+                "failed",
+                "complete",
+            ])),
+            (Self::Attachment, "progress") => Some(Number),
+            (Self::Attachment, "title" | "description" | "tooltip" | "src") => Some(Str),
+            (Self::Attachment, "data") => Some(Base64),
+            (Self::Attachment, "axis") => Some(OneOf(&["horizontal", "vertical"])),
+            (Self::MessageScroller, "scrollbar" | "jumpButton") => Some(Bool),
+            (Self::MessageScroller, "jumpLabel") => Some(Str),
+            (Self::Questionnaire, "items") => Some(Questions),
+            (Self::List, "value" | "placeholder") => Some(Str),
+            (Self::List, "searchable" | "hasMore" | "loading") => Some(Bool),
+            (Self::List, "loadMoreThreshold") => Some(Index),
+            (Self::ListItem, "value") => Some(Str),
+            (Self::ListItem, "disabled") => Some(Bool),
+            (Self::DockPanel, "title") => Some(Str),
+            (Self::DockPanel, "placement") => Some(OneOf(&["center", "left", "right", "bottom"])),
+            (Self::DockPanel, "closable") => Some(Bool),
             (
                 Self::Input
                 | Self::Checkbox
@@ -416,7 +599,10 @@ impl NodeType {
                 | Self::Calendar
                 | Self::Tree
                 | Self::Carousel
-                | Self::Sidebar,
+                | Self::Sidebar
+                | Self::List
+                | Self::Toggle
+                | Self::InputGroup,
                 "controlled",
             ) => Some(Bool),
             (
@@ -434,26 +620,41 @@ impl NodeType {
                 | Self::Stepper
                 | Self::NumberInput
                 | Self::OtpInput
-                | Self::Calendar,
+                | Self::Calendar
+                | Self::Toggle
+                | Self::DropdownButton
+                | Self::InputGroup,
                 "disabled",
             ) => Some(Bool),
             _ => None,
         }
     }
 
-    /// The props a node cannot be built without. Only a `Tab` has one: the `value` it reports
-    /// (PROTOCOL.md section 15). `props` is the whole message, so this also rejects a `setProps`
-    /// that removes or empties `value`.
+    /// The types whose `src`/`data` is a picture, kept by the tree like an `Image`'s.
+    pub fn takes_image(self) -> bool {
+        matches!(self, Self::Image | Self::Attachment)
+    }
+
+    /// The props a node cannot be built without: the `value` a `Tab` and a `ListItem` report and
+    /// the `id` an `AccordionItem` reports (PROTOCOL.md sections 15, 27 and 17). `props` is the
+    /// whole message, so this also rejects a `setProps` that removes or empties it.
     pub fn check_required(self, props: &Props) -> Result<(), String> {
-        if self != Self::Tab
-            || props
-                .get("value")
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.is_empty())
+        let key = match self {
+            Self::Tab | Self::ListItem => "value",
+            Self::AccordionItem => "id",
+            _ => return Ok(()),
+        };
+        if props
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty())
         {
             return Ok(());
         }
-        Err("A Tab needs a non-empty 'value' string".into())
+        Err(format!(
+            "A {} needs a non-empty '{key}' string",
+            self.name()
+        ))
     }
 
     pub fn name(self) -> &'static str {
@@ -507,6 +708,37 @@ impl NodeType {
             Self::Canvas => "Canvas",
             Self::Command => "Command",
             Self::Settings => "Settings",
+            Self::Toggle => "Toggle",
+            Self::DropdownButton => "DropdownButton",
+            Self::Label => "Label",
+            Self::Empty => "Empty",
+            Self::Shimmer => "Shimmer",
+            Self::InputGroup => "InputGroup",
+            Self::Clipboard => "Clipboard",
+            Self::AlertDialog => "AlertDialog",
+            Self::Sheet => "Sheet",
+            Self::Popover => "Popover",
+            Self::HoverCard => "HoverCard",
+            Self::DatePicker => "DatePicker",
+            Self::TimeField => "TimeField",
+            Self::ColorPicker => "ColorPicker",
+            Self::Combobox => "Combobox",
+            Self::Bubble => "Bubble",
+            Self::Message => "Message",
+            Self::MessageHeader => "MessageHeader",
+            Self::MessageFooter => "MessageFooter",
+            Self::Marker => "Marker",
+            Self::Attachment => "Attachment",
+            Self::MessageScroller => "MessageScroller",
+            Self::Questionnaire => "Questionnaire",
+            Self::List => "List",
+            Self::ListItem => "ListItem",
+            Self::Dock => "Dock",
+            Self::DockPanel => "DockPanel",
+            Self::AccordionItem => "AccordionItem",
+            Self::DialogFooter => "DialogFooter",
+            Self::StatusBarLeft => "StatusBarLeft",
+            Self::StatusBarRight => "StatusBarRight",
         }
     }
 }
@@ -563,6 +795,37 @@ pub const ALL: &[NodeType] = &[
     NodeType::Canvas,
     NodeType::Command,
     NodeType::Settings,
+    NodeType::Toggle,
+    NodeType::DropdownButton,
+    NodeType::Label,
+    NodeType::Empty,
+    NodeType::Shimmer,
+    NodeType::InputGroup,
+    NodeType::Clipboard,
+    NodeType::AlertDialog,
+    NodeType::Sheet,
+    NodeType::Popover,
+    NodeType::HoverCard,
+    NodeType::DatePicker,
+    NodeType::TimeField,
+    NodeType::ColorPicker,
+    NodeType::Combobox,
+    NodeType::Bubble,
+    NodeType::Message,
+    NodeType::MessageHeader,
+    NodeType::MessageFooter,
+    NodeType::Marker,
+    NodeType::Attachment,
+    NodeType::MessageScroller,
+    NodeType::Questionnaire,
+    NodeType::List,
+    NodeType::ListItem,
+    NodeType::Dock,
+    NodeType::DockPanel,
+    NodeType::AccordionItem,
+    NodeType::DialogFooter,
+    NodeType::StatusBarLeft,
+    NodeType::StatusBarRight,
 ];
 
 #[cfg(test)]

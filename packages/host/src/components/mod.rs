@@ -11,14 +11,22 @@ pub mod calendar;
 pub mod canvas;
 pub mod carousel;
 pub mod chart;
+pub mod chat;
 pub mod checkbox;
+pub mod color_picker;
+pub mod combobox;
 pub mod command;
+pub mod date_picker;
 pub mod diff;
+pub mod dock;
 pub mod input;
 pub mod keyboard;
 pub mod layout;
+pub mod list;
 pub mod menu;
 pub mod otp;
+pub mod overlays;
+pub mod questionnaire;
 pub mod radio;
 pub mod select;
 pub mod settings;
@@ -27,13 +35,16 @@ pub mod slider;
 pub mod switch;
 pub mod table;
 pub mod tabs;
+pub mod time_field;
+pub mod toggle;
 pub mod tree;
 
 use gpui_kit::{App, Entity};
 use serde_json::Value;
 
 use crate::Session;
-use crate::protocol::{HostMessage, NodeId};
+use crate::protocol::{HostMessage, NodeId, Props};
+use crate::schema::NodeType;
 use crate::transport;
 use crate::tree::{Node, Tree};
 
@@ -101,6 +112,12 @@ pub fn clicked(tree: &Tree, id: NodeId) {
 /// The user closed an `Alert` with `closable`.
 pub fn alert_closed(tree: &Tree, id: NodeId) {
     emit(tree, id, "close", None, None);
+}
+
+/// The user copied a `Clipboard`'s value. In `--no-window` the system clipboard is not touched
+/// (as with `readClipboard` and the native dialogs).
+pub fn copied(tree: &Tree, id: NodeId, value: String) {
+    emit(tree, id, "copied", Some(value.into()), None);
 }
 
 /// The user answered an open Dialog (`ok` or `cancel`): it closes, like a synced control.
@@ -209,6 +226,68 @@ pub fn options(node: &Node, key: &str) -> Vec<(String, String, bool)> {
             )
         })
         .collect()
+}
+
+/// The content of a DatePicker's, TimeField's or ColorPicker's `value` (and a ColorPicker's
+/// `palette`), checked against the node as the op leaves it: `op` over `base`, where `null` removes.
+pub fn check_form_value(
+    node_type: NodeType,
+    base: Option<&Props>,
+    op: &Props,
+) -> Result<(), String> {
+    let get = |key: &str| match op.get(key) {
+        Some(Value::Null) => None,
+        Some(value) => Some(value),
+        None => base.and_then(|props| props.get(key)),
+    };
+    let flag = |key| get(key).and_then(Value::as_bool).unwrap_or(false);
+    let value = get("value").and_then(Value::as_str);
+    let (ok, format) = match node_type {
+        NodeType::DatePicker if flag("range") => (
+            value.is_none_or(|v| date_picker::parse(v, true).is_some()),
+            "'YYYY-MM-DD/YYYY-MM-DD' (start not after end)",
+        ),
+        NodeType::DatePicker => (
+            value.is_none_or(|v| date_picker::parse(v, false).is_some()),
+            "'YYYY-MM-DD'",
+        ),
+        NodeType::TimeField if flag("seconds") => (
+            value.is_none_or(|v| time_field::parse(v, true).is_some()),
+            "'HH:MM:SS'",
+        ),
+        NodeType::TimeField => (
+            value.is_none_or(|v| time_field::parse(v, false).is_some()),
+            "'HH:MM'",
+        ),
+        NodeType::ColorPicker => {
+            let palette = get("palette")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten();
+            if let Some(bad) = palette
+                .into_iter()
+                .find(|color| color.as_str().and_then(color_picker::parse).is_none())
+            {
+                return Err(format!(
+                    "Prop 'palette' of ColorPicker must hold '#RRGGBB' or '#RRGGBBAA' colors, got {bad}"
+                ));
+            }
+            (
+                value.is_none_or(|v| color_picker::parse(v).is_some()),
+                "'#RRGGBB' or '#RRGGBBAA'",
+            )
+        }
+        _ => return Ok(()),
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(format!(
+            "Prop 'value' of {} must be {format}, got '{}'",
+            node_type.name(),
+            value.unwrap_or_default()
+        ))
+    }
 }
 
 /// Checks an `options` list: objects with `value` and `label` strings and an optional `disabled`.

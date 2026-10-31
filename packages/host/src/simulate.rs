@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::components;
-use crate::protocol::{ErrorCode, HostMessage, NodeId, ProtocolError};
+use crate::protocol::{ErrorCode, HostMessage, NodeId, Props, ProtocolError};
 use crate::schema::NodeType;
 use crate::transport;
 use crate::tree::Tree;
@@ -148,13 +148,23 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
 
     let known = matches!(
         (node_type, sim.event.as_str()),
-        (NodeType::Div | NodeType::Button, "click")
-            | (NodeType::Div, "doubleClick")
+        (
+            NodeType::Div | NodeType::Button | NodeType::DropdownButton,
+            "click"
+        ) | (NodeType::Div, "doubleClick")
             | (NodeType::Div | NodeType::Input, "keyDown")
             | (NodeType::Div, "drop")
-            | (NodeType::Dialog, "ok" | "cancel")
-            | (NodeType::Checkbox | NodeType::Switch, "change")
-            | (NodeType::Input | NodeType::NumberInput, "change" | "submit")
+            | (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel")
+            | (NodeType::Sheet | NodeType::DockPanel, "close")
+            | (NodeType::Popover, "change")
+            | (
+                NodeType::Checkbox | NodeType::Switch | NodeType::Toggle,
+                "change"
+            )
+            | (
+                NodeType::Input | NodeType::NumberInput | NodeType::InputGroup,
+                "change" | "submit"
+            )
             | (NodeType::OtpInput, "change")
             | (
                 NodeType::Textarea
@@ -169,16 +179,30 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 "change"
             )
             | (NodeType::Calendar, "change")
+            | (
+                NodeType::DatePicker
+                    | NodeType::TimeField
+                    | NodeType::ColorPicker
+                    | NodeType::Combobox,
+                "change"
+            )
             | (NodeType::Table, "change" | "doubleClick" | "sort")
             | (NodeType::Tree, "change" | "expand" | "collapse")
             | (NodeType::Diff, "change")
             | (NodeType::Carousel, "change")
             | (NodeType::Sidebar, "change")
-            | (NodeType::Div | NodeType::MenuBar, "menu")
+            | (
+                NodeType::Div | NodeType::MenuBar | NodeType::DropdownButton,
+                "menu"
+            )
             | (NodeType::Alert, "close")
+            | (NodeType::Clipboard, "copied")
             | (NodeType::Canvas, "pointerDown")
             | (NodeType::Command, "confirm")
             | (NodeType::Settings, "change")
+            | (NodeType::Attachment, "click" | "remove" | "retry")
+            | (NodeType::Questionnaire, "change" | "submit")
+            | (NodeType::List, "change" | "confirm" | "query" | "loadMore")
     );
     if !known {
         return Err(fail(
@@ -203,7 +227,10 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 .collect(),
             _ => node
                 .props
-                .get("contextMenu")
+                .get(match node_type {
+                    NodeType::DropdownButton => "items",
+                    _ => "contextMenu",
+                })
                 .into_iter()
                 .collect::<Vec<_>>(),
         };
@@ -224,8 +251,26 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
         };
     }
     match (node_type, sim.event.as_str()) {
-        (NodeType::Div | NodeType::Button, "click") => components::clicked(tree, id),
+        (NodeType::Div | NodeType::Button | NodeType::DropdownButton, "click") => {
+            components::clicked(tree, id)
+        }
         (NodeType::Alert, "close") => components::alert_closed(tree, id),
+        (NodeType::Attachment, event) => components::chat::attachment_action(tree, id, event),
+        (NodeType::Questionnaire, "submit") => components::questionnaire::simulate_submit(tree, id),
+        (NodeType::Questionnaire, _) => {
+            let value = sim.value.clone().unwrap_or_default();
+            components::questionnaire::simulate_change(tree, id, &value)
+                .map_err(|err| fail(ErrorCode::InvalidOperation, err))?
+        }
+        // The clipboard is not touched here (there is no window): the event is reported as it is.
+        (NodeType::Clipboard, "copied") => {
+            let value = node
+                .props
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            components::copied(tree, id, value.to_owned())
+        }
         (NodeType::Canvas, "pointerDown") => {
             let coord = |key| sim.value.as_ref()?.get(key)?.as_f64();
             let (Some(x), Some(y)) = (coord("x"), coord("y")) else {
@@ -241,15 +286,41 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             components::clicked(tree, id);
             components::double_clicked(tree, id);
         }
-        // Answering the open Dialog: OK, or Cancel (also Escape, the X and a click outside).
-        (NodeType::Dialog, "ok" | "cancel") => {
+        // Answering the open Dialog or AlertDialog: OK, or Cancel (also Escape, the X and a click
+        // outside on a Dialog).
+        (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel") => {
             if node.props.get("open") != Some(&Value::Bool(true)) {
                 return Err(fail(
                     ErrorCode::InvalidOperation,
-                    format!("Dialog {id} is not open"),
+                    format!("{} {id} is not open", node_type.name()),
                 ));
             }
             components::dialog_answered(tree, id, &sim.event);
+        }
+        // The user closed the open panel with its X, Escape or a click on the overlay.
+        (NodeType::Sheet, "close") => {
+            if node.props.get("open") != Some(&Value::Bool(true)) {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("{} {id} is not open", node_type.name()),
+                ));
+            }
+            components::overlays::sheet_closed(tree, id);
+        }
+        // The user closed the panel's tab: it leaves its Dock.
+        (NodeType::DockPanel, "close") => {
+            if !prop("closable") || tree.is_panel_closed(id) {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("DockPanel {id} is not closable, or already closed"),
+                ));
+            }
+            components::dock::closed(tree, id);
+        }
+        // The user opened or closed the popover: the state is kept, and reported, as a checkbox's.
+        (NodeType::Popover, "change") => {
+            let open = node.props.get("open") == Some(&Value::Bool(true));
+            components::overlays::open_changed(tree, id, !open);
         }
         (NodeType::Div, "drop") => {
             let paths = sim
@@ -276,12 +347,16 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 .ok_or_else(|| fail(ErrorCode::InvalidJson, format!("Invalid key '{keys}'")))?;
             components::key_down(tree, id, &keystroke);
         }
-        (NodeType::Checkbox | NodeType::Switch, "change") => {
+        (NodeType::Checkbox | NodeType::Switch | NodeType::Toggle, "change") => {
             components::checkbox_clicked(tree, id, !checked);
         }
         // The controlled revert needs the window's InputState; only the report is simulated.
         (
-            NodeType::Input | NodeType::Textarea | NodeType::NumberInput | NodeType::OtpInput,
+            NodeType::Input
+            | NodeType::Textarea
+            | NodeType::NumberInput
+            | NodeType::OtpInput
+            | NodeType::InputGroup,
             "change",
         ) => {
             components::input_edited(tree, id, &text()?);
@@ -604,6 +679,39 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             }
         }
         // An entry of a Command: an unknown id is an error; a disabled one does nothing.
+        // A row by its `value` (`null` for `change`: Escape clears it); a disabled row does
+        // nothing, and confirming selects the row first, as a click does.
+        (NodeType::List, "change" | "confirm") => {
+            let value = match &sim.value {
+                Some(Value::Null) | None if sim.event == "change" => None,
+                _ => Some(text()?),
+            };
+            if let Some(value) = &value {
+                match components::list::find(tree, id, value) {
+                    None => {
+                        return Err(fail(
+                            ErrorCode::InvalidOperation,
+                            format!("List {id} has no row '{value}'"),
+                        ));
+                    }
+                    Some(true) => return Ok(Outcome::Done),
+                    Some(false) => {}
+                }
+            }
+            if node.props.get("value").and_then(Value::as_str) != value.as_deref() {
+                components::list::selected(tree, id, value.as_deref());
+            }
+            if let (Some(value), "confirm") = (&value, sim.event.as_str()) {
+                components::list::confirmed(tree, id, value);
+            }
+        }
+        (NodeType::List, "query") => components::list::searched(tree, id, &text()?),
+        // The window asks only while `hasMore` is set.
+        (NodeType::List, _) => {
+            if node.props.get("hasMore") == Some(&Value::Bool(true)) {
+                components::list::more(tree, id);
+            }
+        }
         (NodeType::Command, "confirm") => {
             let entry = text()?;
             let sections = components::command::sections(node);
@@ -644,8 +752,65 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 components::settings::changed(tree, id, path, value.clone());
             }
         }
-        (NodeType::Input | NodeType::NumberInput, "submit") => {
+        (NodeType::Input | NodeType::NumberInput | NodeType::InputGroup, "submit") => {
             components::input_submitted(tree, id, text()?)
+        }
+        // A date, time or color: it must fit the node as `setProps` would; the current one does nothing.
+        (NodeType::DatePicker | NodeType::TimeField | NodeType::ColorPicker, "change") => {
+            let value = match &sim.value {
+                Some(value @ Value::String(_)) => value.clone(),
+                // `null` (or no value) clears; a TimeField has no empty state.
+                None if node_type != NodeType::TimeField => Value::Null,
+                _ => {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        format!("'change' on node {id} needs a string 'value'"),
+                    ));
+                }
+            };
+            let op = Props::from_iter([("value".to_owned(), value.clone())]);
+            components::check_form_value(node_type, Some(&node.props), &op)
+                .map_err(|err| fail(ErrorCode::InvalidOperation, err))?;
+            if node.props.get("value").unwrap_or(&Value::Null) != &value {
+                components::value_chosen(tree, id, value);
+            }
+        }
+        // A Combobox's whole selection: every value must be one of its options.
+        (NodeType::Combobox, "change") => {
+            let value = match &sim.value {
+                Some(value @ Value::Array(list)) if list.iter().all(Value::is_string) => {
+                    value.clone()
+                }
+                _ => {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        format!("'change' on node {id} needs a list of strings as 'value'"),
+                    ));
+                }
+            };
+            let options = components::options(node, "options");
+            let unknown = value.as_array().into_iter().flatten().find(|chosen| {
+                !options
+                    .iter()
+                    .any(|(option, ..)| chosen.as_str() == Some(option.as_str()))
+            });
+            if let Some(unknown) = unknown {
+                return Err(fail(
+                    ErrorCode::InvalidOperation,
+                    format!("Node {id} has no option {unknown}"),
+                ));
+            }
+            // A disabled option cannot be added (the clear button can still remove it).
+            let has = |list: Option<&Value>, option: &str| {
+                list.and_then(Value::as_array)
+                    .is_some_and(|list| list.iter().any(|v| v.as_str() == Some(option)))
+            };
+            let adds_disabled = options.iter().any(|(option, _, disabled)| {
+                *disabled && has(Some(&value), option) && !has(node.props.get("value"), option)
+            });
+            if !adds_disabled && node.props.get("value") != Some(&value) {
+                components::value_chosen(tree, id, value);
+            }
         }
         _ => unreachable!("checked by `known`"),
     }

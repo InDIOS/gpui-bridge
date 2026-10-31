@@ -1,0 +1,88 @@
+# Section 23: simple components (Toggle, DropdownButton, Label, Empty, Shimmer, InputGroup,
+# Clipboard), their props and their events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"Toggle","props":{"checked":false,"label":"Bold","icon":"asterisk","variant":"outline","tooltip":"Bold","a11y":{"role":"button","label":"Bold"}},"events":["change"]}
+> {"op":"create","id":2,"type":"DropdownButton","props":{"label":"Save","icon":"check","variant":"primary","items":[{"id":"save-as","label":"Save as"},{"id":"discard","label":"Discard","disabled":true}]},"events":["click","menu"]}
+> {"op":"create","id":3,"type":"Label","props":{"content":"Total","secondary":"(12)","highlight":"12"}}
+> {"op":"create","id":4,"type":"Empty","props":{"icon":"folder-open","title":"No files","description":"Drop a file here"}}
+> {"op":"create","id":5,"type":"Button","props":{"label":"Choose a file"}}
+> {"op":"append","parent":4,"child":5}
+> {"op":"create","id":6,"type":"Shimmer","props":{"content":"Loading...","duration":3,"spread":0.4,"reverse":true,"once":true}}
+> {"op":"create","id":7,"type":"InputGroup","props":{"value":"example.com","placeholder":"host","prefix":"https://","prefixIcon":"folder-open","suffix":"/path","suffixIcon":"folder","invalid":true},"events":["change","submit"]}
+> {"op":"create","id":8,"type":"Clipboard","props":{"value":"example.com","tooltip":"Copy the address","a11y":{"label":"Copy address"}},"events":["copied"]}
+# A controlled Toggle reports the click and leaves `checked` to the client.
+> {"op":"create","id":9,"type":"Toggle","props":{"label":"Italic","controlled":true},"events":["change"]}
+> {"op":"commit"}
+# Synced (default): the host keeps `checked`, so each click reverses the one before.
+> {"op":"simulate","id":1,"event":"change"}
+< {"type":"event","id":1,"event":"change","checked":true}
+> {"op":"simulate","id":1,"event":"change"}
+< {"type":"event","id":1,"event":"change","checked":false}
+# A controlled one reports every click with the same value until the client sets it.
+> {"op":"simulate","id":9,"event":"change"}
+< {"type":"event","id":9,"event":"change","checked":true}
+> {"op":"simulate","id":9,"event":"change"}
+< {"type":"event","id":9,"event":"change","checked":true}
+> {"op":"setProps","id":9,"props":{"checked":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":9,"event":"change"}
+< {"type":"event","id":9,"event":"change","checked":false}
+# A label, an empty state and a shimmer are presentational: they have no events.
+> {"op":"simulate","id":3,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":4,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":6,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# The left half of a DropdownButton clicks; its items report `menu` with the item's id.
+> {"op":"simulate","id":2,"event":"click"}
+< {"type":"event","id":2,"event":"click"}
+> {"op":"simulate","id":2,"event":"menu","value":"save-as"}
+< {"type":"event","id":2,"event":"menu","value":"save-as"}
+# A disabled item does nothing; an unknown one is an error.
+> {"op":"simulate","id":2,"event":"menu","value":"discard"}
+> {"op":"simulate","id":2,"event":"menu","value":"nope"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# An InputGroup reports its text and its Enter, like an Input.
+> {"op":"simulate","id":7,"event":"change","value":"example.org"}
+< {"type":"event","id":7,"event":"change","value":"example.org"}
+> {"op":"simulate","id":7,"event":"submit","value":"example.org"}
+< {"type":"event","id":7,"event":"submit","value":"example.org"}
+# The copy is reported every time it happens, with the text that was copied.
+> {"op":"simulate","id":8,"event":"copied"}
+< {"type":"event","id":8,"event":"copied","value":"example.com"}
+> {"op":"simulate","id":8,"event":"copied"}
+< {"type":"event","id":8,"event":"copied","value":"example.com"}
+# Without the opt-in, nothing is sent.
+> {"op":"setEvents","id":8,"events":[]}
+> {"op":"setEvents","id":1,"events":[]}
+> {"op":"commit"}
+> {"op":"simulate","id":8,"event":"copied"}
+> {"op":"simulate","id":1,"event":"change"}
+# Malformed props are invalid_props.
+> {"op":"create","id":20,"type":"Toggle","props":{"variant":"pill"}}
+> {"op":"create","id":21,"type":"Toggle","props":{"icon":"not-an-icon"}}
+> {"op":"create","id":22,"type":"DropdownButton","props":{"items":[{"label":"No id"}]}}
+> {"op":"create","id":23,"type":"DropdownButton","props":{"menuLabel":5}}
+> {"op":"create","id":24,"type":"Label","props":{"highlight":5}}
+> {"op":"create","id":25,"type":"Empty","props":{"title":5}}
+> {"op":"create","id":26,"type":"Shimmer","props":{"duration":"2"}}
+> {"op":"create","id":27,"type":"Shimmer","props":{"spread":true}}
+> {"op":"create","id":28,"type":"InputGroup","props":{"prefixIcon":"Nope"}}
+> {"op":"create","id":29,"type":"InputGroup","props":{"readonly":"yes"}}
+> {"op":"create","id":30,"type":"Clipboard","props":{"value":7}}
+> {"op":"setProps","id":6,"props":{"spread":"wide"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"setProps"}

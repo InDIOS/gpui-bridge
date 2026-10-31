@@ -1,0 +1,98 @@
+# Section 25: form controls with state (DatePicker, TimeField, ColorPicker, Combobox), their props and change events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"DatePicker","props":{"value":"2024-08-03","placeholder":"Pick a day"},"events":["change"]}
+> {"op":"create","id":2,"type":"DatePicker","props":{"range":true},"events":["change"]}
+> {"op":"create","id":3,"type":"TimeField","props":{"value":"09:30"},"events":["change"]}
+> {"op":"create","id":4,"type":"ColorPicker","props":{"value":"#3366ff","palette":["#ff0000","#00ff0080"]},"events":["change"]}
+> {"op":"create","id":5,"type":"Combobox","props":{"options":[{"value":"rs","label":"Rust"},{"value":"go","label":"Go"},{"value":"py","label":"Python","disabled":true}],"value":["rs"],"placeholder":"Languages","searchable":true},"events":["change"]}
+> {"op":"commit"}
+# Synced (default): each change is kept in the host, so the same value again is not a change; null clears.
+> {"op":"simulate","id":1,"event":"change","value":"2024-08-10"}
+< {"type":"event","id":1,"event":"change","value":"2024-08-10"}
+> {"op":"simulate","id":1,"event":"change","value":"2024-08-10"}
+> {"op":"simulate","id":1,"event":"change","value":null}
+< {"type":"event","id":1,"event":"change","value":null}
+> {"op":"simulate","id":2,"event":"change","value":"2024-08-01/2024-08-15"}
+< {"type":"event","id":2,"event":"change","value":"2024-08-01/2024-08-15"}
+> {"op":"simulate","id":3,"event":"change","value":"18:05"}
+< {"type":"event","id":3,"event":"change","value":"18:05"}
+> {"op":"simulate","id":4,"event":"change","value":"#FF0000"}
+< {"type":"event","id":4,"event":"change","value":"#FF0000"}
+> {"op":"simulate","id":4,"event":"change","value":null}
+< {"type":"event","id":4,"event":"change","value":null}
+# A Combobox reports its whole selection, when adding and when removing.
+> {"op":"simulate","id":5,"event":"change","value":["rs","go"]}
+< {"type":"event","id":5,"event":"change","value":["rs","go"]}
+> {"op":"simulate","id":5,"event":"change","value":["go"]}
+< {"type":"event","id":5,"event":"change","value":["go"]}
+# A disabled option cannot be added: nothing is sent.
+> {"op":"simulate","id":5,"event":"change","value":["go","py"]}
+# Controlled: the host reports the request but keeps the client's value, so asking again reports again.
+> {"op":"setProps","id":3,"props":{"controlled":true,"value":"09:30"}}
+> {"op":"setProps","id":5,"props":{"controlled":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":3,"event":"change","value":"10:00"}
+< {"type":"event","id":3,"event":"change","value":"10:00"}
+> {"op":"simulate","id":3,"event":"change","value":"10:00"}
+< {"type":"event","id":3,"event":"change","value":"10:00"}
+> {"op":"simulate","id":5,"event":"change","value":[]}
+< {"type":"event","id":5,"event":"change","value":[]}
+> {"op":"simulate","id":5,"event":"change","value":[]}
+< {"type":"event","id":5,"event":"change","value":[]}
+# The client confirms: now the same value is not a change.
+> {"op":"setProps","id":3,"props":{"value":"10:00"}}
+> {"op":"commit"}
+> {"op":"simulate","id":3,"event":"change","value":"10:00"}
+# A value that does not fit the node, an unknown option or a wrong type is an error.
+> {"op":"simulate","id":1,"event":"change","value":"2024-02-30"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":2,"event":"change","value":"2024-08-15/2024-08-01"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"change","value":"10:00:30"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":3,"event":"change","value":null}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":4,"event":"change","value":"red"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":5,"event":"change","value":["rb"]}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+> {"op":"simulate","id":5,"event":"change","value":"rs"}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+> {"op":"simulate","id":5,"event":"change","value":["rs",1]}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# The mode is checked with the whole node: a range prop alone leaves a single date behind.
+> {"op":"setProps","id":1,"props":{"value":"2024-08-03"}}
+> {"op":"setProps","id":1,"props":{"range":true}}
+> {"op":"setProps","id":1,"props":{"range":true,"value":"2024-08-03/2024-08-04"}}
+> {"op":"setProps","id":3,"props":{"seconds":true,"value":"10:00:30"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+# Malformed values are invalid_props.
+> {"op":"create","id":10,"type":"DatePicker","props":{"value":"03/08/2024"}}
+> {"op":"create","id":11,"type":"DatePicker","props":{"range":true,"value":"2024-08-15/2024-08-01"}}
+> {"op":"create","id":12,"type":"DatePicker","props":{"value":"2024-08-01/2024-08-15"}}
+> {"op":"create","id":13,"type":"DatePicker","props":{"range":true,"value":"2024-08-01"}}
+> {"op":"create","id":14,"type":"TimeField","props":{"value":"24:00"}}
+> {"op":"create","id":15,"type":"TimeField","props":{"value":"09:30:00"}}
+> {"op":"create","id":16,"type":"ColorPicker","props":{"value":"3366ff"}}
+> {"op":"create","id":17,"type":"ColorPicker","props":{"value":"#3366f"}}
+> {"op":"create","id":18,"type":"ColorPicker","props":{"palette":["#ff0000","€€€€€€"]}}
+> {"op":"create","id":19,"type":"Combobox","props":{"options":[{"value":"a"}]}}
+> {"op":"create","id":20,"type":"Combobox","props":{"value":"a"}}
+> {"op":"create","id":21,"type":"Combobox","props":{"value":["a",1]}}
+> {"op":"create","id":22,"type":"DatePicker","props":{"value":""}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

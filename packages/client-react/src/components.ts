@@ -12,6 +12,7 @@ import type {
   NodeProps,
   NodeType,
   Option,
+  QuestionnaireAnswer,
   RadioGroupProps as WireRadioGroupProps,
   SettingsChange,
   TableCell,
@@ -331,7 +332,7 @@ export const Pagination = "Pagination" as unknown as HostComponent<PaginationPro
 export type CollapsibleProps = NodeProps["Collapsible"] & { children?: ReactNode };
 export const Collapsible = "Collapsible" as unknown as HostComponent<CollapsibleProps>;
 
-export type AccordionProps = NodeProps["Accordion"] & { onChange?: (id: string) => void };
+export type AccordionProps = NodeProps["Accordion"] & { onChange?: (id: string) => void; children?: ReactNode };
 export const Accordion = "Accordion" as unknown as HostComponent<AccordionProps>;
 
 export type AvatarProps = NodeProps["Avatar"];
@@ -358,7 +359,7 @@ export const GroupBox = "GroupBox" as unknown as HostComponent<GroupBoxProps>;
 export type DescriptionListProps = NodeProps["DescriptionList"];
 export const DescriptionList = "DescriptionList" as unknown as HostComponent<DescriptionListProps>;
 
-export type StatusBarProps = NodeProps["StatusBar"];
+export type StatusBarProps = NodeProps["StatusBar"] & { children?: ReactNode };
 export const StatusBar = "StatusBar" as unknown as HostComponent<StatusBarProps>;
 
 export type ToolbarProps = NodeProps["Toolbar"] & { children?: ReactNode };
@@ -409,3 +410,162 @@ export type SettingsProps = NodeProps["Settings"] & {
   onChange?: (change: SettingsChange) => void;
 };
 export const Settings = "Settings" as unknown as HostComponent<SettingsProps>;
+
+/** A button that stays pressed; `onChange` gets the new `checked`. */
+export type ToggleProps = NodeProps["Toggle"] & { onChange?: (checked: boolean) => void };
+export const Toggle = "Toggle" as unknown as HostComponent<ToggleProps>;
+
+/** An action with a menu: `onClick` is the left half, `onMenu` gets the chosen item's id. */
+export type DropdownButtonProps = NodeProps["DropdownButton"] & {
+  onClick?: () => void;
+  onMenu?: (item: string) => void;
+};
+export const DropdownButton = "DropdownButton" as unknown as HostComponent<DropdownButtonProps>;
+
+export type LabelProps = NodeProps["Label"];
+export const Label = "Label" as unknown as HostComponent<LabelProps>;
+
+/** A centered empty state; its children are the action under the header. */
+export type EmptyProps = NodeProps["Empty"] & { children?: ReactNode };
+export const Empty = "Empty" as unknown as HostComponent<EmptyProps>;
+
+export type ShimmerProps = NodeProps["Shimmer"];
+export const Shimmer = "Shimmer" as unknown as HostComponent<ShimmerProps>;
+
+/** A framed text field; `onChange` and `onSubmit` work as in an `Input`. */
+export type InputGroupProps = NodeProps["InputGroup"] & {
+  onChange?: (value: string) => void;
+  onSubmit?: (value: string) => void;
+};
+export const InputGroup = "InputGroup" as unknown as HostComponent<InputGroupProps>;
+
+/** Copies `value` on click; `onCopied` gets the text that was copied. */
+export type ClipboardProps = NodeProps["Clipboard"] & { onCopied?: (value: string) => void };
+export const Clipboard = "Clipboard" as unknown as HostComponent<ClipboardProps>;
+
+/** A confirmation; `onOk` and `onCancel` close it, as in a `Dialog`. */
+export type AlertDialogProps = NodeProps["AlertDialog"] & {
+  onOk?: () => void;
+  onCancel?: () => void;
+  children?: ReactNode;
+};
+export const AlertDialog = "AlertDialog" as unknown as HostComponent<AlertDialogProps>;
+
+/** A panel that slides in from `side`; `onClose` is its X, Escape or a click on the overlay. */
+export type SheetProps = NodeProps["Sheet"] & { onClose?: () => void; children?: ReactNode };
+export const Sheet = "Sheet" as unknown as HostComponent<SheetProps>;
+
+/**
+ * A panel anchored to its first child (the trigger); the rest are the panel. `onChange` gets the
+ * new `open`: the host keeps it, as it keeps a `Checkbox`'s `checked`.
+ */
+export type PopoverProps = NodeProps["Popover"] & { onChange?: (checked: boolean) => void; children?: ReactNode };
+export const Popover = "Popover" as unknown as HostComponent<PopoverProps>;
+
+/** A card on hover, opened by the mouse alone; `onChange` gets the new `open`. */
+export type HoverCardProps = NodeProps["HoverCard"] & { onChange?: (checked: boolean) => void; children?: ReactNode };
+export const HoverCard = "HoverCard" as unknown as HostComponent<HoverCardProps>;
+
+/** A day picker; `onChange` gets the chosen day, `null` when cleared. */
+export type DatePickerProps = NodeProps["DatePicker"] & { onChange?: (value: string | null) => void };
+export const DatePicker = "DatePicker" as unknown as HostComponent<DatePickerProps>;
+
+/** A time typed by segments; `onChange` gets the time (`HH:MM[:SS]`). */
+export type TimeFieldProps = NodeProps["TimeField"] & { onChange?: (value: string) => void };
+export const TimeField = "TimeField" as unknown as HostComponent<TimeFieldProps>;
+
+/** A color swatch and hex box; `onChange` gets the color, `null` when cleared. */
+export type ColorPickerProps = NodeProps["ColorPicker"] & { onChange?: (value: string | null) => void };
+export const ColorPicker = "ColorPicker" as unknown as HostComponent<ColorPickerProps>;
+
+/** A list that picks several options; `onChange` gets the whole selection. */
+export type ComboboxProps = NodeProps["Combobox"] & { onChange?: (value: string[]) => void };
+export const Combobox = "Combobox" as unknown as HostComponent<ComboboxProps>;
+
+// Chat (PROTOCOL.md section 26).
+
+/** A chat bubble; its children are the content. */
+export type BubbleProps = NodeProps["Bubble"] & { children?: ReactNode };
+export const Bubble = "Bubble" as unknown as HostComponent<BubbleProps>;
+
+/** A message row: a `MessageHeader` and a `MessageFooter` child, the rest is the content. */
+export type MessageProps = NodeProps["Message"] & { children?: ReactNode };
+export const Message = "Message" as unknown as HostComponent<MessageProps>;
+
+export type MessageHeaderProps = NodeProps["MessageHeader"] & { children?: ReactNode };
+export const MessageHeader = "MessageHeader" as unknown as HostComponent<MessageHeaderProps>;
+
+export type MessageFooterProps = NodeProps["MessageFooter"] & { children?: ReactNode };
+export const MessageFooter = "MessageFooter" as unknown as HostComponent<MessageFooterProps>;
+
+/** A compact status row; children go after the text. */
+export type MarkerProps = NodeProps["Marker"] & { children?: ReactNode };
+export const Marker = "Marker" as unknown as HostComponent<MarkerProps>;
+
+/** A file or picture card; each handler shows its control (`onRetry` only while `failed`). */
+export type AttachmentProps = NodeProps["Attachment"] & {
+  onClick?: () => void;
+  onRemove?: () => void;
+  onRetry?: () => void;
+  children?: ReactNode;
+};
+export const Attachment = "Attachment" as unknown as HostComponent<AttachmentProps>;
+
+/** A virtual list of messages anchored at the end; each child is a row. */
+export type MessageScrollerProps = NodeProps["MessageScroller"] & { children?: ReactNode };
+export const MessageScroller = "MessageScroller" as unknown as HostComponent<MessageScrollerProps>;
+
+/** Questions one at a time; `onChange` gets one answer, `onSubmit` all of them. */
+export type QuestionnaireProps = NodeProps["Questionnaire"] & {
+  onChange?: (answer: QuestionnaireAnswer) => void;
+  onSubmit?: (answers: QuestionnaireAnswer[]) => void;
+};
+export const Questionnaire = "Questionnaire" as unknown as HostComponent<QuestionnaireProps>;
+
+// List (PROTOCOL.md section 27).
+
+/**
+ * A selectable list over its `ListItem` children. Passing `value` makes the selection controlled.
+ * `onQuery` gets the search text (render the matching rows); `onLoadMore` asks for more rows.
+ */
+export type ListProps = NodeProps["List"] & {
+  value?: string | null;
+  onChange?: (value: string | null) => void;
+  onConfirm?: (value: string) => void;
+  onQuery?: (query: string) => void;
+  onLoadMore?: () => void;
+  children?: ReactNode;
+};
+export const List = "List" as unknown as HostComponent<ListProps>;
+
+/** A `List` row: `value` is what the list reports; its children are the content. */
+export type ListItemProps = NodeProps["ListItem"] & { children?: ReactNode };
+export const ListItem = "ListItem" as unknown as HostComponent<ListItemProps>;
+
+// Dock (PROTOCOL.md section 28).
+
+/** Panels the user rearranges: its `DockPanel` children. The host owns the layout. */
+export type DockProps = NodeProps["Dock"] & { children?: ReactNode };
+export const Dock = "Dock" as unknown as HostComponent<DockProps>;
+
+/** A `Dock` panel; `onClose` means the user closed it: stop rendering it. */
+export type DockPanelProps = NodeProps["DockPanel"] & { onClose?: () => void; children?: ReactNode };
+export const DockPanel = "DockPanel" as unknown as HostComponent<DockPanelProps>;
+
+// Slots as children (PROTOCOL.md sections 14, 17 and 24).
+
+/** An `Accordion` section: `id` is what `onChange` reports; its children are the content. */
+export type AccordionItemProps = NodeProps["AccordionItem"] & { children?: ReactNode };
+export const AccordionItem = "AccordionItem" as unknown as HostComponent<AccordionItemProps>;
+
+/** A `Dialog`'s or `AlertDialog`'s footer: its children (buttons) replace OK/Cancel. */
+export type DialogFooterProps = NodeProps["DialogFooter"] & { children?: ReactNode };
+export const DialogFooter = "DialogFooter" as unknown as HostComponent<DialogFooterProps>;
+
+/** A `StatusBar`'s left side: its children replace the `left` text. */
+export type StatusBarLeftProps = NodeProps["StatusBarLeft"] & { children?: ReactNode };
+export const StatusBarLeft = "StatusBarLeft" as unknown as HostComponent<StatusBarLeftProps>;
+
+/** A `StatusBar`'s right side: its children replace the `right` text. */
+export type StatusBarRightProps = NodeProps["StatusBarRight"] & { children?: ReactNode };
+export const StatusBarRight = "StatusBarRight" as unknown as HostComponent<StatusBarRightProps>;

@@ -223,6 +223,268 @@ class ClientTest(unittest.TestCase):
             ],
         )
 
+    def test_simple_components_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        toggle = app.toggle(label="Bold", icon="asterisk", variant="outline", tooltip="Bold").on(
+            "change", lambda checked: seen.append(("toggle", checked))
+        )
+        save = (
+            app.dropdown_button(
+                label="Save",
+                variant="primary",
+                items=[{"id": "save-as", "label": "Save as"}],
+                menuLabel="Save options",
+            )
+            .on("click", lambda: seen.append(("save",)))
+            .on("menu", lambda item: seen.append(("menu", item)))
+        )
+        group = (
+            app.input_group(value="example.com", placeholder="host", prefix="https://", suffixIcon="check")
+            .on("change", lambda value: seen.append(("group", value)))
+            .on("submit", lambda value: seen.append(("submit", value)))
+        )
+        clipboard = app.clipboard(value="https://example.com", a11y={"label": "Copy the address"}).on(
+            "copied", lambda value: seen.append(("copied", value))
+        )
+        root = app.div(class_="flex flex-col gap-2 p-4").append(
+            toggle,
+            save,
+            app.label(content="Total", secondary="(12)", highlight="12"),
+            app.empty(icon="folder-open", title="No files", description="Drop a file here").append(
+                app.button(label="Choose a file")
+            ),
+            app.shimmer(content="Loading...", duration=3, spread=0.4, reverse=True, once=True),
+            group,
+            clipboard,
+        )
+        app.window(root=root)
+        app.commit()
+
+        app._dispatch({"type": "event", "id": toggle.id, "event": "change", "checked": True})
+        app._dispatch({"type": "event", "id": save.id, "event": "click"})
+        app._dispatch({"type": "event", "id": save.id, "event": "menu", "value": "save-as"})
+        app._dispatch({"type": "event", "id": group.id, "event": "change", "value": "example.org"})
+        app._dispatch({"type": "event", "id": group.id, "event": "submit", "value": "example.org"})
+        app._dispatch({"type": "event", "id": clipboard.id, "event": "copied", "value": "https://example.com"})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("toggle", True),
+                ("save",),
+                ("menu", "save-as"),
+                ("group", "example.org"),
+                ("submit", "example.org"),
+                ("copied", "https://example.com"),
+            ],
+        )
+
+    def test_overlays_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        alert = (
+            app.alert_dialog(
+                open=True,
+                title="Delete 3 files?",
+                description="This cannot be undone.",
+                icon="circle-alert",
+                okText="Delete",
+                cancelText="Cancel",
+            )
+            .on("ok", lambda: seen.append(("ok",)))
+            .append(app.text(content="3 files"))
+        )
+        sheet = (
+            app.sheet(open=True, side="left", title="Filters", size=320)
+            .on("close", lambda: seen.append(("close",)))
+            .append(app.input(value="*.png"))
+        )
+        popover = (
+            app.popover(open=False, anchor="bottom-right", arrow=True)
+            .on("change", lambda checked: seen.append(("popover", checked)))
+            .append(app.button(label="Sort"), app.text(content="By name"))
+        )
+        card = (
+            app.hover_card(openDelay=300, closeDelay=200, anchor="top-center")
+            .on("change", lambda checked: seen.append(("card", checked)))
+            .append(app.button(label="Info"), app.text(content="Hovered"))
+        )
+        app.window(root=app.div(class_="flex flex-col gap-2 p-4").append(alert, sheet, popover, card))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": alert.id, "event": "ok"})
+        app._dispatch({"type": "event", "id": sheet.id, "event": "close"})
+        app._dispatch({"type": "event", "id": popover.id, "event": "change", "checked": True})
+        app._dispatch({"type": "event", "id": card.id, "event": "change", "checked": False})
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("ok",), ("close",), ("popover", True), ("card", False)])
+
+    def test_chat_nodes_are_accepted_and_report_their_events(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        file = app.attachment(status="failed", title="report.pdf", description="2.4 MB")
+        file.on("click", lambda: seen.append("click")).on("remove", lambda: seen.append("remove"))
+        file.on("retry", lambda: seen.append("retry"))
+        quiz = app.questionnaire(
+            items=[
+                {"name": "plan", "label": "Plan", "choices": [{"value": "free", "label": "Free"}]},
+                {"name": "notes", "label": "Notes", "input": True},
+            ]
+        )
+        quiz.on("change", lambda value: seen.append(("change", value)))
+        quiz.on("submit", lambda value: seen.append(("submit", value)))
+        message = app.message(alignment="end", avatarName="Ada").append(
+            app.message_header().append(app.text(content="Ada")),
+            app.bubble(variant="secondary").append(app.text(content="Hi")),
+            app.message_footer(),
+        )
+        scroller = app.message_scroller(jumpLabel="Latest").append(
+            message, app.marker(content="Thinking", loading=True, loadingStyle="shimmer"), file, quiz
+        )
+        app.window(root=app.div(class_="size-full flex flex-col").append(scroller))
+        app.commit()
+
+        answer = {"name": "plan", "status": "answered", "choices": ["free"], "text": None}
+        app._dispatch({"type": "event", "id": file.id, "event": "click"})
+        app._dispatch({"type": "event", "id": file.id, "event": "remove"})
+        app._dispatch({"type": "event", "id": file.id, "event": "retry"})
+        app._dispatch({"type": "event", "id": quiz.id, "event": "change", "value": answer})
+        app._dispatch({"type": "event", "id": quiz.id, "event": "submit", "value": [answer]})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["click", "remove", "retry", ("change", answer), ("submit", [answer])])
+
+    def test_list_is_accepted_and_reports_its_events(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        rows = app.list(value="a", searchable=True, placeholder="Search", hasMore=True, loadMoreThreshold=5)
+        rows.on("change", lambda value: seen.append(("change", value)))
+        rows.on("confirm", lambda value: seen.append(("confirm", value)))
+        rows.on("query", lambda value: seen.append(("query", value)))
+        rows.on("loadMore", lambda: seen.append("loadMore"))
+        rows.append(
+            app.list_item(value="a").append(app.text(content="Apple")),
+            app.list_item(value="b", disabled=True).append(app.text(content="Banana")),
+        )
+        app.window(root=app.div(class_="size-full flex flex-col").append(rows))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": rows.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": rows.id, "event": "confirm", "value": "a"})
+        app._dispatch({"type": "event", "id": rows.id, "event": "query", "value": "ap"})
+        app._dispatch({"type": "event", "id": rows.id, "event": "loadMore"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [("change", None), ("confirm", "a"), ("query", "ap"), "loadMore"])
+
+    def test_dock_is_accepted_and_reports_close(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        notes = app.dock_panel(title="Notes", closable=True)
+        notes.on("close", lambda: seen.append("close"))
+        dock = app.dock(class_="size-full").append(
+            app.dock_panel(title="Files", placement="left").append(app.text(content="src/")),
+            notes.append(app.text(content="Hello")),
+        )
+        app.window(root=dock)
+        app.commit()
+
+        app._dispatch({"type": "event", "id": notes.id, "event": "close"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["close"])
+
+    def test_slot_children_are_accepted(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        accordion = app.accordion().append(
+            app.accordion_item(id="a", title="First", open=True).append(app.text(content="Body"))
+        )
+        accordion.on("change", seen.append)
+        dialog = app.dialog(open=True, title="Rename").append(
+            app.dialog_footer().append(app.button(label="Save"))
+        )
+        bar = app.status_bar().append(
+            app.status_bar_left().append(app.text(content="Ready")),
+            app.status_bar_right().append(app.text(content="UTF-8")),
+        )
+        app.window(root=app.div().append(accordion, dialog, bar))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": accordion.id, "event": "change", "value": "a"})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, ["a"])
+
+    def test_form_controls_with_state_are_accepted_and_report_typed_values(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        seen = []
+
+        options = [
+            {"value": "rs", "label": "Rust"},
+            {"value": "go", "label": "Go"},
+            {"value": "py", "label": "Python", "disabled": True},
+        ]
+        day = app.date_picker(value="2024-08-03", placeholder="Pick a day").on("change", lambda value: seen.append(("day", value)))
+        range_ = app.date_picker(range=True).on("change", lambda value: seen.append(("range", value)))
+        time_ = app.time_field(value="09:30").on("change", lambda value: seen.append(("time", value)))
+        color = app.color_picker(value="#3366ff", palette=["#ff0000", "#00ff0080"]).on(
+            "change", lambda value: seen.append(("color", value))
+        )
+        langs = app.combobox(options=options, value=["rs"], placeholder="Languages", searchable=True).on(
+            "change", lambda value: seen.append(("langs", value))
+        )
+        app.window(root=app.div().append(day, range_, time_, color, langs))
+        app.commit()
+
+        app._dispatch({"type": "event", "id": day.id, "event": "change", "value": "2024-08-10"})
+        app._dispatch({"type": "event", "id": day.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": range_.id, "event": "change", "value": "2024-08-01/2024-08-15"})
+        app._dispatch({"type": "event", "id": time_.id, "event": "change", "value": "18:05"})
+        app._dispatch({"type": "event", "id": color.id, "event": "change", "value": "#FF0000"})
+        app._dispatch({"type": "event", "id": color.id, "event": "change", "value": None})
+        app._dispatch({"type": "event", "id": langs.id, "event": "change", "value": ["rs", "go"]})
+        app._dispatch({"type": "event", "id": langs.id, "event": "change", "value": ["go"]})
+
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            seen,
+            [
+                ("day", "2024-08-10"),
+                ("day", None),
+                ("range", "2024-08-01/2024-08-15"),
+                ("time", "18:05"),
+                ("color", "#FF0000"),
+                ("color", None),
+                ("langs", ["rs", "go"]),
+                ("langs", ["go"]),
+            ],
+        )
+
     def test_an_a11y_prop_is_validated_by_the_host(self):
         app = App(headless=True)
         errors = []

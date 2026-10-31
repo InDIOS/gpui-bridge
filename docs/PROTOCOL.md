@@ -209,10 +209,50 @@ Rules:
 | `Canvas`   | `commands`, `class` | `pointerDown` |
 | `Command`  | `items`, `placeholder`, `class` | `confirm` |
 | `Settings` | `pages`, `class` | `change` |
+| `Toggle`   | `checked`, `label`, `icon`, `variant` (`ghost`, `outline`), `tooltip`, `disabled`, `controlled`, `class` | `change` |
+| `DropdownButton` | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `outline`, `items`, `menuLabel`, `tooltip`, `disabled`, `class` | `click`, `menu` |
+| `Label`    | `content`, `secondary`, `masked`, `highlight`, `class`       | —                  |
+| `Empty`    | `icon`, `title`, `description`, `class`                      | —                  |
+| `Shimmer`  | `content`, `duration`, `spread`, `reverse`, `once`, `class`  | —                  |
+| `InputGroup` | `value`, `placeholder`, `prefix`, `suffix`, `prefixIcon`, `suffixIcon`, `disabled`, `readonly`, `invalid`, `controlled`, `class` | `change`, `submit` |
+| `Clipboard` | `value`, `tooltip`, `class`                                 | `copied`           |
+| `AlertDialog` | `open`, `title`, `description`, `icon`, `okText`, `cancelText`, `class` | `ok`, `cancel` |
+| `Sheet`    | `open`, `side` (`left`, `right`, `top`, `bottom`), `title`, `size`, `class` | `close` |
+| `Popover`  | `open`, `anchor` (eight corners), `arrow`, `class`           | `change`           |
+| `HoverCard` | `openDelay`, `closeDelay`, `anchor` (eight corners), `class` | `change`           |
+| `DatePicker` | `value` (`YYYY-MM-DD`, or `YYYY-MM-DD/YYYY-MM-DD` with `range`), `range`, `placeholder`, `disabled`, `controlled`, `class` | `change` |
+| `TimeField` | `value` (`HH:MM`, or `HH:MM:SS` with `seconds`), `seconds`, `disabled`, `controlled`, `class` | `change` |
+| `ColorPicker` | `value` (`#RRGGBB` or `#RRGGBBAA`), `palette`, `controlled`, `class` | `change` |
+| `Combobox` | `options`, `value` (a list of option values), `placeholder`, `searchable`, `disabled`, `controlled`, `class` | `change` |
+| `Bubble`   | `variant` (`filled`, `secondary`, `muted`, `tinted`, `outline`, `ghost`, `destructive`), `alignment` (`start`, `end`), `class` | — |
+| `Message`  | `alignment` (`start`, `end`), `avatarName`, `avatarSrc`, `class` | —                  |
+| `MessageHeader` | `class`                                                 | —                  |
+| `MessageFooter` | `class`                                                 | —                  |
+| `Marker`   | `content`, `icon`, `variant` (`plain`, `separator`, `border`), `alignment` (`start`, `center`, `end`), `loading`, `loadingStyle` (`spinner`, `shimmer`), `class` | — |
+| `Attachment` | `status` (`pending`, `uploading`, `processing`, `failed`, `complete`), `progress`, `title`, `description`, `tooltip`, `axis` (`horizontal`, `vertical`), `src`, `data`, `class` | `click`, `remove`, `retry` |
+| `MessageScroller` | `scrollbar`, `jumpButton`, `jumpLabel`, `class`             | —                  |
+| `Questionnaire` | `items`, `class`                                              | `change`, `submit` |
+| `List`          | `value`, `controlled`, `searchable`, `placeholder`, `hasMore`, `loading`, `loadMoreThreshold`, `class` | `change`, `confirm`, `query`, `loadMore` |
+| `ListItem`      | `value` (required), `disabled`                                 | —                  |
+| `Dock`          | `class`                                                        | —                  |
+| `DockPanel`     | `title`, `placement` (`center`, `left`, `right`, `bottom`), `closable` | `close`    |
+| `AccordionItem` | `id` (required), `title`, `open`, `disabled`, `class`          | —                  |
+| `DialogFooter`  | `class`                                                        | —                  |
+| `StatusBarLeft` | `class`                                                        | —                  |
+| `StatusBarRight` | `class`                                                       | —                  |
 
 Every type also accepts `a11y` (section 16). The components from gpui-kit's Basic, Form, Layout
 and Advanced groups are described in section 17; the data components (`Tree`, `Diff`,
-`Carousel`) in section 18, and `Sidebar` and `Chart` in section 19.
+`Carousel`) in section 18, `Sidebar` and `Chart` in section 19, the simple components of
+section 23 (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
+`Clipboard`), the overlays of section 24 (`AlertDialog`, `Sheet`, `Popover`, `HoverCard`)
+the form controls with state of section 25 (`DatePicker`, `TimeField`, `ColorPicker`,
+`Combobox`) and the chat components of section 26 (`Bubble`, `Message`, `MessageHeader`,
+`MessageFooter`, `Marker`, `Attachment`, `MessageScroller`, `Questionnaire`), `List` with
+its `ListItem` rows in section 27, and `Dock` with its `DockPanel` children in section 28.
+`AccordionItem`, `StatusBarLeft` and `StatusBarRight` are in section 17, `DialogFooter` in
+sections 14 and 24: each is a slot of the node that holds it and draws nothing elsewhere
+(`conformance/slots.txt`).
 
 - A known prop with the wrong type or value (for example `disabled: "yes"` or
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
@@ -230,7 +270,8 @@ and Advanced groups are described in section 17; the data components (`Tree`, `D
   size and color unless `class` sets them (`size-4`, `text-muted-foreground`). `name` is
   one of: `a-large-small`, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `asterisk`, `ban`, `battery-charging`, `battery-full`, `battery-low`, `battery-medium`, `battery-warning`, `battery`, `bell`, `book-open`, `bot`, `building-2`, `calendar`, `case-sensitive`, `chart-pie`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-up-down`, `circle-alert`, `circle-check`, `circle-user`, `circle-x`, `close`, `copy`, `cpu`, `dash`, `delete`, `ellipsis-vertical`, `ellipsis`, `external-link`, `eye-off`, `eye`, `file-text`, `file`, `folder-closed`, `folder-open`, `folder`, `frame`, `gallery-vertical-end`, `github`, `globe`, `hard-drive`, `heart-off`, `heart`, `inbox`, `info`, `inspector`, `layout-dashboard`, `loader-circle`, `loader`, `map`, `maximize`, `memory-stick`, `menu`, `mic`, `minimize`, `minus`, `moon`, `network`, `palette`, `panel-bottom-open`, `panel-bottom`, `panel-left-close`, `panel-left-open`, `panel-left`, `panel-right-close`, `panel-right-open`, `panel-right`, `pause`, `play`, `plus`, `redo-2`, `redo`, `refresh-cw`, `replace`, `resize-corner`, `rotate-cw`, `search`, `settings-2`, `settings`, `sort-ascending`, `sort-descending`, `square-terminal`, `square`, `star-fill`, `star-off`, `star`, `sun`, `thumbs-down`, `thumbs-up`, `triangle-alert`, `undo-2`, `undo`, `user`, `window-close`, `window-maximize`, `window-minimize`, `window-restore`. Any other name is `invalid_props`.
 - `contextMenu` and `MenuBar` are described in section 10; `Dialog` and `tooltip` in section 14;
-  `VirtualList`, `Table` and `Tabs` in section 15.
+  `AlertDialog`, `Sheet`, `Popover` and `HoverCard` in section 24; `VirtualList`, `Table` and
+  `Tabs` in section 15.
 - **Form controls.** `Switch` works like `Checkbox` (`change` carries `checked`).
   `RadioGroup` and `Select` take `options`, a list of `{"value": "...", "label": "...",
   "disabled": true?}` that `setProps` replaces whole; `value` is the selected option's
@@ -283,6 +324,7 @@ and Advanced groups are described in section 17; the data components (`Tree`, `D
 {"type":"event","id":5,"event":"submit","value":"current text"}
 {"type":"event","id":9,"event":"menu","value":"copy"}
 {"type":"event","id":11,"event":"change","value":7.5}
+{"type":"event","id":15,"event":"copied","value":"https://example.com"}
 {"type":"event","id":13,"event":"sort","value":{"column":"name","direction":"asc"}}
 {"type":"windowClosed","id":2}
 {"type":"windowEvent","id":2,"event":"resize","x":120,"y":80,"width":400,"height":300}
@@ -574,7 +616,7 @@ with exactly those modifiers.
 - `doubleClick` (opt-in) on a `div` is sent on the second click of a double click; both
   clicks also send `click`.
 - `focus` gives the keyboard focus to an `Input`, a `Textarea`, a `NumberInput`, an `OtpInput`, a
-  `Calendar`, a `Tree`, a `Table`, a `Command` (its search field) or a `div` with `keyDown`,
+  `Calendar`, a `Tree`, a `Table`, a `Command` (its search field), a `List` or a `div` with `keyDown`,
   once the commit is applied and its window is showing. Another type is `invalid_operation`.
 - Not supported: system-wide shortcuts (when the app is not focused), key up events, and
   focus or blur events.
@@ -637,6 +679,10 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
   sends nothing.
 - One dialog at a time per window: if several are open, the one with the lowest id shows.
 - Changes to its props and to the body show while it is open.
+- A **DialogFooter** child replaces the OK/Cancel footer (`okText` and `cancelText` are then
+  ignored): its children (for example `Button`s, each with its own `click`) are the footer, and
+  its `class` styles it. The client closes the dialog with `open: false`; Escape, the X and a
+  click outside still send `cancel`. It is not part of the body; the last one wins.
 
 **notify** is an action (section 13): it shows a toast in a window now, not on `commit`.
 
@@ -652,7 +698,7 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.
 For another type, wrap it in a `div`.
 
-Not supported: several dialogs stacked, dialogs without the OK button or with more buttons,
+Not supported: several dialogs stacked (beyond an `AlertDialog` over a `Dialog`, section 24),
 notification actions (buttons inside a toast), and rich tooltips.
 
 ## 15. Lists, tables and tabs
@@ -788,13 +834,20 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 
 - The object is checked like any other prop: an unknown key, an unknown role or a wrong type is
   `invalid_props` (so a typo does not go silent). `null` removes it.
-- A `div` and a `text` get the accessibility node on their own element. A component (`Button`,
+- A `div` and a `text` get the accessibility node on their own element. GPUI does not pass a
+  `text`'s words to the reader, so a `text` with a `role` and no `label` is named by its
+  `content`; with the `label` role it reads like text on a page (Narrator's scan mode reads it,
+  Tab does not stop on it), which is how a conversation's messages are read. A component (`Button`,
   `Slider`…) is wrapped in one box that carries it, so the wrap only happens when `a11y` is
   set; the wrapper is a row and does not change the sizes inside.
 - A window's root is reported as a `window` with its title, so a window whose own focus has no
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
   themselves as best they can (a `Checkbox`'s label, for example) and take `a11y` for the rest.
+- Some of section 23's components keep the accessibility node the crate builds, so the host does
+  not wrap them and their `role` is ignored: a `Toggle` names itself with its `tooltip` (give it a
+  `tooltip` or an `a11y.label`, not both), a `Clipboard` with `a11y.label` or its `tooltip`, and
+  an `InputGroup` with `a11y.label` — the field inside reads from its `placeholder`.
 - Do not repeat the role a component already reports: an `Input` is a text field named by its
   `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
   that has no label of its own (a `Select`, a `RadioGroup`, a `Progress`), give `a11y` the
@@ -809,7 +862,11 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   reads as its chosen tab, and its `a11y.label` becomes the description.
   Without a stop (`disabled`) they read the same way. gpui-kit already reports a `Slider` as a
   slider, so its `a11y.label` names that one too.
-- The other components keep gpui-component's own keyboard behaviour: `Accordion` and `Calendar`
+- An `Accordion` section's title reads as its name. The title of each enabled `AccordionItem`
+  (none when it or its `Accordion` is `disabled`) is a Tab stop that reads as a button with its
+  open state; Enter and Space open and close it with the same `change` a click sends. Sections
+  given as `items` take no stop.
+- The other components keep gpui-component's own keyboard behaviour: `Calendar` and `Toggle`
   take no Tab stop, so a keyboard-only user cannot reach them (a screen reader's own navigation
   still reads their `a11y`).
 
@@ -818,9 +875,11 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock` and `List` keep their own delegates and state machines
-and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
-`Chart` in section 19, `Command` in section 21 and `Settings` in section 22.
+binary. `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
+`Chart` in section 19, `Command` in section 21, `Settings` in section 22, the simple
+components (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
+`Clipboard`) in section 23, the overlays in section 24, the form controls with state in
+section 25, chat in section 26, `List` in section 27 and `Dock` in section 28.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends
@@ -841,10 +900,12 @@ and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sideba
   with the page, kept in `page` in synced mode.
 - **Collapsible** — shows its children while `open`; the trigger is the app's (a `Button` that
   sets `open`), so it has no event of its own.
-- **Accordion** — sections as `items`: `{"id", "title", "content", "open", "disabled"}`; the
-  content is **text** (a section that needs rich content uses a `Collapsible` with children).
-  `multiple` (default `false`), `bordered` (default `true`), `disabled`. A toggle sends `change`
-  with the section's `id` and, in synced mode, rewrites that item's `open`.
+- **Accordion** — sections as `items`: `{"id", "title", "content", "open", "disabled"}`, whose
+  content is text, or as **AccordionItem** children (`id`, required and not empty, `title`,
+  `open`, `disabled`), whose children are the content, styled by its `class`. With any
+  `AccordionItem` child, `items` is ignored (the host logs it once). `multiple` (default
+  `false`), `bordered` (default `true`), `disabled`. A toggle sends `change` with the section's
+  `id` and, in synced mode, rewrites its `open` (the `AccordionItem`'s, or the item's in `items`).
 - **Avatar** — a picture from `src` (an image file), or the initial of `name`.
 - **Stepper** — `items` as `RadioGroup`'s `options` (`value`, `label`, `disabled`), `value` is
   the current step, `vertical` stacks them. A click sends `change` with the step's `value`.
@@ -860,7 +921,9 @@ and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sideba
   its children are the content.
 - **DescriptionList** — key-value rows as `items` (`{"label", "value", "span"}`), `columns`
   (default 1), `bordered`, `horizontal` (label and value side by side).
-- **StatusBar** — `left` and `right` text.
+- **StatusBar** — `left` and `right` text. A **StatusBarLeft** (or **StatusBarRight**) child
+  replaces that side's text: its children go in a row on that side, styled by its `class` (the
+  last one wins). Other children are not drawn.
 - **Toolbar** — a strip for tools; its children are its content.
 - **Resizable** — panels the user can drag: `axis` (`horizontal` by default, or `vertical`) and
   `sizes`, the initial width (or height) in pixels of each panel in order; a panel without a
@@ -1192,3 +1255,369 @@ Left out: custom field elements, reset buttons, group footers and group variants
 `unknown_type` to it and nothing else changes.
 
 The transcript in `conformance/settings.txt` is the reference for its props and events.
+
+## 23. Simple components
+
+Seven small nodes: a toggle button, a split button with a menu, a rich text label, an empty
+state, loading text, a framed text field and a copy button.
+
+```json
+{"op":"create","id":40,"type":"Empty","props":{"icon":"folder-open","title":"No files","description":"Drop a file here"}}
+{"op":"create","id":41,"type":"Button","props":{"label":"Choose a file"}}
+{"op":"append","parent":40,"child":41}
+{"op":"create","id":42,"type":"Toggle","props":{"label":"Bold","icon":"asterisk","variant":"outline","checked":false},"events":["change"]}
+{"op":"create","id":43,"type":"DropdownButton","props":{"label":"Save","variant":"primary","items":[{"id":"save-as","label":"Save as"},{"id":"discard","label":"Discard","disabled":true}]},"events":["click","menu"]}
+{"op":"create","id":44,"type":"InputGroup","props":{"value":"example.com","prefix":"https://","suffixIcon":"check"},"events":["submit"]}
+{"op":"create","id":45,"type":"Label","props":{"content":"Total","secondary":"(12)","highlight":"12"}}
+{"op":"create","id":46,"type":"Shimmer","props":{"content":"Loading...","duration":2}}
+{"op":"create","id":47,"type":"Clipboard","props":{"value":"https://example.com","a11y":{"label":"Copy the address"}},"events":["copied"]}
+```
+
+- **Toggle** — a button that stays pressed: `checked`, `label`, `icon` and a `tooltip` that also
+  names it for a screen reader; `variant` is `ghost` (default) or `outline`. Its children are
+  drawn after `label`/`icon`. A click sends `change` with `checked`, and the synced and
+  controlled modes of section 5 apply, as with `Checkbox`. It takes no Tab stop.
+- **DropdownButton** — an action and its menu in one control: a `Button` half (`label`, `icon`,
+  `variant`, `outline`, `tooltip`) and a caret that opens `items`, a menu list in the format of
+  section 10 (`menuLabel` names the caret for a screen reader). A click on the left half sends
+  `click`; choosing an item sends `menu` with its `id`. It takes no children.
+- **Label** — `content` with an optional `secondary` text after it (muted) and `masked` (dots
+  instead of characters); `highlight` marks **every** occurrence of that substring, ignoring
+  case. It is not drawn when a character of the texts changes its UTF-8 length when lowercased
+  (such as the Kelvin sign `K` or `İ`): gpui-component would crash on it.
+- **Empty** — a centered empty state: a dashed frame whose header is `icon` (in a muted box),
+  `title` and `description`, with the children in a content slot under it (usually a `Button`).
+  It fills the box it is given (`flex-1`, `min-w-0`), so size its parent or give it `class`.
+- **Shimmer** — `content` with a moving highlight: `duration` in seconds (default 2), `spread`
+  (the highlight's half-width, 0.3 by default), `reverse` and `once`. It animates on its own —
+  no `animate-*` class — and shows the text still when the system asks for reduced motion. The
+  crate clamps `spread` to 0.05–1 and a negative `duration` to 1 ms; a `duration` too large to
+  represent keeps the default.
+- **InputGroup** — a framed text field: `value` (applied like an `Input`'s), `placeholder`,
+  `prefix`/`prefixIcon` on the left and `suffix`/`suffixIcon` on the right (text and a bundled
+  icon; a side with neither adds nothing), `readonly`, `invalid`, `disabled` and `controlled`.
+  `change` and `submit` work as in an `Input`, and `a11y.label` names the group (its `role` is
+  ignored). The sides are text and an icon only: a button inside the frame is not part of this
+  node.
+- **Clipboard** — a small icon button that copies `value`. A click copies it and sends `copied`
+  with that text; the icon turns into a check for two seconds, and a second click in that window
+  does nothing. `tooltip` is a hint and `a11y.label` names the button (its own default name is a
+  translated "Copy").
+
+The `items` of a `DropdownButton` are the menu list of section 10, submenus included, and a
+disabled or unknown item behaves as it does there.
+
+`simulate` covers the actions: `change` on a `Toggle`, `change` and `submit` on an `InputGroup`,
+`click` and `menu` on a `DropdownButton`, and `copied` on a `Clipboard`. Without a window
+(`--no-window`) nothing is copied: the event is reported and the system clipboard is not touched,
+as with `readClipboard` and the native dialogs. `simulate copied` has no two-second wait, so two
+calls send two events.
+
+`PROTOCOL_VERSION` stays at 1: the seven are new node types, so an older host answers
+`unknown_type` to them and nothing else changes.
+
+The transcript in `conformance/simple.txt` is the reference for their props and events.
+
+## 24. Overlays
+
+Four nodes over the contents of a window: a confirmation, a side panel, and the two panels a
+trigger opens.
+
+```json
+{"op":"create","id":60,"type":"AlertDialog","props":{"open":true,"title":"Delete 3 files?","description":"This cannot be undone.","icon":"circle-alert","okText":"Delete","cancelText":"Cancel"},"events":["ok","cancel"]}
+{"op":"create","id":62,"type":"Sheet","props":{"open":true,"side":"left","title":"Filters","size":320},"events":["close"]}
+{"op":"create","id":64,"type":"Popover","props":{"anchor":"bottom-right","arrow":true},"events":["change"]}
+{"op":"create","id":67,"type":"HoverCard","props":{"openDelay":300,"closeDelay":200},"events":["change"]}
+```
+
+- **AlertDialog** — a confirmation in the dialog layer of section 14: `open` (default `false`),
+  `title`, `description`, `icon` (a bundled icon, as in `Empty`) and `okText` (default `OK`).
+  `cancelText` is what adds the Cancel button, as in a `Dialog`. Its children are the body, under
+  the description, and `class` styles it. `ok`, `cancel` (also Escape) are opt-in events that
+  close it and set `open` to `false` in the host, as with a `Dialog`; there is no X and no
+  dismiss-by-click, so neither cancels. An open `AlertDialog` shows over an open `Dialog`, and
+  closing it brings the `Dialog` back, with its contents as they were: that is how a confirmation
+  is put on top of another dialog. The two share one layer, so a window still shows one dialog at
+  a time (the open `AlertDialog` wins; among equals, the lowest id). A `DialogFooter` child
+  replaces its OK/Cancel buttons, as in a `Dialog` (Escape still sends `cancel`).
+- **Sheet** — a panel that slides in from `side` (`right` by default; `left`, `top`, `bottom`):
+  `open`, `title` and `size` in pixels (default 350; the width on the sides, the height above and
+  below). Its children are the scrollable body and `class` styles it. Closing it with its X,
+  Escape or a click on the dimmed background sends `close` and sets `open` to `false`; closing it
+  with `open: false` sends nothing. The panel is resizable by its edge (the crate's default) and
+  its overlay and close-on-overlay behaviour are not props. One sheet per window: the open one
+  with the lowest id.
+- **Popover** — a panel anchored to its **first child**, the trigger; the rest of the children are
+  the panel. `open` (default `false`) lives in the host and is synchronized like a `Checkbox`'s
+  `checked`: the user opening or closing it (a click on the trigger, Enter or Space with the focus
+  in it, Escape, a click outside) sends `change` with `checked` and updates `open`, and a
+  `setProps` with another `open` wins. `anchor` (default `top-left`) names where the panel goes:
+  `top-*` opens below the trigger and `bottom-*` above it, aligned left, centre or right;
+  `left-center` and `right-center` open to the sides. `arrow` draws a triangle pointing at the
+  trigger. `class` styles the **trigger's slot**, not the panel: put `w-full` there for a trigger
+  that fills the space its parent gives it, and style the panel with the nodes inside it. Only the
+  static `class` utilities reach that slot (`hover:` and `transition` need the element itself, so
+  they do not). The trigger keeps its own `click`, and that click does not bubble up; a disabled
+  or loading `Button` does not open the popover. For the keyboard to open it the trigger must be
+  focusable (`Button`, `Input`): a `Text` or a plain `div` trigger is mouse-only.
+- **HoverCard** — the same shape as a `Popover`, opened and closed by the mouse alone: the first
+  child is the trigger. `openDelay` and `closeDelay` are milliseconds (600 and 300 by default) and
+  `anchor` (default `top-center`) works as in a `Popover`. It has no `open` prop — the host does
+  not open or close it, and there is no `simulate` for it — its `change` with `checked` comes from
+  a real hover only. It does not take the focus, so neither the keyboard nor a screen reader
+  reaches it: do not put information there that is nowhere else.
+
+Without children these two draw nothing (the first child is the trigger) and the host warns once on
+stderr; with one child they still open an empty panel with the crate's padding.
+
+The `a11y` of the node itself is ignored by the four: an `AlertDialog` and a `Sheet` read their
+`title`, and in a `Popover`/`HoverCard` the reader reads the `a11y` of the trigger child.
+
+`simulate` covers `ok`/`cancel` on an open `AlertDialog` (as on a `Dialog`), `close` on an open
+`Sheet`, and `change` on a `Popover` (which toggles `open`, as a click does). A `HoverCard` has
+none: its `change` only comes from the mouse in a real window.
+
+`PROTOCOL_VERSION` stays at 1: the four are new node types, so an older host answers `unknown_type`
+to them.
+
+The transcript in `conformance/overlays.txt` is the reference for their props and events.
+
+## 25. Form controls with state
+
+Four form controls that keep what the user picks in the host, like `Select` and `Calendar`: the
+value lives in the node's `value` and every change the user makes is reported with `change`.
+
+```json
+{"op":"create","id":70,"type":"DatePicker","props":{"value":"2024-08-03","placeholder":"Pick a day"},"events":["change"]}
+{"op":"create","id":71,"type":"DatePicker","props":{"range":true,"value":"2024-08-01/2024-08-15"},"events":["change"]}
+{"op":"create","id":72,"type":"TimeField","props":{"value":"09:30"},"events":["change"]}
+{"op":"create","id":73,"type":"ColorPicker","props":{"value":"#3366ff","palette":["#ff0000","#00ff00"]},"events":["change"]}
+{"op":"create","id":74,"type":"Combobox","props":{"options":[{"value":"rs","label":"Rust"},{"value":"go","label":"Go"}],"value":["rs"],"searchable":true},"events":["change"]}
+```
+
+- **DatePicker** — a field that opens a calendar. `value` is a day, `YYYY-MM-DD`; with
+  `range: true` it is an ISO 8601 interval, `YYYY-MM-DD/YYYY-MM-DD`, with the start not after the
+  end. A range is reported once both ends are picked. The field has a clear button, which sends
+  `change` with `value: null`. `placeholder` shows while it is empty.
+- **TimeField** — a time typed by segments (hours, minutes, seconds). `value` is `HH:MM` (24 hours);
+  with `seconds: true` it is `HH:MM:SS`. It has no empty state: without `value` it shows `00:00`,
+  and the user cannot clear it.
+- **ColorPicker** — a field with a swatch and the hex value that opens a palette, hue, saturation,
+  lightness and alpha sliders and a hex box. `value` is `#RRGGBB` or `#RRGGBBAA` (the `#` is
+  required, any case); the host reports `#RRGGBB` in capitals, and `#RRGGBBAA` when the color is
+  translucent. `palette` is a list of colors in the same form, shown first. Clearing it sends
+  `value: null`. It has no `disabled`: gpui-component cannot disable its color pickers.
+- **Combobox** — a list that picks several options: `options` as in a `Select`, `value` the list of
+  chosen option values. Each toggle (adding or removing one) sends `change` with the whole list;
+  values that are not among the options are not shown. `searchable` adds a search box and
+  `placeholder` shows while nothing is chosen. For a single choice with search, use a `Select`
+  with `searchable`.
+
+`range` and `seconds` fix the form of `value`, so a `value` is checked against the node as the
+operation leaves it: `setProps` with `range: true` on a node whose `value` is a single day is
+`invalid_props` (send the new `value` with it). A `value` that does not fit (`2024-02-30`, an
+inverted range, `24:00`, `3366ff`), an empty string, or a `palette` color that is not hex is
+`invalid_props` and the operation is not applied. Unlike `Calendar`, which shows no day for a
+date it cannot read, these four reject it.
+
+Like a `Select`, the four have two modes (section 5): by default the host keeps the new value and
+reports it; with `controlled: true` it only reports it and keeps showing the client's `value` until
+a `setProps` confirms it.
+
+`simulate` covers `change` on the four, with the `value` the user would pick: a string for the first
+three (`null` clears a `DatePicker` or a `ColorPicker`), and a list of strings for a `Combobox`. A
+value that does not fit the node or an unknown option is `invalid_operation`; a value of the wrong
+type is `invalid_json`. The value the node already has sends nothing, as in section 5, and so does
+a `Combobox` list that adds a disabled option (removing one is allowed: the clear button does it).
+
+`PROTOCOL_VERSION` stays at 1: the four are new node types, so an older host answers `unknown_type`
+to them.
+
+The transcript in `conformance/form-state.txt` is the reference for their props and events.
+
+## 26. Chat
+
+Four presentational nodes for a conversation, the header and footer of a `Message`, the
+scrolling list that holds them, and a step-by-step questionnaire. They are drawn from their
+props every frame; a `MessageScroller` keeps its scroll position in the host and a
+`Questionnaire` its answers. An `Attachment`'s upload status is the client's to change.
+
+```json
+{"op":"create","id":80,"type":"Message","props":{"alignment":"end","avatarName":"Ada"}}
+{"op":"create","id":81,"type":"MessageHeader"}
+{"op":"create","id":82,"type":"text","props":{"content":"Ada · 10:42"}}
+{"op":"create","id":83,"type":"Bubble","props":{"variant":"filled"}}
+{"op":"create","id":84,"type":"text","props":{"content":"Here is the report."}}
+{"op":"create","id":85,"type":"MessageFooter"}
+{"op":"create","id":86,"type":"Button","props":{"label":"Copy","variant":"ghost"},"events":["click"]}
+{"op":"append","parent":81,"child":82}
+{"op":"append","parent":83,"child":84}
+{"op":"append","parent":85,"child":86}
+{"op":"append","parent":80,"child":81}
+{"op":"append","parent":80,"child":83}
+{"op":"append","parent":80,"child":85}
+{"op":"create","id":87,"type":"Marker","props":{"content":"Thinking","loading":true,"loadingStyle":"shimmer"}}
+{"op":"create","id":88,"type":"Attachment","props":{"status":"uploading","progress":45,"title":"report.pdf","description":"2.4 MB"},"events":["click","remove"]}
+{"op":"create","id":89,"type":"MessageScroller","props":{"class":"flex-1","jumpLabel":"Ir al último"}}
+{"op":"append","parent":89,"child":80}
+{"op":"append","parent":89,"child":87}
+```
+
+- **Bubble** — a chat bubble: its children are the content. `variant` is the surface (`filled`
+  by default; `ghost` has no surface or padding and takes the whole width). `alignment` puts it at
+  the `start` or `end` of the row; unset, it follows the `Message` that holds it. It is at most
+  80% as wide as its parent; with `a11y`, the box that carries it is a full-width column, so it
+  keeps that width and its side. Reactions are not part of this node (put a row of `Button`s in the
+  message's footer instead).
+- **Message** — a message row: an avatar, a header, the content and a footer, aligned to the
+  `start` (default) or the `end` (the avatar moves to that side too). `avatarName`/`avatarSrc`
+  draw an `Avatar` (its `name` and `src`); without either there is no avatar. A
+  **MessageHeader** child is the header (sender, time) and a **MessageFooter** child the footer
+  (state, actions); both lay out their own children in a row with small muted text, take their
+  own `class`, and the last of each wins. Every other child is the content, usually one or more
+  `Bubble`s. With a `ghost` bubble the header and footer lose their side inset so they line up
+  with its text. A `MessageHeader` or `MessageFooter` outside a `Message` draws nothing, like a
+  `Tab` outside `Tabs`. Group messages with a `div` and `class` (`flex flex-col gap-4`).
+- **Marker** — a compact status row in a conversation: `content` (text), an `icon` before it,
+  and children after the text (inside the same content slot). `variant` is `plain` (default),
+  `separator` (a line on each side, label centered) or `border` (a line under it); `alignment`
+  overrides where the content sits, and a separator keeps only the line on the far side of a
+  `start` or `end` label. `loading` adds a spinner (unless there is an `icon`) or, with
+  `loadingStyle: "shimmer"`, a moving highlight over `content` (children only fade; the shimmer
+  stops when the system asks for reduced motion). A marker that reports progress can be
+  announced with `a11y: {"role": "status"}`.
+- **Attachment** — a file or picture card. `status` is `complete` (default), `pending` (dashed
+  border), `uploading`, `processing`, or `failed` (red border); `progress` (0–100, clamped) draws
+  a ring and a bar along the bottom and is added to `description`, only while `uploading`.
+  `title` and `description` are text (the title shimmers while in progress; the description
+  turns red when `failed`). The picture is `src` or `data`, exactly as in an `Image` (`data`
+  wins and must be standard base64); without one the media shows a file icon. `axis: "vertical"` turns the chip into a card with the picture on top
+  (only the picture, without `title`/`description`, makes a square tile). `tooltip` shows while
+  the card is hovered (the reason an upload failed, for example). The children are actions
+  (usually `Button`s): they sit on the trailing edge and their clicks never reach the card.
+
+  The card's own controls exist only while their event is subscribed: `click` makes the whole
+  card clickable, `remove` shows a remove button on its upper corner (on hover), and `retry`
+  shows a retry control, only while `failed` (a round button on the picture or the file icon,
+  and a link after `description`). None carries a value. `simulate` sends all three;
+  a `retry` on an attachment that is not `failed` sends nothing, since the button is not there.
+- **MessageScroller** — a virtual list of messages: each child is a row (usually a `Message` or
+  a `Marker`), rows can have any height, and only the ones in view are built, so tens of
+  thousands of messages cost little. It fills the box it is given, so size its parent or give
+  it `class` (`flex-1`). It starts at the end and stays there as rows are added or the last one
+  grows (a streamed answer); when the user scrolls up it stays put, and a round button
+  (`jumpButton`, on by default) brings it back to the end. `jumpLabel` is that button's tooltip
+  and name (the crate's default is the English "Jump to latest"); `scrollbar` (on by default)
+  shows a vertical scrollbar. The scrollbar is approximate: rows that were never drawn count as
+  zero height, so its thumb changes size as the user scrolls through the list, and dragging it
+  moves the content in small jumps (the wheel and the jump button are smooth). Adding, removing or moving rows keeps the reading position: the
+  host compares the new children with the old ones and tells the list only what changed in
+  between. The list has the `log` role. It has no events.
+- **Questionnaire** — questions shown one at a time, with progress ("Question 1 of 3"), and
+  Previous, Skip, Next and Submit buttons that appear when they apply. `items` lists the
+  questions: `{name, label, description?, required?, multiple?, disabled?, input?, choices?}`,
+  where `choices` are `{value, label, description?, disabled?, selected?}` (radio buttons, or
+  checkboxes with `multiple`) and `input: true` adds a free-text field. `name`s and each
+  question's choice `value`s must be unique, and a question without `multiple` can have at
+  most one `selected` choice; anything else is `invalid_props`. A `selected` choice is an
+  answer from the start. Choosing in a single-choice question moves to the next one on its own;
+  a `required` question cannot be skipped, and an optional one must be answered or skipped
+  before Submit. On the keyboard, up and down move between answers, left and right between
+  questions, and Enter confirms a filled answer.
+
+  Every answer is reported with `change`, whose value is `{name, status, choices, text}`:
+  `status` is `answered`, `skipped` or `unanswered` (cleared), `choices` the chosen values and
+  `text` the free text or `null`; typing sends one `change` per edit, as an `Input` does.
+  `submit` sends the list of those answers, in question order (disabled questions left out).
+  The host keeps the answers in the node (`answers`, by name, visible in the `--no-window`
+  dump), and setting different `items` starts over (the same ones again keep the answers). Without a window, `simulate change` takes
+  `{name, choices?, text?}` (an answer the user could give, or `invalid_operation`) and
+  `simulate submit` sends `submit` only when every question is answered; skipping exists only
+  in a window. The client cannot set the answers, and validation beyond `required` is the
+  client's, after `submit`.
+
+`PROTOCOL_VERSION` stays at 1: the eight are new node types, so an older host answers
+`unknown_type` to them and nothing else changes.
+
+The transcript in `conformance/chat.txt` is the reference for their props and events.
+
+## 27. List
+
+A selectable list with the keyboard, an optional search field and incremental loading. Its rows
+are **`ListItem` children** (the pattern of `Tab`, section 15), so a row can hold any nodes:
+
+```json
+{"op":"create","id":1,"type":"List","props":{"class":"h-64","value":"b","searchable":true,"placeholder":"Search fruit","hasMore":true},"events":["change","confirm","query","loadMore"]}
+{"op":"create","id":2,"type":"ListItem","props":{"value":"a"}}
+{"op":"create","id":3,"type":"text","props":{"content":"Apple"}}
+{"op":"append","parent":2,"child":3}
+{"op":"append","parent":1,"child":2}
+{"type":"event","id":1,"event":"change","value":"a"}
+{"type":"event","id":1,"event":"confirm","value":"a"}
+```
+
+- A `ListItem` is `value` —required and not empty, it is what the events report— and
+  `disabled`. Values should be unique within a list (with a repeat, the first row wins). Its
+  children are laid out in a row. Other children of a `List` are not drawn.
+- A screen reader reads a row by its `a11y.label`: gpui-component gives the row the list item role
+  but no name, so the host puts `a11y` on the row's content (with the `label` role unless another is
+  given). While the list itself has the focus, moving the selection moves the reader to the
+  selected row. With `searchable` the focus stays in the search field, so the reader stays there
+  too and reads the rows only when browsing (scan mode). A row without `a11y.label` has no name.
+- Every row has the height of the first one (gpui-component measures one row); what is taller
+  is cut. The list virtualizes its rows and fills its container, so give it a height (`h-64`,
+  `flex-1`) with `class`. The client still sends every row as nodes, as with `VirtualList`.
+- `value` is the selected row's `value`; one that is not among the rows selects nothing. The
+  arrow keys (passing over disabled rows) and a click send `change` with the row's `value`, and
+  Escape sends `change` with `null`. `value` follows the synced and controlled modes of
+  section 5 (`controlled`). The list passes Escape on to what holds it.
+- `confirm` reports the row's `value` on Enter or a click (a click on another row sends its
+  `change` first). A disabled row is neither selected nor confirmed.
+- `searchable` shows a search field above the rows (`placeholder` is its hint). Each edit sends
+  `query` with the text, trimmed; the same text twice is sent once. The host does not filter:
+  the client sends the rows that match (and, to keep Enter useful, usually sets `value` to the
+  first one). While typing, the list highlights its first row until the new rows arrive.
+- With `hasMore`, scrolling to within `loadMoreThreshold` rows of the end (a whole number,
+  default 20) sends `loadMore`, once per row count: the client appends rows, and clears
+  `hasMore` when there are no more. `loading` replaces the rows with gpui-component's skeleton.
+  A list without rows shows gpui-component's empty state.
+- `focus` (section 12) works on a List, so the arrow keys move the selection.
+- Without a window, `simulate change` takes a row's `value` or `null`, `simulate confirm` a
+  row's `value` (it selects it first), `simulate query` the text and `simulate loadMore` nothing
+  (sent only with `hasMore`). An unknown row is `invalid_operation`; a disabled one does nothing.
+
+`PROTOCOL_VERSION` stays at 1: `List` and `ListItem` are new node types. The transcript in
+`conformance/list.txt` is the reference for their props and events.
+
+## 28. Dock
+
+Panels the user rearranges: drags a tab to another group or to an edge to split, resizes the
+splits, and folds the side docks. The panels are **`DockPanel` children** of the `Dock`, and a
+panel's children are its content (any nodes):
+
+```json
+{"op":"create","id":1,"type":"Dock","props":{"class":"size-full"}}
+{"op":"create","id":2,"type":"DockPanel","props":{"title":"Files","placement":"left"}}
+{"op":"create","id":3,"type":"DockPanel","props":{"title":"Notes","closable":true},"events":["close"]}
+{"op":"append","parent":1,"child":2}
+{"op":"append","parent":1,"child":3}
+{"type":"event","id":3,"event":"close"}
+```
+
+- **The host owns the layout** (ADR 0003). A new `DockPanel` joins the first tab group of its
+  `placement` (`center` by default, or the `left`, `right` or `bottom` dock, created on first
+  use); `placement` is read only then, and changing it later does not move the panel. A removed
+  `DockPanel` leaves the layout. Nothing else a client does touches the layout, so `setProps` on
+  a panel or its content never undoes what the user arranged; moving a panel keeps its content.
+  The layout lives as long as the window and is not saved.
+- `title` is the tab's text; it can change at any time. Other children of a `Dock` are not
+  drawn, and a `DockPanel` outside a `Dock` draws nothing.
+- With `closable`, the tab offers to close the panel. Closing it removes it from the layout and
+  sends `close`; the app then removes the node. The panel does not come back while its node
+  exists: to show it again, append a new `DockPanel` (a new id). A close cannot be refused.
+- The `Dock` fills what its `class` gives it (`size-full`, `flex-1`).
+- Without a window, `simulate close` works on a `DockPanel` with `closable` that is still open;
+  otherwise it is `invalid_operation`.
+
+`PROTOCOL_VERSION` stays at 1: `Dock` and `DockPanel` are new node types. The transcript in
+`conformance/dock.txt` is the reference for their props and events.

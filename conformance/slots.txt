@@ -1,0 +1,63 @@
+# Slots as children (ADR 0004): AccordionItem (section 17), DialogFooter (sections 14 and 24),
+# StatusBarLeft and StatusBarRight (section 17).
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div"}
+# An Accordion with AccordionItem children: their children are the content, `items` is ignored.
+> {"op":"create","id":2,"type":"Accordion","props":{"items":[{"id":"x","title":"Ignored"}]},"events":["change"]}
+> {"op":"create","id":3,"type":"AccordionItem","props":{"id":"a","title":"First","open":true,"class":"p-2"}}
+> {"op":"create","id":4,"type":"Button","props":{"label":"Inside"}}
+> {"op":"create","id":5,"type":"AccordionItem","props":{"id":"b","title":"Second","disabled":true}}
+> {"op":"append","parent":3,"child":4}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":2,"child":5}
+> {"op":"append","parent":1,"child":2}
+# A Dialog and an AlertDialog whose DialogFooter replaces OK/Cancel.
+> {"op":"create","id":6,"type":"Dialog","props":{"open":true,"title":"Rename","okText":"Ignored"},"events":["ok","cancel"]}
+> {"op":"create","id":7,"type":"DialogFooter","props":{"class":"gap-2"}}
+> {"op":"create","id":8,"type":"Button","props":{"label":"Save"},"events":["click"]}
+> {"op":"append","parent":7,"child":8}
+> {"op":"append","parent":6,"child":7}
+> {"op":"append","parent":1,"child":6}
+> {"op":"create","id":9,"type":"AlertDialog","props":{"title":"Delete?"},"events":["ok","cancel"]}
+> {"op":"create","id":10,"type":"DialogFooter"}
+> {"op":"append","parent":9,"child":10}
+> {"op":"append","parent":1,"child":9}
+# A StatusBar whose sides are children.
+> {"op":"create","id":11,"type":"StatusBar","props":{"left":"Ignored"}}
+> {"op":"create","id":12,"type":"StatusBarLeft","props":{"class":"gap-1"}}
+> {"op":"create","id":13,"type":"Icon","props":{"name":"check"}}
+> {"op":"create","id":14,"type":"text","props":{"content":"Ready"}}
+> {"op":"create","id":15,"type":"StatusBarRight"}
+> {"op":"create","id":16,"type":"Button","props":{"label":"UTF-8"}}
+> {"op":"append","parent":12,"child":13}
+> {"op":"append","parent":12,"child":14}
+> {"op":"append","parent":15,"child":16}
+> {"op":"append","parent":11,"child":12}
+> {"op":"append","parent":11,"child":15}
+> {"op":"append","parent":1,"child":11}
+> {"op":"window","root":1}
+> {"op":"commit"}
+# `change` sends the AccordionItem's id; `items` is not looked at, and a disabled section is quiet.
+> {"op":"simulate","id":2,"event":"change","value":"a"}
+< {"type":"event","id":2,"event":"change","value":"a"}
+> {"op":"simulate","id":2,"event":"change","value":"b"}
+> {"op":"simulate","id":2,"event":"change","value":"x"}
+< {"type":"error","code":"invalid_operation"}
+# Without AccordionItem children, `items` is back.
+> {"op":"remove","id":3}
+> {"op":"remove","id":5}
+> {"op":"commit"}
+> {"op":"simulate","id":2,"event":"change","value":"x"}
+< {"type":"event","id":2,"event":"change","value":"x"}
+# A footer button sends its own event; Escape (cancel) still closes the dialog.
+> {"op":"simulate","id":8,"event":"click"}
+< {"type":"event","id":8,"event":"click"}
+> {"op":"simulate","id":6,"event":"cancel"}
+< {"type":"event","id":6,"event":"cancel"}
+# An AccordionItem needs an id, as a Tab needs a value.
+> {"op":"create","id":20,"type":"AccordionItem","props":{"title":"No id"}}
+> {"op":"create","id":21,"type":"AccordionItem","props":{"id":"c","open":"yes"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}

@@ -1,6 +1,6 @@
 # Releasing
 
-Host and clients are versioned **in lockstep** (today `0.2.0`): the packages carry the host
+Host and clients are versioned **in lockstep** (today `0.3.0`): the packages carry the host
 binary, so a client version is also a host version. The protocol has its own number
 (`PROTOCOL_VERSION` in `packages/host/src/protocol.rs`, today 1) and only changes with an agreed
 protocol change.
@@ -47,7 +47,7 @@ quote, and `gpui-bridge-host --version` prints the same facts.
 3. Pack the client, the platform package for this machine and the platform-tagged wheel:
 
    ```sh
-   pnpm pack:node                         # packages/client-node/gpui-bridge-0.2.0.tgz
+   pnpm pack:node                         # packages/client-node/gpui-bridge-0.3.0.tgz
    pnpm --dir packages/host-<platform>-<arch> pack
    pnpm wheel                             # -> packages/client-python/dist/*.whl
    ```

@@ -1,0 +1,80 @@
+# Section 27: List, its ListItem rows (by `value`), its props and its events.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"List","props":{"class":"h-64","value":"b","searchable":true,"placeholder":"Search fruit","hasMore":true,"loadMoreThreshold":5},"events":["change","confirm","query","loadMore"]}
+> {"op":"create","id":2,"type":"ListItem","props":{"value":"a"}}
+> {"op":"create","id":3,"type":"text","props":{"content":"Apple"}}
+> {"op":"create","id":4,"type":"ListItem","props":{"value":"b","a11y":{"label":"Banana"}}}
+> {"op":"create","id":5,"type":"Icon","props":{"name":"star"}}
+> {"op":"create","id":6,"type":"text","props":{"content":"Banana"}}
+> {"op":"create","id":7,"type":"ListItem","props":{"value":"c","disabled":true}}
+> {"op":"create","id":8,"type":"text","props":{"content":"Cherry"}}
+> {"op":"append","parent":2,"child":3}
+> {"op":"append","parent":4,"child":5}
+> {"op":"append","parent":4,"child":6}
+> {"op":"append","parent":7,"child":8}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":4}
+> {"op":"append","parent":1,"child":7}
+> {"op":"window","root":1}
+> {"op":"commit"}
+# A List takes the focus, so the arrow keys move its selection.
+> {"op":"focus","id":1}
+# Selecting a row reports its value; the current one does nothing.
+> {"op":"simulate","id":1,"event":"change","value":"a"}
+< {"type":"event","id":1,"event":"change","value":"a"}
+> {"op":"simulate","id":1,"event":"change","value":"a"}
+# Escape clears the selection.
+> {"op":"simulate","id":1,"event":"change","value":null}
+< {"type":"event","id":1,"event":"change","value":null}
+# A click or Enter selects the row first, then confirms it.
+> {"op":"simulate","id":1,"event":"confirm","value":"b"}
+< {"type":"event","id":1,"event":"change","value":"b"}
+< {"type":"event","id":1,"event":"confirm","value":"b"}
+> {"op":"simulate","id":1,"event":"confirm","value":"b"}
+< {"type":"event","id":1,"event":"confirm","value":"b"}
+# A disabled row cannot be selected or confirmed; an unknown one is an error.
+> {"op":"simulate","id":1,"event":"confirm","value":"c"}
+> {"op":"simulate","id":1,"event":"change","value":"c"}
+> {"op":"simulate","id":1,"event":"change","value":"z"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# The search field reports what was typed; the client answers with other rows.
+> {"op":"simulate","id":1,"event":"query","value":"ban"}
+< {"type":"event","id":1,"event":"query","value":"ban"}
+> {"op":"remove","id":2}
+> {"op":"remove","id":7}
+> {"op":"commit"}
+# Near the end the list asks for more rows, while `hasMore` is set.
+> {"op":"simulate","id":1,"event":"loadMore"}
+< {"type":"event","id":1,"event":"loadMore"}
+> {"op":"setProps","id":1,"props":{"hasMore":false,"loading":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"loadMore"}
+# Controlled: the change is reported, but the selection stays the client's until it sets `value`.
+> {"op":"create","id":9,"type":"ListItem","props":{"value":"d"}}
+> {"op":"append","parent":1,"child":9}
+> {"op":"setProps","id":1,"props":{"controlled":true}}
+> {"op":"commit"}
+> {"op":"simulate","id":1,"event":"change","value":"d"}
+< {"type":"event","id":1,"event":"change","value":"d"}
+> {"op":"simulate","id":1,"event":"change","value":"d"}
+< {"type":"event","id":1,"event":"change","value":"d"}
+# A ListItem is drawn by its List and has no events of its own.
+> {"op":"simulate","id":4,"event":"click"}
+< {"type":"error","code":"invalid_operation","op":"simulate"}
+# Malformed props are invalid_props; a ListItem needs a non-empty `value`, also on setProps.
+> {"op":"create","id":20,"type":"ListItem","props":{}}
+> {"op":"create","id":21,"type":"ListItem","props":{"value":""}}
+> {"op":"create","id":22,"type":"ListItem","props":{"value":"x","disabled":"yes"}}
+> {"op":"create","id":23,"type":"List","props":{"loadMoreThreshold":-1}}
+> {"op":"create","id":24,"type":"List","props":{"searchable":"yes"}}
+> {"op":"create","id":25,"type":"List","props":{"value":3}}
+> {"op":"setProps","id":4,"props":{"value":null}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"create"}
+< {"type":"error","code":"invalid_props","op":"setProps"}

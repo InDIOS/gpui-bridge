@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useState } from "react";
-import type { App, ClientMessage, DiffSelection, HostError } from "gpui-bridge";
-import { Accordion, Alert, Badge, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Collapsible, Command, DescriptionList, Dialog, Diff, Div, Field, Form, GroupBox, Icon, Image, Input, Kbd, MenuBar, NumberInput, Pagination, Progress, RadioGroup, Rating, render, Resizable, Select, Settings, Sidebar, Skeleton, Slider, Spinner, StatusBar, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
+import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
+import { Accordion, AccordionItem, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, DialogFooter, Diff, Div, Dock, DockPanel, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, StatusBarLeft, StatusBarRight, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -28,7 +28,7 @@ function created(sent: ClientMessage[], type: string) {
   return sent.filter((m): m is Extract<ClientMessage, { op: "create" }> => m.op === "create" && m.type === type);
 }
 
-function emit(app: App, message: { id: number; event: string; value?: string | number | null | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
+function emit(app: App, message: { id: number; event: string; value?: string | number | null | string[] | QuestionnaireAnswer | QuestionnaireAnswer[] | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
 
@@ -684,6 +684,306 @@ test("the new components render with their props and report their events", async
   emit(app, { id: calendar.id, event: "change", value: "2024-09-01" });
   await app.close();
   assert.deepEqual(seen, ["close", ["rating", 4], ["page", 2], ["accordion", "a"], ["step", "two"], ["number", "13"], ["day", "2024-09-01"]]);
+  assert.deepEqual(errors, []);
+});
+
+test("the simple components render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Toggle label="Bold" icon="asterisk" variant="outline" tooltip="Bold" onChange={(checked) => seen.push(["toggle", checked])} />
+      <DropdownButton
+        label="Save"
+        variant="primary"
+        items={[{ id: "save-as", label: "Save as" }]}
+        menuLabel="Save options"
+        onClick={() => seen.push(["save"])}
+        onMenu={(item) => seen.push(["menu", item])}
+      />
+      <Label content="Total" secondary="(12)" highlight="12" />
+      <Empty icon="folder-open" title="No files" description="Drop a file here">
+        <Button label="Choose a file" />
+      </Empty>
+      <Shimmer content="Loading..." duration={3} spread={0.4} reverse once />
+      <InputGroup value="example.com" placeholder="host" prefix="https://" suffixIcon="check" onChange={(value) => seen.push(["group", value])} onSubmit={(value) => seen.push(["submit", value])} />
+      <Clipboard value="https://example.com" a11y={{ label: "Copy the address" }} onCopied={(value) => seen.push(["copied", value])} />
+    </Div>,
+  );
+  const [toggle] = created(sent, "Toggle");
+  const [dropdown] = created(sent, "DropdownButton");
+  const [label] = created(sent, "Label");
+  const [empty] = created(sent, "Empty");
+  const [shimmer] = created(sent, "Shimmer");
+  const [group] = created(sent, "InputGroup");
+  const [clipboard] = created(sent, "Clipboard");
+  assert.deepEqual(toggle.props, { label: "Bold", icon: "asterisk", variant: "outline", tooltip: "Bold", controlled: false });
+  assert.deepEqual(dropdown.props, {
+    label: "Save",
+    variant: "primary",
+    items: [{ id: "save-as", label: "Save as" }],
+    menuLabel: "Save options",
+  });
+  assert.deepEqual(label.props, { content: "Total", secondary: "(12)", highlight: "12" });
+  assert.deepEqual(empty.props, { icon: "folder-open", title: "No files", description: "Drop a file here" });
+  assert.deepEqual(shimmer.props, { content: "Loading...", duration: 3, spread: 0.4, reverse: true, once: true });
+  // A `value` makes a field controlled in React, as it does in the DOM.
+  assert.deepEqual(group.props, {
+    value: "example.com",
+    placeholder: "host",
+    prefix: "https://",
+    suffixIcon: "check",
+    controlled: true,
+  });
+  assert.deepEqual(clipboard.props?.a11y, { label: "Copy the address" });
+
+  emit(app, { id: toggle.id, event: "change", checked: true });
+  emit(app, { id: dropdown.id, event: "click" });
+  emit(app, { id: dropdown.id, event: "menu", value: "save-as" });
+  emit(app, { id: group.id, event: "change", value: "example.org" });
+  emit(app, { id: group.id, event: "submit", value: "example.org" });
+  emit(app, { id: clipboard.id, event: "copied", value: "https://example.com" });
+  await app.close();
+  assert.deepEqual(seen, [
+    ["toggle", true],
+    ["save"],
+    ["menu", "save-as"],
+    ["group", "example.org"],
+    ["submit", "example.org"],
+    ["copied", "https://example.com"],
+  ]);
+  assert.deepEqual(errors, []);
+});
+
+test("the overlays render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <AlertDialog
+        open
+        title="Delete 3 files?"
+        description="This cannot be undone."
+        icon="circle-alert"
+        okText="Delete"
+        cancelText="Cancel"
+        onOk={() => seen.push(["ok"])}
+        onCancel={() => seen.push(["cancel"])}
+      >
+        <Text>3 files</Text>
+      </AlertDialog>
+      <Sheet open side="left" title="Filters" size={320} onClose={() => seen.push(["close"])}>
+        <Input value="*.png" />
+      </Sheet>
+      <Popover open={false} anchor="bottom-right" arrow onChange={(checked) => seen.push(["popover", checked])}>
+        <Button label="Sort" />
+        <Text>By name</Text>
+      </Popover>
+      <HoverCard openDelay={300} closeDelay={200} anchor="top-center" onChange={(checked) => seen.push(["card", checked])}>
+        <Button label="Info" />
+        <Text>Hovered</Text>
+      </HoverCard>
+    </Div>,
+  );
+  const [alert] = created(sent, "AlertDialog");
+  const [sheet] = created(sent, "Sheet");
+  const [popover] = created(sent, "Popover");
+  const [card] = created(sent, "HoverCard");
+  assert.deepEqual(alert.props, {
+    open: true,
+    title: "Delete 3 files?",
+    description: "This cannot be undone.",
+    icon: "circle-alert",
+    okText: "Delete",
+    cancelText: "Cancel",
+  });
+  assert.deepEqual(sheet.props, { open: true, side: "left", title: "Filters", size: 320 });
+  assert.deepEqual(popover.props, { open: false, anchor: "bottom-right", arrow: true });
+  assert.deepEqual(card.props, { openDelay: 300, closeDelay: 200, anchor: "top-center" });
+  // The children of a `Popover`/`HoverCard` are its trigger and its panel.
+  const [button] = created(sent, "Button");
+  assert.ok(sent.some((m) => m.op === "append" && m.parent === popover.id && m.child === button.id));
+
+  emit(app, { id: alert.id, event: "ok" });
+  emit(app, { id: sheet.id, event: "close" });
+  emit(app, { id: popover.id, event: "change", checked: true });
+  emit(app, { id: card.id, event: "change", checked: false });
+  await app.close();
+  assert.deepEqual(seen, [["ok"], ["close"], ["popover", true], ["card", false]]);
+  assert.deepEqual(errors, []);
+});
+
+test("the chat nodes render with their props and report their events", async () => {
+  const seen: unknown[] = [];
+  const items = [{ name: "plan", label: "Plan", choices: [{ value: "free", label: "Free" }] }];
+  const { app, sent, errors } = await renderRecorded(
+    <MessageScroller jumpLabel="Latest">
+      <Message alignment="end" avatarName="Ada">
+        <MessageHeader>
+          <Text>Ada</Text>
+        </MessageHeader>
+        <Bubble variant="secondary">
+          <Text>Hi</Text>
+        </Bubble>
+        <MessageFooter />
+      </Message>
+      <Marker content="Thinking" loading loadingStyle="shimmer" />
+      <Attachment status="failed" title="report.pdf" onClick={() => seen.push("click")} onRemove={() => seen.push("remove")} onRetry={() => seen.push("retry")} />
+      <Questionnaire items={items} onChange={(answer) => seen.push(["change", answer])} onSubmit={(answers) => seen.push(["submit", answers])} />
+    </MessageScroller>,
+  );
+  const [file] = created(sent, "Attachment");
+  const [quiz] = created(sent, "Questionnaire");
+  assert.deepEqual(created(sent, "Message")[0].props, { alignment: "end", avatarName: "Ada" });
+  assert.deepEqual(quiz.props, { items });
+
+  const answer = { name: "plan", status: "answered" as const, choices: ["free"], text: null };
+  emit(app, { id: file.id, event: "click" });
+  emit(app, { id: file.id, event: "remove" });
+  emit(app, { id: file.id, event: "retry" });
+  emit(app, { id: quiz.id, event: "change", value: answer });
+  emit(app, { id: quiz.id, event: "submit", value: [answer] });
+  await tick();
+  assert.deepEqual(seen, ["click", "remove", "retry", ["change", answer], ["submit", [answer]]]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a List renders its ListItem rows and reports its events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <List value="a" searchable placeholder="Search" hasMore onChange={(value) => seen.push(["change", value])} onConfirm={(value) => seen.push(["confirm", value])} onQuery={(query) => seen.push(["query", query])} onLoadMore={() => seen.push("loadMore")}>
+      <ListItem value="a">
+        <Text>Apple</Text>
+      </ListItem>
+      <ListItem value="b" disabled>
+        <Text>Banana</Text>
+      </ListItem>
+    </List>,
+  );
+  const [list] = created(sent, "List");
+  // Like React DOM, passing `value` makes it controlled; the wire says so.
+  assert.deepEqual(list.props, { value: "a", searchable: true, placeholder: "Search", hasMore: true, controlled: true });
+  assert.deepEqual(created(sent, "ListItem").map((item) => item.props), [{ value: "a" }, { value: "b", disabled: true }]);
+
+  emit(app, { id: list.id, event: "change", value: null });
+  emit(app, { id: list.id, event: "confirm", value: "b" });
+  emit(app, { id: list.id, event: "query", value: "ap" });
+  emit(app, { id: list.id, event: "loadMore" });
+  await tick();
+  assert.deepEqual(seen, [["change", null], ["confirm", "b"], ["query", "ap"], "loadMore"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("a Dock renders its DockPanel children and reports close", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Dock class="size-full">
+      <DockPanel title="Files" placement="left">
+        <Text>src/</Text>
+      </DockPanel>
+      <DockPanel title="Notes" closable onClose={() => seen.push("close")}>
+        <Text>Hello</Text>
+      </DockPanel>
+    </Dock>,
+  );
+  const panels = created(sent, "DockPanel");
+  assert.deepEqual(panels.map((panel) => panel.props), [{ title: "Files", placement: "left" }, { title: "Notes", closable: true }]);
+
+  emit(app, { id: panels[1].id, event: "close" });
+  await tick();
+  assert.deepEqual(seen, ["close"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("slot children render under their parents and report their events", async () => {
+  const seen: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <Accordion onChange={(id) => seen.push(id)}>
+        <AccordionItem id="a" title="First" open>
+          <Text>Body</Text>
+        </AccordionItem>
+      </Accordion>
+      <Dialog open title="Rename">
+        <DialogFooter>
+          <Button label="Save" onClick={() => seen.push("save")} />
+        </DialogFooter>
+      </Dialog>
+      <StatusBar>
+        <StatusBarLeft>
+          <Text>Ready</Text>
+        </StatusBarLeft>
+        <StatusBarRight>
+          <Text>UTF-8</Text>
+        </StatusBarRight>
+      </StatusBar>
+    </Div>,
+  );
+  assert.deepEqual(created(sent, "AccordionItem").map((item) => item.props), [{ id: "a", title: "First", open: true }]);
+  for (const type of ["DialogFooter", "StatusBarLeft", "StatusBarRight"]) assert.equal(created(sent, type).length, 1);
+
+  emit(app, { id: created(sent, "Accordion")[0].id, event: "change", value: "a" });
+  emit(app, { id: created(sent, "Button")[0].id, event: "click" });
+  await tick();
+  assert.deepEqual(seen, ["a", "save"]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
+test("the form controls with state render with their props and report typed values", async () => {
+  const seen: unknown[] = [];
+  const options = [
+    { value: "rs", label: "Rust" },
+    { value: "go", label: "Go" },
+    { value: "py", label: "Python", disabled: true },
+  ];
+  const { app, sent, errors } = await renderRecorded(
+    <Div>
+      <DatePicker value="2024-08-03" placeholder="Pick a day" onChange={(value) => seen.push(["day", value])} />
+      <DatePicker range onChange={(value) => seen.push(["range", value])} />
+      <TimeField value="09:30" onChange={(value) => seen.push(["time", value])} />
+      <ColorPicker value="#3366ff" palette={["#ff0000", "#00ff0080"]} onChange={(value) => seen.push(["color", value])} />
+      <Combobox options={options} value={["rs"]} placeholder="Languages" searchable onChange={(value) => seen.push(["langs", value])} />
+    </Div>,
+  );
+  const [day, range] = created(sent, "DatePicker");
+  const [time] = created(sent, "TimeField");
+  const [color] = created(sent, "ColorPicker");
+  const [langs] = created(sent, "Combobox");
+  // Like React DOM, passing `value` makes them controlled; the wire says so.
+  assert.deepEqual(day.props, { value: "2024-08-03", placeholder: "Pick a day", controlled: true });
+  assert.deepEqual(range.props, { range: true, controlled: false });
+  assert.deepEqual(time.props, { value: "09:30", controlled: true });
+  assert.deepEqual(color.props, { value: "#3366ff", palette: ["#ff0000", "#00ff0080"], controlled: true });
+  assert.deepEqual(langs.props, {
+    options,
+    value: ["rs"],
+    placeholder: "Languages",
+    searchable: true,
+    controlled: true,
+  });
+
+  emit(app, { id: day.id, event: "change", value: "2024-08-10" });
+  emit(app, { id: day.id, event: "change", value: null });
+  emit(app, { id: range.id, event: "change", value: "2024-08-01/2024-08-15" });
+  emit(app, { id: time.id, event: "change", value: "18:05" });
+  emit(app, { id: color.id, event: "change", value: "#FF0000" });
+  emit(app, { id: color.id, event: "change", value: null });
+  emit(app, { id: langs.id, event: "change", value: ["rs", "go"] });
+  emit(app, { id: langs.id, event: "change", value: ["go"] });
+  await tick();
+  assert.deepEqual(seen, [
+    ["day", "2024-08-10"],
+    ["day", null],
+    ["range", "2024-08-01/2024-08-15"],
+    ["time", "18:05"],
+    ["color", "#FF0000"],
+    ["color", null],
+    ["langs", ["rs", "go"]],
+    ["langs", ["go"]],
+  ]);
+  await app.close();
   assert.deepEqual(errors, []);
 });
 
