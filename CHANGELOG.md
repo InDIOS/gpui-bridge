@@ -3,7 +3,10 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
-## Unreleased
+## 0.3.0 — 2026-10-31
+
+Every addition is a new node type or an optional child node, so `PROTOCOL_VERSION` stays 1: an
+older host answers `unknown_type` to the new nodes and nothing else changes.
 
 - Go client (`packages/client-go/`, module `github.com/InDIOS/gpui-bridge/packages/client-go`,
   package `gpuibridge`), standard library only. Its first version is tagged
@@ -23,6 +26,34 @@ Versions are lockstep across the host and the three clients; the protocol has it
   `number`) with a searchable sidebar; the host keeps each value the user sets and reports
   `change` with `{key, value}` (PROTOCOL.md §22). `settings()` in Node, `<Settings onChange>` in
   React, `app.settings()` in Python and `App.Settings` in Go.
+- Seven simple nodes: `Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup` and
+  `Clipboard` (PROTOCOL.md §23).
+- Four overlays: `AlertDialog` and `Sheet` (window layers like `Dialog`), `Popover` and
+  `HoverCard` (PROTOCOL.md §24).
+- Four form controls that keep their value in the host and report `change`, synced or
+  `controlled` like `Select`: `DatePicker`, `TimeField`, `ColorPicker` and `Combobox`
+  (PROTOCOL.md §25).
+- Chat: `Bubble`, `Message` with `MessageHeader` and `MessageFooter` child nodes, `Marker`,
+  `Attachment`, `MessageScroller` (anchored to the bottom, variable row height) and
+  `Questionnaire` (PROTOCOL.md §26).
+- `List` with `ListItem` rows: search, keyboard, `loadMore` near the end, rows named for screen
+  readers from `a11y.label` (PROTOCOL.md §27).
+- `Dock` with `DockPanel` children: panels the user drags into tabs and splits; the host owns the
+  layout (in memory), `closable` panels report `close` (PROTOCOL.md §28).
+- Slots as child nodes: `AccordionItem` inside `Accordion`, `DialogFooter` inside `Dialog` and
+  `AlertDialog`, `StatusBarLeft` and `StatusBarRight` inside `StatusBar`. When present they win
+  over the text props: `items` is ignored, and `okText`/`cancelText` are ignored (the footer's
+  buttons send their own `click`; Escape, the close button and a click outside still send
+  `cancel`).
+- Keyboard and screen readers: `Slider`, `Rating`, `Tabs` and `Pagination` are Tab stops that
+  move with the arrow keys, and the host sets their role and value; each enabled `AccordionItem`
+  title is a named button that Enter and Space toggle. These new Tab stops change the focus order
+  of existing windows. Dock tab titles and `Accordion` `items` titles are named for readers.
+- The host is built on gpui-kit 0.8.1 (a text field's accessibility now sits on the element that
+  takes focus).
+- Known limits: `frameless` windows are only usable on Windows (window controls are a no-op on
+  macOS and Linux, and on Wayland without server-side decorations every window comes without a
+  frame); the hosts are not code-signed.
 
 ## 0.2.0 — first public release
 

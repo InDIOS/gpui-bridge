@@ -875,11 +875,11 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
 The components of gpui-kit's index that fit the tree model without extra dependencies are
 mapped onto nodes. `Editor` (syntax highlighting needs `tree-sitter`) and `Speech` (dictation
 needs the system recognizer) are left out on purpose: they would add megabytes to the host
-binary. `Dock` and `List` keep their own delegates and state machines
-and are not mapped yet; `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
-`Chart` in section 19, `Command` in section 21, `Settings` in section 22 and the simple
+binary. `Tree`, `Diff` and `Carousel` are in section 18, `Sidebar` and
+`Chart` in section 19, `Command` in section 21, `Settings` in section 22, the simple
 components (`Toggle`, `DropdownButton`, `Label`, `Empty`, `Shimmer`, `InputGroup`,
-`Clipboard`) in section 23.
+`Clipboard`) in section 23, the overlays in section 24, the form controls with state in
+section 25, chat in section 26, `List` in section 27 and `Dock` in section 28.
 
 - **Alert** — an inline message: `variant` is `default` (default), `info`, `success`, `warning`
   or `error`; `banner` makes it a full-width band; `closable` shows a close button that sends

@@ -77,11 +77,16 @@ window on Windows so far. Protocol version 1.
   `Calendar`, `Tree`, `Diff`, `Carousel`, `Sidebar`, `Chart` (line, bar and pie), `Command`,
   `Settings` (typed field pages) and the simple ones: `Toggle`, `DropdownButton`, `Label`,
   `Empty`, `Shimmer`, `InputGroup` (a text field with a prefix and a suffix) and `Clipboard`.
-  `Editor` and `Speech` are left out (they need `tree-sitter` and the system recognizer), and
-  `Dock` and `List` are not mapped yet.
+  Form controls that keep their value: `DatePicker`, `TimeField`, `ColorPicker`, `Combobox`.
+  Chat: `Bubble`, `Message` (with `MessageHeader`/`MessageFooter`), `Marker`, `Attachment`,
+  `MessageScroller`, `Questionnaire`. `List` (with `ListItem` rows) and `Dock` (with
+  `DockPanel` children). Slots as child nodes: `AccordionItem`, `DialogFooter`,
+  `StatusBarLeft`/`StatusBarRight`. `Editor` and `Speech` are left out (they need `tree-sitter`
+  and the system recognizer).
 - **Accessibility:** every node takes an `a11y` prop (an id, a role, a label, a description and
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
-  readers through AccessKit; the window root and the controls name themselves too.
+  readers through AccessKit; the window root and the controls name themselves too. `Slider`,
+  `Rating`, `Tabs`, `Pagination` and `Accordion` titles are Tab stops driven by the keyboard.
 - **Windows:** several windows, frameless windows with a custom title bar, initial position,
   minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
   `visibility`), light/dark and custom themes.
