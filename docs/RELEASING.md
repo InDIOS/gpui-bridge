@@ -106,8 +106,12 @@ can go through `release.yml` from the start. In order:
 
 4. **npm trusted publishers:** on npmjs.com, in each of the five packages' *Settings → Trusted
    publisher*, choose GitHub Actions with owner `InDIOS`, repository `gpui-bridge` and workflow
-   `release.yml`. From then on, *Publishing access* can be set to require 2FA and disallow
-   tokens.
+   `release.yml`, leave the environment empty (the `npm` job has none) and check **Allow npm
+   publish**: unchecked, the connection only allows `npm stage publish`, and the job fails with
+   `ENEEDAUTH` (as 0.3.0 did at first). After *Set up connection*, the page lists the connection
+   as *Pending validation* until the first publish, which must come before the date it shows; an
+   empty form means nothing was saved. From then on, *Publishing access* can be set to require
+   2FA and disallow tokens.
 5. **PyPI pending publisher:** on pypi.org, *Your projects → Publishing → Add a new pending
    publisher*: project `gpui-bridge`, owner `InDIOS`, repository `gpui-bridge`, workflow
    `release.yml`, environment `pypi`. In GitHub, create the `pypi` environment (optionally with
