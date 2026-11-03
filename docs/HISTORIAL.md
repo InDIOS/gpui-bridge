@@ -2189,3 +2189,41 @@ candidatas. El usuario eligió la opción 1, las tres que más valen. Cuatro nod
 **Criterio de aceptación:** inventario con decisión de protocolo; las ranuras elegidas abiertas
 como hijos sin romper las props de texto, en host, protocolo, conformance, los 4 clientes, un
 ejemplo y Narrator. Cumplido.
+
+### Fase 50 — M17: ventanas fuera de Windows (2026-11-03)
+
+Hallado el 2026-10-28 probando los ejemplos en Ubuntu sobre WSL: `windowControl` no hacía nada
+fuera de Windows y, en un compositor Wayland sin decoraciones del servidor (WSLg, GNOME), las
+ventanas salían sin barra de título. Solo host y documentación; el protocolo, `conformance/` y
+los clientes no cambian, y `PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (`windowControl`):** commit `5dd2225`. `window_control_area` solo lo lee el hit-test
+  de Windows. En Linux y macOS el host atiende las áreas él mismo, con el patrón del `TitleBar`
+  de gpui-component. Un `drag` llama a `start_window_move` en el primer movimiento tras
+  presionar: si lo llamara al presionar, el compositor se quedaría con el puntero y el segundo
+  clic de un doble clic no llegaría. El doble clic hace `zoom_window` (`titlebar_double_click`
+  en macOS). `minimize`, `maximize` y `close` actúan en `on_click`; `close` usa `remove_window`,
+  que termina en `windowClosed` igual que el cierre del sistema. Una ventana `frameless` pone
+  `app_owns_titlebar_drag`, para que AppKit no atienda también el doble clic.
+- **Paso 2 (marco en Linux):** commit `4c52c14`. El `Root` de gpui-component ya envolvía la
+  ventana en `window_border`, así que con decoraciones del cliente había bordes y sombra pero no
+  barra. Ahora `RootView` pone la `TitleBar` de gpui-component, con el `title` y los tres
+  botones, encima del contenido cuando `window_decorations()` es `Client` y la ventana no es
+  `frameless`. Una ventana `frameless` pide `WindowDecorations::Client`. En X11 solo se concede
+  si hay un compositor y `_GTK_FRAME_EXTENTS`; si no, el gestor pone su marco encima de la barra
+  propia (documentado en §3, `1b18d4f`).
+- **Documentación:** `PROTOCOL.md` §3 (`frameless` en Linux) y §5 (`windowControl` fuera de
+  Windows), y el comentario de `examples/frameless.ts`. El rodeo `WAYLAND_DISPLAY=` ya no hace
+  falta.
+- **Pruebas:** en Windows, `fmt`, `clippy` y `cargo test` (74 unitarios, conformidad y
+  `no_window`) en verde, sin cambios de comportamiento. En WSL Ubuntu, el usuario probó en
+  ventana real, en Wayland y en X11, `counter` (barra, botones, arrastre, doble clic, bordes),
+  `frameless` (arrastre, doble clic, minimizar, cerrar con `windowClosed`, bordes) y
+  `menus --frameless`: todo bien. No hay test unitario: son llamadas a la plataforma sin
+  ventana.
+- **Tamaño del host release (Windows):** 21.417.984 → **21.450.752 B** (+32.768 B, la `TitleBar` enlazada).
+- **Sin probar:** macOS (no hay máquina).
+
+**Criterio de aceptación:** `examples/frameless.ts` se arrastra, maximiza con doble clic,
+minimiza y cierra (con `windowClosed`) en Linux; una ventana normal en Wayland sin decoraciones
+del servidor tiene título, botones y bordes. Cumplido.
