@@ -70,7 +70,10 @@ interpreted safely.
 - `frameless` (optional): `true` opens the window without the system title bar. The window
   keeps its resize borders, shadow and taskbar title; the app draws its own title bar with
   `windowControl` divs (section 5). Read only when the window opens: a later change is
-  ignored, with a warning on stderr.
+  ignored, with a warning on stderr. On Linux the host draws the resize borders and shadow
+  itself (client-side decorations); it does the same, plus a title bar with `title` and the
+  three buttons, for a normal window when the system draws no frame (a Wayland compositor
+  without server-side decorations, such as WSLg or GNOME).
 - `x`, `y` (optional): the window's initial position, in logical pixels, from the top-left
   corner of the screen. Read only when the window opens (a later change warns on stderr).
   With neither, the window opens centered; with only one, the other is 0.

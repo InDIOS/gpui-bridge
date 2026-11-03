@@ -14,7 +14,7 @@ use gpui_kit::component::message::{MessageFooter, MessageHeader};
 use gpui_kit::component::scroll::{ScrollableElement, Scrollbar};
 use gpui_kit::component::theme::{ActiveTheme, Theme};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, VirtualListScrollHandle, WindowExt, v_virtual_list};
+use gpui_kit::component::{Icon, TitleBar, VirtualListScrollHandle, WindowExt, v_virtual_list};
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -932,19 +932,36 @@ impl Render for RootView {
             .track_focus(&focus)
             .capture_key_down(shortcuts)
             .children(children);
+        let (title, frameless) = self
+            .session
+            .read(cx)
+            .tree
+            .windows()
+            .get(&window_id)
+            .map(|spec| {
+                let title = spec.title.clone().unwrap_or_default();
+                (title, spec.frameless.unwrap_or(false))
+            })
+            .unwrap_or_default();
         // The window's own focus (when nothing else has it) needs an accessibility node too.
-        let element = {
-            let tree = &self.session.read(cx).tree;
-            let title = tree
-                .windows()
-                .get(&window_id)
-                .and_then(|spec| spec.title.clone())
-                .unwrap_or_default();
-            element
-                .id(("window", window_id))
-                .role(Role::Window)
-                .aria_label(title)
-        };
+        let element = element
+            .id(("window", window_id))
+            .role(Role::Window)
+            .aria_label(title.clone());
+        // A Wayland compositor without server decorations leaves the frame to the app (Linux
+        // only); `Root` already draws the resize borders, the host adds the title bar.
+        let element =
+            if !frameless && matches!(window.window_decorations(), Decorations::Client { .. }) {
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .child(TitleBar::new().child(div().text_sm().child(title)))
+                    .child(div().flex_1().min_h_0().child(element))
+                    .into_any_element()
+            } else {
+                element.into_any_element()
+            };
         if animating {
             // Something in this pass moves, so the window draws another frame; the rest of the
             // window is only redrawn when a commit, the pointer or the theme changes it.

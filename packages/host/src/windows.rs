@@ -191,6 +191,11 @@ fn open_window(
         }),
         // macOS: the host's `drag` areas move the window, so AppKit must not handle their double click too.
         app_owns_titlebar_drag: spec.frameless.unwrap_or(false),
+        // Linux: no system frame either; `Root` draws the resize borders.
+        window_decorations: spec
+            .frameless
+            .unwrap_or(false)
+            .then_some(WindowDecorations::Client),
         ..Default::default()
     };
     let session = session.clone();
