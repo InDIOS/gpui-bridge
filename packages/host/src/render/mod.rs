@@ -1034,6 +1034,7 @@ struct RenderCx<'a> {
 }
 
 static WARN_SPIN: Once = Once::new();
+static WARN_POSITION: Once = Once::new();
 
 impl RenderCx<'_> {
     fn node(&mut self, id: NodeId) -> AnyElement {
@@ -1067,6 +1068,17 @@ impl RenderCx<'_> {
                 log::warn!("'animate-spin' only rotates Icon nodes; ignored elsewhere")
             });
         }
+        // Elsewhere the classes may land inside a wrapper, which would then hold the node in place.
+        let classes = if node.node_type != NodeType::Div && classes.iter().any(Class::positions) {
+            WARN_POSITION.call_once(|| {
+                log::warn!(
+                    "'absolute', 'relative', 'left-', 'top-', 'right-' and 'bottom-' only apply to div nodes; ignored elsewhere"
+                )
+            });
+            classes.iter().copied().filter(|c| !c.positions()).collect()
+        } else {
+            classes
+        };
 
         let accessibility = a11y::of(node);
         if keyboard::takes_stop(node)

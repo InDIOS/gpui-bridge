@@ -388,7 +388,17 @@ warning on stderr (once per class).
 
 - **Layout:** `flex`, `flex-row`, `flex-col`, `flex-1`, `flex-wrap`, `items-start|center|end`, `justify-start|center|end|between`
 - **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}` (GPUI's spacing scale)
-- **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`
+- **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`;
+  `w-[Npx]` and `h-[Npx]` in logical pixels (`N` a decimal number, at least 0)
+- **Position** (on `div` only; on other node types these classes are ignored, with a warning
+  on stderr): `absolute` takes a node out of the layout and places it against its parent's
+  box, with `left-`, `top-`, `right-` and `bottom-` followed by `[Npx]` (logical pixels; `N`
+  may be negative, as in `right-[-4px]` for a badge that hangs off a corner) or by `{n}` on
+  the spacing scale (`top-0`, `right-4`). There is no `static`: every node is already
+  `relative` (a containing block, and moved by its own `left-`… from where the layout put it,
+  as in CSS), so the parent needs no class and the `relative` class changes nothing. In a
+  scroll area an `absolute` child scrolls with the content. Nodes paint in child order (a
+  later sibling covers an earlier one); there is no `z-`.
 - **Overflow:** `overflow-hidden`; on `div` only, `overflow-scroll`, `overflow-x-scroll` and
   `overflow-y-scroll` make it a scroll area with the theme's scrollbar, which keeps its
   position across commits. A `flex-1` child that should scroll usually needs `min-h-0`

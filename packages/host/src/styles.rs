@@ -80,6 +80,25 @@ pub enum Ease {
     InOut,
 }
 
+/// The edge an `absolute` node is placed from (`left-*`, `top-*`, `right-*`, `bottom-*`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Side {
+    Left,
+    Top,
+    Right,
+    Bottom,
+}
+
+fn side(prefix: &str) -> Option<Side> {
+    Some(match prefix {
+        "left" => Side::Left,
+        "top" => Side::Top,
+        "right" => Side::Right,
+        "bottom" => Side::Bottom,
+        _ => return None,
+    })
+}
+
 /// Tailwind's `duration-*` values, in milliseconds.
 const DURATIONS: [u32; 8] = [75, 100, 150, 200, 300, 500, 700, 1000];
 
@@ -115,6 +134,15 @@ pub enum Class {
     W(f32),
     H(f32),
     Size(f32),
+    /// `w-[Npx]` and `h-[Npx]`, in logical pixels.
+    WPx(f32),
+    HPx(f32),
+    /// Only on `div` (see `Class::positions`). GPUI has no `static`: every element is a containing
+    /// block, so `absolute` places a node against its parent and `relative` changes nothing.
+    Relative,
+    Absolute,
+    /// `left-[Npx]` (may be negative) or `left-{n}` on the spacing scale.
+    Inset(Side, AbsoluteLength),
     MinW0,
     MinH0,
     Shrink0,
@@ -159,6 +187,13 @@ pub enum Class {
     /// Only on `Icon`.
     AnimateSpin,
     AnimatePulse,
+}
+
+impl Class {
+    /// `absolute`, `relative` and the insets: only a `div` takes its classes on its outer box.
+    pub fn positions(&self) -> bool {
+        matches!(self, Class::Relative | Class::Absolute | Class::Inset(..))
+    }
 }
 
 pub fn parse_class(name: &str) -> Option<Class> {
@@ -217,7 +252,19 @@ pub fn parse_class(name: &str) -> Option<Class> {
         "ease-in-out" => Ease(self::Ease::InOut),
         "animate-spin" => AnimateSpin,
         "animate-pulse" => AnimatePulse,
+        "relative" => Relative,
+        "absolute" => Absolute,
         _ => {
+            // Before the `prefix-number` branch, which would split `left-[-4px]` at its inner dash.
+            if let Some((prefix, value)) = name.strip_suffix("px]").and_then(|n| n.split_once("-["))
+            {
+                let n = value.parse::<f32>().ok().filter(|n| n.is_finite())?;
+                return match prefix {
+                    "w" if n >= 0.0 => Some(WPx(n)),
+                    "h" if n >= 0.0 => Some(HPx(n)),
+                    _ => Some(Inset(side(prefix)?, px(n).into())),
+                };
+            }
             if let Some(hover) = name.strip_prefix("hover:") {
                 return match parse_color(hover)? {
                     Bg(role) => Some(HoverBg(role)),
@@ -251,7 +298,7 @@ pub fn parse_class(name: &str) -> Option<Class> {
                 "size" => Size(n),
                 "opacity" if n <= 100.0 && n % 5.0 == 0.0 => Opacity(n / 100.0),
                 "duration" => DurationMs(DURATIONS.into_iter().find(|&ms| ms as f32 == n)?),
-                _ => return None,
+                _ => Inset(side(prefix)?, spacing(n).into()),
             }
         }
     };
@@ -273,6 +320,8 @@ fn parse_color(name: &str) -> Option<Class> {
 }
 
 /// Parsed class strings, plus the unknown classes already warned about.
+// shortcut: never evicts, so each new `left-[Npx]` a client writes adds an entry; bound it if a
+// client moves nodes many thousands of times.
 #[derive(Default)]
 pub struct StyleCache {
     parsed: HashMap<String, Rc<[Class]>>,
@@ -365,6 +414,14 @@ pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
         Class::W(n) => el.w(spacing(n)),
         Class::H(n) => el.h(spacing(n)),
         Class::Size(n) => el.size(spacing(n)),
+        Class::WPx(n) => el.w(px(n)),
+        Class::HPx(n) => el.h(px(n)),
+        Class::Relative => el.relative(),
+        Class::Absolute => el.absolute(),
+        Class::Inset(Side::Left, n) => el.left(n),
+        Class::Inset(Side::Top, n) => el.top(n),
+        Class::Inset(Side::Right, n) => el.right(n),
+        Class::Inset(Side::Bottom, n) => el.bottom(n),
         Class::MinW0 => el.min_w(px(0.)),
         Class::MinH0 => el.min_h(px(0.)),
         Class::Shrink0 => el.flex_shrink_0(),
@@ -446,7 +503,8 @@ pub fn apply_hover<E: InteractiveElement>(element: E, classes: &[Class], theme: 
 #[cfg(test)]
 mod tests {
     // Explicit imports: `super::*` would bring GPUI's `test` macro, shadowing Rust's.
-    use super::{Class, Ease, ScrollAxis, StyleCache, ThemeRole, parse_class};
+    use super::{Class, Ease, ScrollAxis, Side, StyleCache, ThemeRole, parse_class};
+    use gpui_kit::{px, rems};
     use std::collections::HashSet;
     use std::rc::Rc;
 
@@ -555,6 +613,16 @@ mod tests {
             ("ease-in-out", Class::Ease(Ease::InOut)),
             ("animate-spin", Class::AnimateSpin),
             ("animate-pulse", Class::AnimatePulse),
+            ("relative", Class::Relative),
+            ("absolute", Class::Absolute),
+            ("left-[12px]", Class::Inset(Side::Left, px(12.).into())),
+            ("top-[12.5px]", Class::Inset(Side::Top, px(12.5).into())),
+            ("right-[-4px]", Class::Inset(Side::Right, px(-4.).into())),
+            ("bottom-[0px]", Class::Inset(Side::Bottom, px(0.).into())),
+            ("left-0", Class::Inset(Side::Left, rems(0.).into())),
+            ("bottom-4", Class::Inset(Side::Bottom, rems(1.).into())),
+            ("w-[192px]", Class::WPx(192.)),
+            ("h-[108.5px]", Class::HPx(108.5)),
         ];
         for (name, expected) in cases {
             assert_eq!(parse_class(name), Some(expected), "{name}");
@@ -595,6 +663,20 @@ mod tests {
             "animate-bounce",
             "animate-none",
             "transition-colors",
+            "left-[]",
+            "left-[12]",
+            "left-[px]",
+            "left-[NaNpx]",
+            "left-[infpx]",
+            "left-[12rem]",
+            "left--1",
+            "-left-1",
+            "inset-0",
+            "static",
+            "w-[-4px]",
+            "h-[-1px]",
+            "p-[4px]",
+            "hover:left-0",
         ] {
             assert_eq!(parse_class(name), None, "{name}");
         }
