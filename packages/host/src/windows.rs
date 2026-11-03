@@ -189,6 +189,8 @@ fn open_window(
             appears_transparent: spec.frameless.unwrap_or(false),
             ..Default::default()
         }),
+        // macOS: the host's `drag` areas move the window, so AppKit must not handle their double click too.
+        app_owns_titlebar_drag: spec.frameless.unwrap_or(false),
         ..Default::default()
     };
     let session = session.clone();

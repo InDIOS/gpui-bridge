@@ -93,6 +93,8 @@ pub struct RootView {
     transitions: HashMap<NodeId, Transition>,
     /// Hovered nodes among those whose `hover:` the host animates (GPUI's own `hover` cannot be).
     hovered: Rc<RefCell<HashSet<NodeId>>>,
+    /// The `drag` area pressed and not yet moved, outside Windows (see `drag_area`).
+    title_drag: Rc<Cell<Option<NodeId>>>,
     /// One view per node that keeps moving on its own (an `animate-*` loop, see
     /// `animated_nodes`), kept up to date by `sync_animated`. A frame redraws those nodes and not
     /// the whole window: a spinner on a tree of thousands of nodes should not rebuild all of it.
@@ -173,6 +175,7 @@ impl RootView {
             applied_commit: 0,
             transitions: HashMap::new(),
             hovered: Rc::default(),
+            title_drag: Rc::default(),
             animated: HashMap::new(),
             texts: HashMap::new(),
             clock: Rc::default(),
@@ -610,6 +613,7 @@ impl RootView {
             in_chip: false,
             transitions: &mut self.transitions,
             hovered,
+            title_drag: self.title_drag.clone(),
             stateful: &mut self.stateful,
             focusables: &self.focusables,
             now,
@@ -999,6 +1003,7 @@ struct RenderCx<'a> {
     /// a Dialog body or a list row runs in keeps it too.
     transitions: &'a mut HashMap<NodeId, Transition>,
     hovered: Rc<RefCell<HashSet<NodeId>>>,
+    title_drag: Rc<Cell<Option<NodeId>>>,
     /// Nodes this pass produced state for (a transition, or a tracked `hover:`).
     stateful: &'a mut HashSet<NodeId>,
     focusables: &'a HashMap<NodeId, FocusHandle>,
@@ -1694,8 +1699,23 @@ impl RenderCx<'_> {
         if !track_hover {
             element = styles::apply_hover(element, classes, self.theme);
         }
+        // Only Windows reads the area; elsewhere the host moves the window and the buttons act on click.
+        let os_control = control.filter(|_| !cfg!(target_os = "windows"));
         if let Some(area) = control {
             element = element.window_control_area(area);
+        }
+        match os_control {
+            Some(WindowControlArea::Drag) => {
+                element = drag_area(element, id, &self.title_drag);
+            }
+            Some(_) => {
+                // Keeps the press from reaching a `drag` area around the button.
+                element = element.on_mouse_down(MouseButton::Left, |_, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                });
+            }
+            None => {}
         }
         if blocks {
             element = element.occlude();
@@ -1736,9 +1756,24 @@ impl RenderCx<'_> {
             .map(SharedString::from);
         let a11y = a11y::of(node);
         // An accessibility node needs an id too, so the div gets one even with nothing to click.
-        if clicks || menu.is_some() || track_hover || tooltip.is_some() || a11y.is_some() {
+        let button = os_control.filter(|area| *area != WindowControlArea::Drag);
+        if clicks
+            || menu.is_some()
+            || track_hover
+            || tooltip.is_some()
+            || a11y.is_some()
+            || button.is_some()
+        {
             // A stable id keeps the context menu's open state across renders.
             let mut element = element.id(("node", id));
+            if let Some(area) = button {
+                element = element.on_click(move |_, window, _| match area {
+                    WindowControlArea::Min => window.minimize_window(),
+                    WindowControlArea::Max => window.zoom_window(),
+                    // Ends in `windowClosed`, like the system's close (see `windows::window_closed`).
+                    _ => window.remove_window(),
+                });
+            }
             if clicks {
                 let session = self.session.clone();
                 element = element.on_click(move |event, _, cx| {
@@ -2217,6 +2252,42 @@ fn window_control(node: &Node) -> Option<WindowControlArea> {
         "close" => Some(WindowControlArea::Close),
         _ => None,
     }
+}
+
+/// A `drag` area outside Windows, as gpui-component's `TitleBar` does it: the move starts on the
+/// first mouse move after a press, since starting it on the press hands the pointer to the
+/// compositor and the second click of a double click never arrives.
+fn drag_area(element: Div, id: NodeId, pressed: &Rc<Cell<Option<NodeId>>>) -> Div {
+    let (down, up, out, moved) = (
+        pressed.clone(),
+        pressed.clone(),
+        pressed.clone(),
+        pressed.clone(),
+    );
+    element
+        .on_mouse_down(MouseButton::Left, move |event, window, _| {
+            if event.click_count == 2 {
+                if cfg!(target_os = "macos") {
+                    window.titlebar_double_click();
+                } else {
+                    window.zoom_window();
+                }
+            } else {
+                down.set(Some(id));
+            }
+        })
+        .on_mouse_up(MouseButton::Left, move |_, _, _| up.set(None))
+        .on_mouse_down_out(move |_, _, _| {
+            if out.get() == Some(id) {
+                out.set(None);
+            }
+        })
+        .on_mouse_move(move |_, window, _| {
+            if moved.get() == Some(id) {
+                moved.set(None);
+                window.start_window_move();
+            }
+        })
 }
 
 /// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read again.

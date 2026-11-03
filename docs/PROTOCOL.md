@@ -258,11 +258,13 @@ sections 14 and 24: each is a slot of the node that holds it and draws nothing e
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
   always allowed (it removes the prop). Unknown props are ignored, with a warning on stderr.
 - `Button` without `variant` uses the gpui-component default style.
-- `windowControl` makes a `div` a part of the window's title bar, handled by the system:
-  `drag` moves the window (with snapping, and double-click to maximize or restore),
-  `minimize`, `maximize` (maximize or restore) and `close` act as the system buttons. These
-  divs do not need `click` events; `close` ends in `windowClosed` as usual. Meant for
-  `frameless` windows, but it also works in a normal one. Inside a `windowControl` area,
+- `windowControl` makes a `div` a part of the window's title bar: `drag` moves the window
+  (double-click maximizes or restores), `minimize`, `maximize` (maximize or restore) and
+  `close` act as the system buttons. On Windows the system handles these areas (with Snap);
+  on Linux and macOS the host does, by asking the system to move, zoom, minimize or close
+  the window. These divs do not need `click` events; `close` ends in `windowClosed` as
+  usual. Meant for `frameless` windows, but it also works in a normal one. Inside a
+  `windowControl` area,
   `Button`, `Checkbox`, `Input`, a `div` with `click` and a nested `windowControl` div take
   their own clicks, so a title bar can hold a search box or buttons; everything else in it
   (text, icons, plain divs) is part of the area.

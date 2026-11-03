@@ -1,5 +1,6 @@
-// Frameless window: no system title bar; the app draws its own with `windowControl` areas,
-// which Windows handles natively (drag, snap, double-click to maximize, the buttons).
+// Frameless window: no system title bar; the app draws its own with `windowControl` areas
+// (drag, double-click to maximize, the buttons). Windows handles them natively, with Snap;
+// on Linux and macOS the host moves, zooms, minimizes and closes the window itself.
 // Run: node examples/frameless.ts   (after `npm run build` in client-node/ and `cargo build` in host/)
 
 import { createApp } from "gpui-bridge";
