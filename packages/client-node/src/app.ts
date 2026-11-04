@@ -64,6 +64,8 @@ export interface WindowOptions {
   frameless?: boolean;
   /** Minimizes (`true`) or restores (`false`) on the next commit. An action, not a remembered state. */
   minimized?: boolean;
+  /** Hides (`false`, no taskbar button or Alt+Tab) or shows and focuses (`true`) on the next commit, keeping the window's state. An action; Windows only. */
+  visible?: boolean;
   /** Window events to receive; `AppWindow.on` sets this for you. Replaces the previous list. */
   events?: WindowEventName[];
 }

@@ -11,7 +11,7 @@ use crate::Session;
 use crate::protocol::{CustomThemes, HostMessage, WindowId as ClientWindowId, WindowTheme};
 use crate::render::RootView;
 use crate::transport;
-use crate::tree::{ThemeSpec, WindowSpec};
+use crate::tree::{ThemeSpec, WindowRequest, WindowSpec};
 
 const DEFAULT_SIZE: (f32, f32) = (800., 600.);
 
@@ -64,8 +64,8 @@ pub fn sync_windows(session: &Entity<Session>, windows: &RefCell<Windows>, cx: &
             .update(cx, |_, window, _| window.remove_window());
     }
 
-    // `minimized` is an action (PROTOCOL.md section 3): applied after opening or updating the
-    // window, so `{"minimized":true}` works in the same commit that opens it.
+    // `minimized` and `visible` are actions (PROTOCOL.md section 3): applied after opening or
+    // updating the window, so `{"minimized":true}` works in the same commit that opens it.
     let requests = session.update(cx, |session, _| session.tree.take_window_requests());
 
     for (id, spec) in specs {
@@ -97,23 +97,53 @@ pub fn sync_windows(session: &Entity<Session>, windows: &RefCell<Windows>, cx: &
         }
     }
 
-    for (id, minimized) in requests {
+    for (id, request) in requests {
+        let name = match request {
+            WindowRequest::Minimized(_) => "minimized",
+            WindowRequest::Visible(_) => "visible",
+        };
         let Some(handle) = windows.borrow().open.get(&id).map(|window| window.handle) else {
-            log::warn!("'minimized' for window {id}, which is not open; ignored");
+            log::warn!("'{name}' for window {id}, which is not open; ignored");
             continue;
         };
-        let result = handle.update(cx, |_, window, _| {
-            if minimized {
-                window.minimize_window();
-            } else {
-                // Restores a minimized window and brings it to the front.
+        let result = handle.update(cx, |_, window, _| match request {
+            WindowRequest::Minimized(true) => window.minimize_window(),
+            WindowRequest::Visible(false) => show_window(window, false),
+            // Restores a minimized window and brings it to the front.
+            WindowRequest::Minimized(false) => window.activate_window(),
+            WindowRequest::Visible(true) => {
+                show_window(window, true);
                 window.activate_window();
             }
         });
         if let Err(err) = result {
-            log::warn!("failed to apply 'minimized' to window {id}: {err:#}");
+            log::warn!("failed to apply '{name}' to window {id}: {err:#}");
         }
     }
+}
+
+/// Hides the window, taskbar button and Alt+Tab entry included, or shows it again. GPUI has no
+/// per-window hide (and `App::hide` does nothing on Windows), so this goes to the HWND.
+#[cfg(windows)]
+fn show_window(window: &Window, visible: bool) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn ShowWindow(hwnd: isize, command: i32) -> i32;
+    }
+    const SW_HIDE: i32 = 0;
+    const SW_SHOW: i32 = 5;
+    if let Ok(handle) = HasWindowHandle::window_handle(window)
+        && let RawWindowHandle::Win32(handle) = handle.as_raw()
+    {
+        // SAFETY: the HWND belongs to this open GPUI window, on its own (the main) thread.
+        unsafe { ShowWindow(handle.hwnd.get(), if visible { SW_SHOW } else { SW_HIDE }) };
+    }
+}
+
+#[cfg(not(windows))]
+fn show_window(_: &Window, _: bool) {
+    log::warn!("'visible' only works on Windows; ignored");
 }
 
 /// The user closed a platform window: report it, forget it, and quit after the last one unless there is a tray.

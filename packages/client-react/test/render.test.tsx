@@ -570,18 +570,20 @@ test("Icon renders as an Icon node and changes its name", async () => {
 test("Window opens while mounted, updates, and closes when unmounted", async () => {
   let setOpen!: (open: boolean) => void;
   let setTitle!: (title: string) => void;
+  let setVisible!: (visible: boolean) => void;
   let setWrapped!: (wrapped: boolean) => void;
   const closes: string[] = [];
   function Root() {
     const [open, setO] = useState(false);
     const [title, setT] = useState("Settings");
+    const [visible, setV] = useState(true);
     const [wrapped, setW] = useState(true);
-    [setOpen, setTitle, setWrapped] = [setO, setT, setW];
+    [setOpen, setTitle, setVisible, setWrapped] = [setO, setT, setV, setW];
     return (
       <Div>
         <Text>main</Text>
         {open && (
-          <Window title={title} width={300} onClose={() => closes.push("user")}>
+          <Window title={title} width={300} visible={visible} onClose={() => closes.push("user")}>
             <Text>inside</Text>
           </Window>
         )}
@@ -614,6 +616,11 @@ test("Window opens while mounted, updates, and closes when unmounted", async () 
   setTitle("Preferences");
   await tick();
   assert.deepEqual(windowOps(), [{ op: "window", id: opened.id, title: "Preferences" }]);
+
+  sent.length = 0;
+  setVisible(false);
+  await tick();
+  assert.deepEqual(windowOps(), [{ op: "window", id: opened.id, visible: false }]);
 
   // The user closes it: onClose runs; unmounting afterwards sends no closeWindow (the host forgot it).
   app.handleMessage({ type: "windowClosed", id: opened.id! });

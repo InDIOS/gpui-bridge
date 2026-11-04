@@ -43,6 +43,8 @@ pub enum ClientMessage {
         frameless: Option<bool>,
         /// Minimizes (`true`) or restores (`false`) on commit. An action, not a remembered state.
         minimized: Option<bool>,
+        /// Hides (`false`) or shows and focuses (`true`) on commit; an action, Windows only.
+        visible: Option<bool>,
         /// Window events the client wants (`focus`, `blur`, `resize`, `move`, `visibility`);
         /// replaces the previous list.
         events: Option<Vec<String>>,
@@ -421,6 +423,7 @@ mod tests {
                 theme_set: None,
                 frameless: None,
                 minimized: None,
+                visible: None,
                 events: None,
             }
         );
@@ -440,13 +443,14 @@ mod tests {
                 theme_set: None,
                 frameless: None,
                 minimized: None,
+                visible: None,
                 events: None
             }
         );
         // Position, minimum size, minimize/restore and window events (PROTOCOL.md section 3).
         assert_eq!(
             parse(
-                r#"{"op":"window","id":2,"x":120,"y":80,"minWidth":320,"minHeight":200,"minimized":true,"events":["focus","resize"]}"#
+                r#"{"op":"window","id":2,"x":120,"y":80,"minWidth":320,"minHeight":200,"minimized":true,"visible":false,"events":["focus","resize"]}"#
             ),
             ClientMessage::Window {
                 id: Some(2),
@@ -462,6 +466,7 @@ mod tests {
                 theme_set: None,
                 frameless: None,
                 minimized: Some(true),
+                visible: Some(false),
                 events: Some(vec!["focus".into(), "resize".into()])
             }
         );

@@ -2284,8 +2284,9 @@ puntos. Cumplido.
 ### Fase 52 — Issues #5 a #11 de GitHub (2026-11-04)
 
 El usuario abrió siete issues en GitHub mientras pasaba una app de bandeja a txiki.js con
-`gpui-bridge@0.4.0`. Se arreglaron cinco en el host; #6 (la bandeja no se actualiza) quedó
-acotado a un estado de Explorer, y #9 (ocultar una ventana) queda pendiente de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
+`gpui-bridge@0.4.0`. Se arreglaron cinco en el host y se añadió `visible` (#9), elegido por
+el usuario: solo Windows. #6 (la bandeja no se actualiza) quedó acotado a un estado de
+Explorer. Todo es aditivo: `PROTOCOL_VERSION` sigue en 1.
 
 - **#5, `NumberInput` sin valor:** `NumberInput` faltaba en las dos listas de tipos que apuntan
   `value_writes` (`create` y `setProps`) en `tree.rs`, así que su `value` nunca llegaba al
@@ -2319,16 +2320,21 @@ acotado a un estado de Explorer, y #9 (ocultar una ventana) queda pendiente de d
   tenía cerraba el host con 0xC0000005, así que estos toasts se retiran en `on_app_quit`. Los
   de una ventana ya los retira gpui-component cuando la ventana se cierra.
 - **#10, márgenes por lado:** `mt-|mr-|mb-|ml-{n}`, la misma tabla que el padding.
-- **#9, ocultar una ventana:** sin hacer. GPUI 0.3.10 no tiene una forma de ocultar una sola
-  ventana, y `App::hide` está vacío en Windows. Habría que llamar a `ShowWindow` sobre el HWND,
-  añadir una opción de ventana nueva en los cuatro clientes y no hacer nada en macOS ni en
-  Linux. Queda para que decida el usuario.
-- **Documentación:** `PROTOCOL.md` §7 (valor al abrir la ventana), §8 (márgenes) y §14
-  (`notify` sin ventana), y `CHANGELOG.md` (Unreleased).
+- **#9, ocultar una ventana:** GPUI 0.3.10 no tiene una forma de ocultar una sola ventana, y
+  `App::hide` está vacío en Windows. El usuario eligió una opción solo para Windows: `visible`,
+  una acción como `minimized` (`WindowRequest` en `tree.rs`). `false` llama a
+  `ShowWindow(SW_HIDE)` sobre el HWND (`raw-window-handle`, que ya estaba en el árbol; la
+  función de `user32` se declara a mano, sin crate nuevo). `true` llama a `SW_SHOW` y después
+  a `activate_window`. En macOS y Linux da un aviso. La ventana conserva su estado. Una prueba
+  con `IsWindowVisible` dio: abierta, oculta, visible de nuevo, y oculta cuando se abre con
+  `visible: false` en el mismo commit. La captura muestra el `Input` con su texto. Node y React
+  tipan la opción, Go suma `Visible` y Python la pasa tal cual; hay un test en Node, React y Go.
+- **Documentación:** `PROTOCOL.md` §3 (`visible`), §7 (valor al abrir la ventana), §8
+  (márgenes), §11 y §14 (`notify` sin ventana), y `CHANGELOG.md` (Unreleased).
 - **Pruebas:** `fmt`, `clippy` y `cargo test` (unitarios con `NumberInput` en
   `value_writes` y las clases nuevas, conformidad y `no_window`). En una ventana real: una
   captura muestra los cuatro valores (un `Input` y un `NumberInput` creados antes de la
   ventana, uno creado con ella y uno puesto con `setProps`). Otra captura (PrintWindow, solo la
   ventana) muestra los mismos valores tras `closeWindow` y reabrir. El toast sin ventana
   aparece en pantalla y el host sale con 0.
-- **Tamaño del host release (Windows):** 21.571.584 → **21.591.552 B** (+19.968 B).
+- **Tamaño del host release (Windows):** 21.571.584 → **21.592.064 B** (+20.480 B).

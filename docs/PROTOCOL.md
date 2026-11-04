@@ -84,8 +84,12 @@ interpreted safely.
 - `minimized` (optional): `true` minimizes the window on the next `commit`, `false` restores
   it and brings it to the front. It is an **action, not a remembered state**: send it again
   to act again, and the user can restore or minimize the window at any time. A window that is
-  not open is not an error; the host warns on stderr. GPUI (0.3.9) has no "hide" for an open
-  window, so `minimized` is the way to take one out of sight without closing it.
+  not open is not an error; the host warns on stderr.
+- `visible` (optional, Windows only): `false` hides the window on the next `commit`, taskbar
+  button and Alt+Tab entry included; `true` shows it again, restores it and brings it to the
+  front. The window keeps its state (text, scroll, focus) and its `events`. An **action**,
+  like `minimized`; `{"visible":false}` in the commit that opens the window opens it hidden.
+  On macOS and Linux it is ignored with a warning on stderr.
 - `events` (optional): the window events the client wants (see "Window events" below). It
   **replaces** the previous list, so `[]` unsubscribes, and an unknown name is `invalid_json`.
   Like node events, they are opt-in; `windowClosed` is always sent.
@@ -641,9 +645,8 @@ sends `windowClosed` and keeps running, so the app can live in the tray and open
 again with `window`. Removing the tray with no window open ends the host; so does closing
 stdin, which also removes the icon.
 
-Not supported: several tray icons, double click, notification balloons, and hiding a window
-without closing it (reopening it starts from the client's tree; an `Input`'s text that the
-client does not hold is lost).
+Not supported: several tray icons, double click and notification balloons. To keep a window
+out of sight while the app lives in the tray, use `visible: false` (Windows only, section 3).
 
 ## 12. Keyboard
 

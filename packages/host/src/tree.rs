@@ -24,6 +24,15 @@ pub struct Node {
 /// Window events a client can subscribe to (PROTOCOL.md section 3).
 pub const WINDOW_EVENTS: [&str; 5] = ["focus", "blur", "resize", "move", "visibility"];
 
+/// A window action of a commit (PROTOCOL.md section 3).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum WindowRequest {
+    /// `true` minimizes, `false` restores and focuses.
+    Minimized(bool),
+    /// `false` hides (no taskbar button), `true` shows, restores and focuses.
+    Visible(bool),
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WindowSpec {
     pub title: Option<String>,
@@ -71,9 +80,9 @@ pub struct Tree {
     focus_request: Option<NodeId>,
     /// The last commit removed the tray: with no window open, the host exits.
     tray_removed: bool,
-    /// `minimized` requests, applied by `sync_windows` after opening or updating windows:
-    /// an action, not a remembered state (the user can restore the window at any time).
-    window_requests: Vec<(WindowId, bool)>,
+    /// `minimized` and `visible` requests, applied by `sync_windows` after opening or updating
+    /// windows: actions, not a remembered state (the user can restore the window at any time).
+    window_requests: Vec<(WindowId, WindowRequest)>,
     pending: Vec<ClientMessage>,
     /// Number of commits applied, so each window view applies `value_writes` once.
     commits: u64,
@@ -109,9 +118,9 @@ impl Tree {
             .is_some_and(|spec| spec.events.contains(event))
     }
 
-    /// `minimized` requests of the last commit: `true` minimizes, `false` restores.
+    /// `minimized` and `visible` requests of the last commit, in order.
     /// `sync_windows` drains them once the window is open.
-    pub fn take_window_requests(&mut self) -> Vec<(WindowId, bool)> {
+    pub fn take_window_requests(&mut self) -> Vec<(WindowId, WindowRequest)> {
         std::mem::take(&mut self.window_requests)
     }
 
@@ -340,6 +349,7 @@ impl Tree {
                 theme_set,
                 frameless,
                 minimized,
+                visible,
                 events,
             } => {
                 let id = id.unwrap_or(1);
@@ -389,7 +399,12 @@ impl Tree {
                     }
                 }
                 if let Some(minimized) = minimized {
-                    self.window_requests.push((id, minimized));
+                    self.window_requests
+                        .push((id, WindowRequest::Minimized(minimized)));
+                }
+                if let Some(visible) = visible {
+                    self.window_requests
+                        .push((id, WindowRequest::Visible(visible)));
                 }
                 self.theme.theme = theme.or(self.theme.theme);
                 self.theme.theme_set = theme_set.or(self.theme.theme_set.take());
@@ -1293,6 +1308,7 @@ mod tests {
                 json!({"op": "window", "root": 1, "events": ["focus", "resize"]}),
                 json!({"op": "window", "events": ["hover"]}),
                 json!({"op": "window", "minimized": true}),
+                json!({"op": "window", "visible": false}),
             ],
         );
         assert_eq!(errors, [ErrorCode::InvalidJson]);
@@ -1300,7 +1316,13 @@ mod tests {
         assert!(tree.wants_window_event(1, "resize"));
         assert!(!tree.wants_window_event(1, "visibility"));
         // `minimized` is an action: each message queues one, and the host drains them once.
-        assert_eq!(tree.take_window_requests(), [(1, true)]);
+        assert_eq!(
+            tree.take_window_requests(),
+            [
+                (1, WindowRequest::Minimized(true)),
+                (1, WindowRequest::Visible(false))
+            ]
+        );
         assert!(tree.take_window_requests().is_empty());
 
         // A new list replaces the previous one; an empty list unsubscribes.

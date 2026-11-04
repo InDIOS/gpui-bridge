@@ -135,6 +135,8 @@ export type ClientMessage =
       frameless?: boolean;
       /** Minimizes (`true`) or restores (`false`) on commit; an action, not a remembered state. */
       minimized?: boolean;
+      /** Hides (`false`, no taskbar button) or shows and focuses (`true`) on commit; Windows only. */
+      visible?: boolean;
       /** Window events the client wants; replaces the previous list. */
       events?: WindowEventName[];
     }
