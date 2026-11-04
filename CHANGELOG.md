@@ -12,8 +12,6 @@ Host fixes and two additions; `PROTOCOL_VERSION` stays 1.
   again, shows its `value` (#11).
 - Closing stdin ends the host when no window is open, with or without a tray; the tray icon is
   removed first (#7).
-- A tray update the shell refuses recreates the icon instead of leaving the old tooltip and icon
-  (#6, mitigation: the failure did not reproduce here).
 - `notify` with `system: true` works with no window open: notification center only, clicks not
   reported (#8).
 - Classes `mt-|mr-|mb-|ml-{n}` (#10).

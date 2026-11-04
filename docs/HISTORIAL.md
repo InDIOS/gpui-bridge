@@ -2284,8 +2284,8 @@ puntos. Cumplido.
 ### Fase 52 — Issues #5 a #11 de GitHub (2026-11-04)
 
 El usuario abrió siete issues en GitHub mientras pasaba una app de bandeja a txiki.js con
-`gpui-bridge@0.4.0`. Se arreglaron seis en el host; #9 (ocultar una ventana) queda pendiente
-de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
+`gpui-bridge@0.4.0`. Se arreglaron cinco en el host; #6 (la bandeja no se actualiza) quedó
+acotado a un estado de Explorer, y #9 (ocultar una ventana) queda pendiente de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
 
 - **#5, `NumberInput` sin valor:** `NumberInput` faltaba en las dos listas de tipos que apuntan
   `value_writes` (`create` y `setProps`) en `tree.rs`, así que su `value` nunca llegaba al
@@ -2301,12 +2301,18 @@ de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
   sin ventanas que movieran el bucle de mensajes. Una prueba con un `await` posterior salió
   bien. Ahora la tarea quita la bandeja, llama a `quit` y espera con `pending()`. Se probaron
   sin ventana, con bandeja, con la bandeja quitada y con ventana, en debug y release: siempre
-  código 0. No se hizo el `App.kill()` del cliente que pedía el issue, ni se miró `tjs.exit`.
-- **#6, error 5 al actualizar la bandeja:** no se reprodujo, ni con un PNG de 1024 px ni en
-  release. `sync` ya corre en el hilo principal, así que la hipótesis del hilo equivocado del
-  issue queda descartada. El error 5 puede ser un `GetLastError` viejo, porque
-  `Shell_NotifyIconW` no documenta que lo ponga. Mitigación: si `set_icon` o `set_tooltip`
-  fallan, el icono se crea de nuevo (comentario `shortcut:` en `tray.rs`).
+  código 0. `removeTray` + `commit` con stdin abierto ya salía bien (sin ventana, con una
+  ventana sin `root` y tras `closeWindow`, también con el binario 0.4.0 de CI). No se hizo el
+  `App.kill()` del cliente que pedía el issue, ni se miró `tjs.exit`.
+- **#6, error 5 al actualizar la bandeja:** sin cambio de código. Con los builds locales no
+  falla. Con el binario 0.4.0 de CI falla solo desde su ruta en
+  `D:\DEVELOP\Working\monitors-control\node_modules\…`. El mismo archivo copiado a otra ruta
+  funciona, y el build nuevo copiado a una ruta con `@indios` también. Explorer no tiene
+  entrada para esa ruta en `HKCU\Control Panel\NotifyIconSettings` y rechaza `NIM_MODIFY` y
+  `NIM_DELETE` de ese icono. Es un estado de Explorer ligado a esa ruta, no un error del host.
+  `sync` ya corre en el hilo principal, así que la hipótesis del hilo equivocado del issue
+  queda descartada. La idea de crear el icono de nuevo cuando falla se quitó sin probarla en
+  esa ruta: con `NIM_DELETE` rechazado, dejaría iconos repetidos.
 - **#8, `notify` con `system: true` sin ventana:** va directo a `show_system_notification`
   con una etiqueta `gpui-bridge:{id}`. El clic no se informa, porque gpui-component maneja la
   única respuesta e ignora las etiquetas que no son suyas. Al salir, un toast que GPUI todavía
@@ -2322,6 +2328,7 @@ de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
 - **Pruebas:** `fmt`, `clippy` y `cargo test` (unitarios con `NumberInput` en
   `value_writes` y las clases nuevas, conformidad y `no_window`). En una ventana real: una
   captura muestra los cuatro valores (un `Input` y un `NumberInput` creados antes de la
-  ventana, uno creado con ella y uno puesto con `setProps`). El toast sin ventana aparece en
-  pantalla y el host sale con 0.
+  ventana, uno creado con ella y uno puesto con `setProps`). Otra captura (PrintWindow, solo la
+  ventana) muestra los mismos valores tras `closeWindow` y reabrir. El toast sin ventana
+  aparece en pantalla y el host sale con 0.
 - **Tamaño del host release (Windows):** 21.571.584 → **21.591.552 B** (+19.968 B).
