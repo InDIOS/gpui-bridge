@@ -1751,7 +1751,7 @@ impl RenderCx<'_> {
         // With `transition`, the host follows the pointer itself to animate `hover:`.
         let track_hover = Timing::of(classes).is_some() && styles::has_hover(classes);
         let hovered = track_hover && self.hovered.borrow().contains(&id);
-        let mut element = self.style(id, div(), classes, hovered).children(children);
+        let mut element = self.style(id, div(), classes, hovered);
         if !track_hover {
             element = styles::apply_hover(element, classes, self.theme);
         }
@@ -1759,7 +1759,23 @@ impl RenderCx<'_> {
         if let Some(at) = self.drags.borrow().placed.get(&id) {
             element = element.left(at.x).top(at.y).right(auto()).bottom(auto());
         }
-        let movers = drag::draggable_children(self.tree, node);
+        // Dots first, under the children (so the children's bounds come one place later).
+        let dots = node.node_type == NodeType::Div && classes.contains(&Class::BgDots);
+        if dots {
+            // `border` is too close to `muted`, the usual canvas color, to see the dots on it.
+            let color = self.theme.muted_foreground.opacity(0.5);
+            let paint = move |bounds, _: (), window: &mut Window, _: &mut App| {
+                styles::paint_dots(bounds, color, window)
+            };
+            element = element.child(canvas(|_, _, _| (), paint).absolute().size_full());
+            element.extend(children);
+        } else {
+            element = element.children(children);
+        }
+        let mut movers = drag::draggable_children(self.tree, node);
+        for mover in &mut movers {
+            mover.0 += usize::from(dots);
+        }
         if !movers.is_empty() {
             element = self.move_children(id, element, classes, movers);
         }

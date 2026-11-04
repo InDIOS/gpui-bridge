@@ -432,7 +432,7 @@ warning on stderr (once per class).
   position across commits. A `flex-1` child that should scroll usually needs `min-h-0`
   (or `min-w-0`) on itself or its parent, as in CSS.
 - **Borders:** `border`, `border-t|r|b|l` (1px), `rounded-sm|md|lg|full`
-- **Text:** `text-xs|sm|base|lg|xl`, `font-medium`, `font-bold`, `font-mono` (the theme's
+- **Text:** `text-xs|sm|base|lg|xl|2xl|3xl|4xl`, `font-medium`, `font-bold`, `font-mono` (the theme's
   monospace font), `truncate`, `whitespace-normal`, `whitespace-nowrap`, `whitespace-pre`
   (the same as `nowrap`: spaces and line breaks are always kept)
 - **Interaction:** `cursor-pointer`; on `div` only, `hover:` followed by a theme color class
@@ -459,6 +459,14 @@ warning on stderr (once per class).
   `success`, `success-foreground`, `warning`, `warning-foreground`, `info`,
   `info-foreground`, `popover`, `popover-foreground`, `border`, `input`, `ring`. They follow
   the active theme (section 3).
+- **Gradients and shadows** (theme colors only): `bg-gradient-to-{t|tr|r|br|b|bl|l|tl}` with
+  `from-{color}` and `to-{color}` draws a linear gradient between two colors (no `via-`; a
+  missing end is transparent); it wins over `bg-{color}`, and `transition` does not animate
+  it. `shadow-sm|md|lg|xl|2xl` is Tailwind's shadow; `shadow-{color}` tints it with that
+  theme color at 50% opacity, a glow (`shadow-lg shadow-primary`). Not animated either.
+  `hover:` and `drag-over:` take neither.
+- **Dots** (on `div` only): `bg-dots` paints 2px dots every 16px in the theme's
+  `muted-foreground` color at 50% opacity under the children, over the `bg-` color.
 
 ## 9. Conformance fixtures
 

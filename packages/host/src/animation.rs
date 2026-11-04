@@ -38,6 +38,13 @@ impl Visual {
                 _ => {}
             }
         }
+        // A gradient wins over `bg-`, which the transition would otherwise paint on top.
+        if classes
+            .iter()
+            .any(|class| matches!(class, Class::BgGradient(_)))
+        {
+            visual.bg = None;
+        }
         if hovered {
             for class in classes {
                 match *class {

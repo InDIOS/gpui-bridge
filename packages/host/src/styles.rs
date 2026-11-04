@@ -164,6 +164,9 @@ pub enum Class {
     TextBase,
     TextLg,
     TextXl,
+    Text2xl,
+    Text3xl,
+    Text4xl,
     FontMedium,
     FontBold,
     FontMono,
@@ -182,6 +185,15 @@ pub enum Class {
     DragOverBg(ThemeRole),
     DragOverTextColor(ThemeRole),
     DragOverBorderColor(ThemeRole),
+    /// `bg-gradient-to-*`, by GPUI's angle (0 is up, clockwise), with its `from-`/`to-` colors.
+    BgGradient(f32),
+    GradientFrom(ThemeRole),
+    GradientTo(ThemeRole),
+    /// `shadow-sm` to `shadow-2xl` (0 to 4), and `shadow-{color}`, which tints it.
+    Shadow(u8),
+    ShadowColor(ThemeRole),
+    /// Only on `div`: dots under its children (see `paint_dots`).
+    BgDots,
     /// 0 to 1.
     Opacity(f32),
     /// Animate color and opacity changes (see `animation`).
@@ -240,6 +252,23 @@ pub fn parse_class(name: &str) -> Option<Class> {
         "text-base" => TextBase,
         "text-lg" => TextLg,
         "text-xl" => TextXl,
+        "text-2xl" => Text2xl,
+        "text-3xl" => Text3xl,
+        "text-4xl" => Text4xl,
+        "bg-gradient-to-t" => BgGradient(0.),
+        "bg-gradient-to-tr" => BgGradient(45.),
+        "bg-gradient-to-r" => BgGradient(90.),
+        "bg-gradient-to-br" => BgGradient(135.),
+        "bg-gradient-to-b" => BgGradient(180.),
+        "bg-gradient-to-bl" => BgGradient(225.),
+        "bg-gradient-to-l" => BgGradient(270.),
+        "bg-gradient-to-tl" => BgGradient(315.),
+        "shadow-sm" => Shadow(0),
+        "shadow-md" => Shadow(1),
+        "shadow-lg" => Shadow(2),
+        "shadow-xl" => Shadow(3),
+        "shadow-2xl" => Shadow(4),
+        "bg-dots" => BgDots,
         "font-medium" => FontMedium,
         "font-bold" => FontBold,
         "font-mono" => FontMono,
@@ -317,14 +346,21 @@ pub fn parse_class(name: &str) -> Option<Class> {
     Some(class)
 }
 
+/// A class that takes a theme color (`Class::Bg`, ...).
+type ColorClass = fn(ThemeRole) -> Class;
+
 fn parse_color(name: &str) -> Option<Class> {
-    let (make, role): (fn(ThemeRole) -> Class, _) = if let Some(role) = name.strip_prefix("bg-") {
-        (Class::Bg, role)
-    } else if let Some(role) = name.strip_prefix("text-") {
-        (Class::TextColor, role)
-    } else {
-        (Class::BorderColor, name.strip_prefix("border-")?)
-    };
+    let prefixes: [(&str, ColorClass); 6] = [
+        ("bg-", Class::Bg),
+        ("text-", Class::TextColor),
+        ("border-", Class::BorderColor),
+        ("from-", Class::GradientFrom),
+        ("to-", Class::GradientTo),
+        ("shadow-", Class::ShadowColor),
+    ];
+    let (make, role) = prefixes
+        .iter()
+        .find_map(|&(prefix, make)| Some((make, name.strip_prefix(prefix)?)))?;
     ROLES
         .iter()
         .find(|(name, _)| *name == role)
@@ -396,7 +432,7 @@ pub fn color(theme: &Theme, role: ThemeRole) -> Hsla {
 /// Applies classes in order, so a later class overrides an earlier one (`p-2 p-4` gives `p-4`).
 /// `OverflowScroll` and `Hover*` need an interactive element; see `scroll_axis` and `apply_hover`.
 pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
-    classes.iter().fold(element, |el, class| match *class {
+    let element = classes.iter().fold(element, |el, class| match *class {
         Class::Flex => el.flex(),
         Class::FlexRow => el.flex_row(),
         Class::FlexCol => el.flex_col(),
@@ -453,6 +489,9 @@ pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
         Class::TextBase => el.text_base(),
         Class::TextLg => el.text_lg(),
         Class::TextXl => el.text_xl(),
+        Class::Text2xl => el.text_2xl(),
+        Class::Text3xl => el.text_3xl(),
+        Class::Text4xl => el.text_size(rems(2.25)),
         Class::FontMedium => el.font_weight(FontWeight::MEDIUM),
         Class::FontBold => el.font_weight(FontWeight::BOLD),
         Class::FontMono => el.font_family(theme.mono_font_family.clone()),
@@ -472,12 +511,90 @@ pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
         | Class::DragOverBg(_)
         | Class::DragOverTextColor(_)
         | Class::DragOverBorderColor(_)
+        | Class::BgGradient(_)
+        | Class::GradientFrom(_)
+        | Class::GradientTo(_)
+        | Class::Shadow(_)
+        | Class::ShadowColor(_)
+        | Class::BgDots
         | Class::Transition
         | Class::DurationMs(_)
         | Class::Ease(_)
         | Class::AnimateSpin
         | Class::AnimatePulse => el,
-    })
+    });
+    decorate(element, classes, theme)
+}
+
+/// The classes that combine: a gradient and its two colors, a shadow and its tint. The last of
+/// each kind wins; a gradient end without a color is transparent.
+fn decorate<E: Styled>(mut element: E, classes: &[Class], theme: &Theme) -> E {
+    let last = |pick: fn(&Class) -> Option<ThemeRole>| classes.iter().rev().find_map(pick);
+    let angle = classes.iter().rev().find_map(|class| match *class {
+        Class::BgGradient(angle) => Some(angle),
+        _ => None,
+    });
+    if let Some(angle) = angle {
+        let end =
+            |role: Option<ThemeRole>| role.map_or(transparent_black(), |role| color(theme, role));
+        let from = end(last(|class| match *class {
+            Class::GradientFrom(role) => Some(role),
+            _ => None,
+        }));
+        let to = end(last(|class| match *class {
+            Class::GradientTo(role) => Some(role),
+            _ => None,
+        }));
+        element = element.bg(linear_gradient(
+            angle,
+            linear_color_stop(from, 0.),
+            linear_color_stop(to, 1.),
+        ));
+    }
+    let size = classes.iter().rev().find_map(|class| match *class {
+        Class::Shadow(size) => Some(size),
+        _ => None,
+    });
+    if let Some(size) = size {
+        let preset = StyleRefinement::default();
+        let preset = match size {
+            0 => preset.shadow_sm(),
+            1 => preset.shadow_md(),
+            2 => preset.shadow_lg(),
+            3 => preset.shadow_xl(),
+            _ => preset.shadow_2xl(),
+        };
+        let mut shadows = preset.box_shadow.unwrap_or_default();
+        let tint = last(|class| match *class {
+            Class::ShadowColor(role) => Some(role),
+            _ => None,
+        });
+        if let Some(role) = tint {
+            // A glow: the theme color, half see-through, instead of the preset's faint black.
+            for shadow in &mut shadows {
+                shadow.color = color(theme, role).opacity(0.5);
+            }
+        }
+        element = element.shadow(shadows);
+    }
+    element
+}
+
+/// `bg-dots`: 2 px dots every 16 px, painted in `bounds`.
+pub fn paint_dots(bounds: Bounds<Pixels>, color: Hsla, window: &mut Window) {
+    const STEP: f32 = 16.;
+    let dot = size(px(2.), px(2.));
+    let (width, height) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
+    let mut y = STEP / 2.;
+    while y < height {
+        let mut x = STEP / 2.;
+        while x < width {
+            let at = bounds.origin + point(px(x), px(y));
+            window.paint_quad(fill(Bounds::new(at, dot), color).corner_radii(px(1.)));
+            x += STEP;
+        }
+        y += STEP;
+    }
 }
 
 /// The last `overflow-*-scroll` class, if any.
@@ -656,6 +773,16 @@ mod tests {
                 Class::HoverBorderColor(ThemeRole::Ring),
             ),
             ("drag-over:bg-accent", Class::DragOverBg(ThemeRole::Accent)),
+            ("text-2xl", Class::Text2xl),
+            ("text-4xl", Class::Text4xl),
+            ("bg-gradient-to-r", Class::BgGradient(90.)),
+            ("bg-gradient-to-tl", Class::BgGradient(315.)),
+            ("from-primary", Class::GradientFrom(ThemeRole::Primary)),
+            ("to-muted", Class::GradientTo(ThemeRole::Muted)),
+            ("shadow-sm", Class::Shadow(0)),
+            ("shadow-2xl", Class::Shadow(4)),
+            ("shadow-primary", Class::ShadowColor(ThemeRole::Primary)),
+            ("bg-dots", Class::BgDots),
             (
                 "drag-over:border-primary",
                 Class::DragOverBorderColor(ThemeRole::Primary),
@@ -701,7 +828,6 @@ mod tests {
             "gap-NaN",
             "gap-inf",
             "z-10",
-            "text-2xl",
             "flex-",
             "bg-",
             "bg-destructive",
@@ -740,6 +866,18 @@ mod tests {
             "drag-over:p-2",
             "drag-over:",
             "drag-over:hover:bg-accent",
+            "text-5xl",
+            "bg-gradient-to-x",
+            "bg-gradient",
+            "via-primary",
+            "from-",
+            "to-blue",
+            "shadow",
+            "shadow-3xl",
+            "shadow-inner",
+            "hover:shadow-lg",
+            "hover:from-primary",
+            "bg-dots-primary",
         ] {
             assert_eq!(parse_class(name), None, "{name}");
         }
