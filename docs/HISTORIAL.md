@@ -2227,3 +2227,56 @@ los clientes no cambian, y `PROTOCOL_VERSION` sigue en 1.
 **Criterio de aceptación:** `examples/frameless.ts` se arrastra, maximiza con doble clic,
 minimiza y cierra (con `windowClosed`) en Linux; una ventana normal en Wayland sin decoraciones
 del servidor tiene título, botones y bordes. Cumplido.
+
+### Fase 51 — M19: posición libre, arrastre y soltar nodos (2026-11-03)
+
+Pedido por el usuario para pasar a gpui-bridge su app de control de monitores (hoy en
+WebView2): un lienzo donde se arrastran las pantallas y se pegan a los bordes de las otras, y
+chips de «Turned off» que se sueltan en el lienzo para encender una pantalla. Decisión del
+usuario: el arrastre lo maneja el host, no el cliente con un `setProps` por movimiento. Cada
+propuesta de protocolo se aprobó antes de programar. Todo es aditivo (clases, props y eventos):
+`PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (posición):** commit `a980a77`. `absolute`, `relative` (no cambia nada: en GPUI todo
+  nodo ya es contenedor), `left-|top-|right-|bottom-` con `[Npx]` (admite negativos) o con la
+  escala, y `w-[Npx]`/`h-[Npx]`. La posición solo vale en `div`: en otros nodos las clases
+  caerían en un envoltorio, así que se quitan con un aviso.
+- **Paso 2 (arrastre en el host):** commit `0d559b5`. `drag: true` en un `div` `absolute`
+  arranca con el `on_drag` de GPUI, que espera 2 px y anula el clic. El `on_drag_move` del
+  padre mueve el nodo en cada frame dentro del borde del padre. `magnetic` (`true` = 8 px) lo
+  pega a los bordes internos del padre y a los hermanos `drag` que se le solapan, o casi, en el
+  otro eje, tocándolos o alineado. `dragEnd {x, y}` da px enteros listos para `left-`/`top-`.
+  La posición soltada gana a las clases hasta que llegue un `setProps` con `class` (vía
+  `value_writes`). El fin del arrastre se detecta en `render`, porque GPUI redibuja la ventana
+  al soltar. Sin `dragMove` ni teclado.
+- **Paso 3 (soltar en una zona):** commit `f765186`. `dragData` (string) en un `div`: el nodo
+  no se mueve y una copia suya (mismo tamaño, 80 % de opacidad) sigue al puntero. `dropTarget`
+  más la variante `drag-over:` (colores del tema). `dropNode {data, x, y}` llega a la zona más
+  interna, con la esquina de la copia dentro del borde y de la zona. Un arrastre libre nunca
+  cae en una zona porque usa otro tipo de valor de arrastre.
+- **Paso 4 (visual):** commit `f00bea0`. Degradados `bg-gradient-to-*` con `from-`/`to-` (dos
+  paradas de GPUI), `shadow-sm…2xl` y `shadow-{color}` (brillo al 50 %), `text-2xl|3xl|4xl` y
+  `bg-dots` (puntos de 2 px en `muted-foreground` al 50 %). Solo colores del tema. Los puntos
+  salieron casi invisibles en `border`, el color de la primera versión, y se corrigieron
+  durante la prueba.
+- **Paso 5 (ejemplo y clientes):** commit `fbb36f9`. `examples/monitors.ts` con datos falsos.
+  Node y React tipan las cuatro props y los dos eventos (`onDragEnd`, `onDropNode`); Python y
+  Go no necesitan cambios. Un test por cliente (el de Go pasa por `simulate` en el host real).
+- **Documentación y fixtures:** `PROTOCOL.md` §5, §8 y §9; `conformance/drag.txt` y
+  `conformance/drop-node.txt`.
+- **Pruebas:** `fmt`, `clippy` y `cargo test` (78 unitarios, conformidad y `no_window`); Node
+  31, React 29, Python 31, Go y el typecheck de los ejemplos. En ventana real, el usuario probó
+  a mano cada paso con sondas temporales (padres con `border p-8` para comprobar el origen de
+  `x`/`y`) y después `examples/monitors.ts`: todo bien.
+- **Rendimiento:** mientras hay cualquier arrastre, GPUI redibuja toda la ventana con cada
+  movimiento (`window.rs`). Con 10 nodos fueron 0,13 ms por pasada en debug; no se midió en un
+  árbol grande.
+- **Tamaño del host release (Windows):** 21.450.752 → **21.571.584 B** (+120.832 B).
+- **Límites conocidos:** React no puede devolver un nodo a su sitio reenviando la misma
+  `class`. El host no impide que los nodos se solapen (lo corrige el cliente). No hay teclado
+  ni Narrator para mover nodos, ni filtro por zona, ni `via-`, ni sombras en `hover:`.
+
+**Criterio de aceptación:** en `examples/monitors.ts` las pantallas se arrastran con fluidez y
+se pegan a los bordes de las otras, el cliente recibe la posición final, un chip apagado se
+suelta en el lienzo y llega `dropNode`, y el lienzo tiene degradado, sombra, número grande y
+puntos. Cumplido.
