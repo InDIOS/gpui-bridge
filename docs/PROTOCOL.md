@@ -70,7 +70,12 @@ interpreted safely.
 - `frameless` (optional): `true` opens the window without the system title bar. The window
   keeps its resize borders, shadow and taskbar title; the app draws its own title bar with
   `windowControl` divs (section 5). Read only when the window opens: a later change is
-  ignored, with a warning on stderr.
+  ignored, with a warning on stderr. On Linux it asks for client-side decorations and the
+  host draws the resize borders and shadow; on X11 without a compositing manager the system
+  refuses them and the window manager keeps its own frame above the app's title bar. The
+  host also draws the borders, plus a title bar with `title` and the
+  three buttons, for a normal window when the system draws no frame (a Wayland compositor
+  without server-side decorations, such as WSLg or GNOME).
 - `x`, `y` (optional): the window's initial position, in logical pixels, from the top-left
   corner of the screen. Read only when the window opens (a later change warns on stderr).
   With neither, the window opens centered; with only one, the other is 0.
@@ -160,7 +165,7 @@ Rules:
 
 | type       | props                                                        | events             |
 |------------|--------------------------------------------------------------|--------------------|
-| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip` | `click`, `doubleClick`, `menu`, `keyDown`, `drop` |
+| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic`, `dragData`, `dropTarget` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd`, `dropNode` |
 | `text`     | `content`, `class`                                           | —                  |
 | `Button`   | `label`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
 | `Input`    | `value`, `placeholder`, `disabled`, `controlled`, `class`    | `change`, `submit`, `keyDown` |
@@ -258,11 +263,13 @@ sections 14 and 24: each is a slot of the node that holds it and draws nothing e
   `variant: "huge"`) produces `invalid_props` and the operation is not applied. `null` is
   always allowed (it removes the prop). Unknown props are ignored, with a warning on stderr.
 - `Button` without `variant` uses the gpui-component default style.
-- `windowControl` makes a `div` a part of the window's title bar, handled by the system:
-  `drag` moves the window (with snapping, and double-click to maximize or restore),
-  `minimize`, `maximize` (maximize or restore) and `close` act as the system buttons. These
-  divs do not need `click` events; `close` ends in `windowClosed` as usual. Meant for
-  `frameless` windows, but it also works in a normal one. Inside a `windowControl` area,
+- `windowControl` makes a `div` a part of the window's title bar: `drag` moves the window
+  (double-click maximizes or restores), `minimize`, `maximize` (maximize or restore) and
+  `close` act as the system buttons. On Windows the system handles these areas (with Snap);
+  on Linux and macOS the host does, by asking the system to move, zoom, minimize or close
+  the window. These divs do not need `click` events; `close` ends in `windowClosed` as
+  usual. Meant for `frameless` windows, but it also works in a normal one. Inside a
+  `windowControl` area,
   `Button`, `Checkbox`, `Input`, a `div` with `click` and a nested `windowControl` div take
   their own clicks, so a title bar can hold a search box or buttons; everything else in it
   (text, icons, plain divs) is part of the area.
@@ -381,17 +388,56 @@ warning on stderr (once per class).
 
 - **Layout:** `flex`, `flex-row`, `flex-col`, `flex-1`, `flex-wrap`, `items-start|center|end`, `justify-start|center|end|between`
 - **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}` (GPUI's spacing scale)
-- **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`
+- **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`;
+  `w-[Npx]` and `h-[Npx]` in logical pixels (`N` a decimal number, at least 0)
+- **Position** (on `div` only; on other node types these classes are ignored, with a warning
+  on stderr): `absolute` takes a node out of the layout and places it against its parent's
+  box, with `left-`, `top-`, `right-` and `bottom-` followed by `[Npx]` (logical pixels; `N`
+  may be negative, as in `right-[-4px]` for a badge that hangs off a corner) or by `{n}` on
+  the spacing scale (`top-0`, `right-4`). There is no `static`: every node is already
+  `relative` (a containing block, and moved by its own `left-`… from where the layout put it,
+  as in CSS), so the parent needs no class and the `relative` class changes nothing. In a
+  scroll area an `absolute` child scrolls with the content. Nodes paint in child order (a
+  later sibling covers an earlier one); there is no `z-`.
+- **Dragging** (`div` props): `drag: true` on an `absolute` div whose parent is a `div` lets
+  the user move it with the mouse (without `absolute`, `drag` is ignored with a warning). The
+  host moves it every frame, without the client, and keeps it inside the parent's border. The
+  drag starts once the pointer moves a few pixels, so a plain click still sends `click` and a
+  drag does not. `magnetic` (`true` = 8, or a distance in px) snaps it to the parent's inner
+  edges and to the edges of its `drag` siblings within that distance: touching a sibling
+  (side by side) or aligned with it, only with siblings it overlaps, or nearly, on the other
+  axis. The host does not keep nodes from overlapping. On drop, `dragEnd` (opt-in) sends
+  `{"type":"event","id":5,"event":"dragEnd","value":{"x":120,"y":40}}`: whole pixels inside
+  the parent's border, the values for `left-[120px] top-[40px]`. The node stays where it was
+  left, over its classes, until a `setProps` carrying `class` places it again (the client
+  accepts with that position or corrects it; one that arrives during the drag applies on
+  drop). A node placed with `right-`/`bottom-` gets left/top too, so the client switches to
+  `left-`/`top-`. React only resends a prop that changed, so it cannot put a node back by
+  sending the same `class` again. Mouse only: no keyboard moves.
+- **Dropping a node on a zone** (`div` props): `dragData` (a string) lets the user carry a
+  div to a `dropTarget: true` div. The node stays where it is; a copy of it (same size, 80%
+  opacity) follows the pointer, and the drag starts once the pointer moves a few pixels, as
+  with `drag` (which wins, with a warning, on a div that has both). While the copy is over a
+  zone, its `drag-over:` classes apply: theme colors, as with `hover:`
+  (`drag-over:bg-accent`, `drag-over:border-primary`). Left on a zone, the innermost one
+  under the pointer gets `dropNode` (opt-in):
+  `{"type":"event","id":3,"event":"dropNode","value":{"data":"monitor-2","x":120,"y":40}}`,
+  where `x`/`y` is the copy's top-left corner in whole pixels inside the zone's border, kept
+  inside the zone: the `left-`/`top-` for a node placed there. Left anywhere else, nothing
+  is sent. The host moves no node: the client acts with the usual operations. A free `drag`
+  never lands on a zone. No filter of what a zone takes, no event on the source, no drop
+  between windows, mouse only.
 - **Overflow:** `overflow-hidden`; on `div` only, `overflow-scroll`, `overflow-x-scroll` and
   `overflow-y-scroll` make it a scroll area with the theme's scrollbar, which keeps its
   position across commits. A `flex-1` child that should scroll usually needs `min-h-0`
   (or `min-w-0`) on itself or its parent, as in CSS.
 - **Borders:** `border`, `border-t|r|b|l` (1px), `rounded-sm|md|lg|full`
-- **Text:** `text-xs|sm|base|lg|xl`, `font-medium`, `font-bold`, `font-mono` (the theme's
+- **Text:** `text-xs|sm|base|lg|xl|2xl|3xl|4xl`, `font-medium`, `font-bold`, `font-mono` (the theme's
   monospace font), `truncate`, `whitespace-normal`, `whitespace-nowrap`, `whitespace-pre`
   (the same as `nowrap`: spaces and line breaks are always kept)
 - **Interaction:** `cursor-pointer`; on `div` only, `hover:` followed by a theme color class
-  (`hover:bg-accent`, `hover:text-primary`, `hover:border-ring`)
+  (`hover:bg-accent`, `hover:text-primary`, `hover:border-ring`), and `drag-over:` the same
+  way on a `dropTarget` (below)
 - **Opacity:** `opacity-{n}`, with `n` from 0 to 100 in steps of 5. On a `div` it fades its
   children too.
 - **Transitions:** `transition` makes a node's background, text and border colors and its
@@ -413,6 +459,14 @@ warning on stderr (once per class).
   `success`, `success-foreground`, `warning`, `warning-foreground`, `info`,
   `info-foreground`, `popover`, `popover-foreground`, `border`, `input`, `ring`. They follow
   the active theme (section 3).
+- **Gradients and shadows** (theme colors only): `bg-gradient-to-{t|tr|r|br|b|bl|l|tl}` with
+  `from-{color}` and `to-{color}` draws a linear gradient between two colors (no `via-`; a
+  missing end is transparent); it wins over `bg-{color}`, and `transition` does not animate
+  it. `shadow-sm|md|lg|xl|2xl` is Tailwind's shadow; `shadow-{color}` tints it with that
+  theme color at 50% opacity, a glow (`shadow-lg shadow-primary`). Not animated either.
+  `hover:` and `drag-over:` take neither.
+- **Dots** (on `div` only): `bg-dots` paints 2px dots every 16px in the theme's
+  `muted-foreground` color at 50% opacity under the children, over the `bg-` color.
 
 ## 9. Conformance fixtures
 
@@ -479,6 +533,10 @@ of the client contract: without `--no-window` it is `unknown_op`.
   `Input` and `doubleClick` on a `div` (which sends `click` first) report to that node. A key
   that does not parse is `invalid_json`.
 - `drop` on a `div` plays files dropped on it; `value` is the list of paths.
+- `dragEnd` on a `div` plays the user leaving it at `value` `{"x":..,"y":..}` and sends the
+  event (rounded to whole pixels); without a window there is no layout, so nothing is
+  clamped or snapped. `dropNode` on a `div` plays a node left on it, with `value`
+  `{"data":..,"x":..,"y":..}`, the same way.
 - `ok` and `cancel` on an open `Dialog` play the user's answer: the event is sent and `open`
   becomes `false`. On a closed one they are `invalid_operation`.
 - `change` on `Tabs` works like on `RadioGroup` (over `tabs`, or over its `Tab` children).

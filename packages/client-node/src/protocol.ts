@@ -179,7 +179,7 @@ export type ErrorCode =
 /** Messages from the host (host stdout). */
 export type HostMessage =
   | { type: "ready"; protocol: number }
-  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | SettingsChange | QuestionnaireAnswer | QuestionnaireAnswer[]; checked?: boolean; paths?: string[] }
+  | { type: "event"; id: NodeId; event: string; value?: string | number | null | string[] | TableSort | DiffSelection | CanvasPoint | DragPoint | NodeDrop | SettingsChange | QuestionnaireAnswer | QuestionnaireAnswer[]; checked?: boolean; paths?: string[] }
   | { type: "windowClosed"; id: WindowId }
   /** A window event the client opted into with `window.events`; `move`/`resize` carry bounds. */
   | { type: "windowEvent"; id: WindowId; event: WindowEventName; x?: number; y?: number; width?: number; height?: number; visible?: boolean }
@@ -268,6 +268,27 @@ export interface DivProps {
   contextMenu?: MenuItem[];
   /** Shown when the pointer rests on the div. */
   tooltip?: string;
+  /** With the `absolute` class: the user moves it inside its parent; `dragEnd` gives where it was left (PROTOCOL.md section 8). */
+  drag?: boolean;
+  /** Snaps a `drag` div to its parent's edges and its `drag` siblings within this many px (`true` = 8). */
+  magnetic?: boolean | number;
+  /** The user can carry the div to a `dropTarget`, which gets this string in `dropNode`. */
+  dragData?: string;
+  /** Takes divs with `dragData`; its `drag-over:` classes apply while one is carried over it. */
+  dropTarget?: boolean;
+}
+
+/** Where the user left a `drag` div: whole px inside its parent's border (`left-`/`top-`). */
+export interface DragPoint {
+  x: number;
+  y: number;
+}
+
+/** A `dragData` div left on a `dropTarget`: its data and where its copy's corner was left, inside the zone. */
+export interface NodeDrop {
+  data: string;
+  x: number;
+  y: number;
 }
 
 export interface TextProps {
@@ -1393,7 +1414,15 @@ export interface NodeProps {
 // Event payloads per node type (PROTOCOL.md section 6).
 
 export interface NodeEvents {
-  div: { click: {}; doubleClick: {}; menu: { item: string }; keyDown: { key: string }; drop: { paths: string[] } };
+  div: {
+    click: {};
+    doubleClick: {};
+    menu: { item: string };
+    keyDown: { key: string };
+    drop: { paths: string[] };
+    dragEnd: { value: DragPoint };
+    dropNode: { value: NodeDrop };
+  };
   text: {};
   Button: { click: {} };
   Input: { change: { value: string }; submit: { value: string }; keyDown: { key: string } };

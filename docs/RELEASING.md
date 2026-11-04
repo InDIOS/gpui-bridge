@@ -1,6 +1,6 @@
 # Releasing
 
-Host and clients are versioned **in lockstep** (today `0.3.0`): the packages carry the host
+Host and clients are versioned **in lockstep** (today `0.4.0`): the packages carry the host
 binary, so a client version is also a host version. The protocol has its own number
 (`PROTOCOL_VERSION` in `packages/host/src/protocol.rs`, today 1) and only changes with an agreed
 protocol change.
@@ -47,7 +47,7 @@ quote, and `gpui-bridge-host --version` prints the same facts.
 3. Pack the client, the platform package for this machine and the platform-tagged wheel:
 
    ```sh
-   pnpm pack:node                         # packages/client-node/gpui-bridge-0.3.0.tgz
+   pnpm pack:node                         # packages/client-node/gpui-bridge-0.4.0.tgz
    pnpm --dir packages/host-<platform>-<arch> pack
    pnpm wheel                             # -> packages/client-python/dist/*.whl
    ```
@@ -106,8 +106,12 @@ can go through `release.yml` from the start. In order:
 
 4. **npm trusted publishers:** on npmjs.com, in each of the five packages' *Settings → Trusted
    publisher*, choose GitHub Actions with owner `InDIOS`, repository `gpui-bridge` and workflow
-   `release.yml`. From then on, *Publishing access* can be set to require 2FA and disallow
-   tokens.
+   `release.yml`, leave the environment empty (the `npm` job has none) and check **Allow npm
+   publish**: unchecked, the connection only allows `npm stage publish`, and the job fails with
+   `ENEEDAUTH` (as 0.3.0 did at first). After *Set up connection*, the page lists the connection
+   as *Pending validation* until the first publish, which must come before the date it shows; an
+   empty form means nothing was saved. From then on, *Publishing access* can be set to require
+   2FA and disallow tokens.
 5. **PyPI pending publisher:** on pypi.org, *Your projects → Publishing → Add a new pending
    publisher*: project `gpui-bridge`, owner `InDIOS`, repository `gpui-bridge`, workflow
    `release.yml`, environment `pypi`. In GitHub, create the `pypi` environment (optionally with
@@ -132,8 +136,8 @@ From 0.2.1 on, a release is steps 2 and 6 only.
   a signing service (for example Azure Trusted Signing) that the maintainer owns; until then,
   the binary is unsigned. macOS binaries installed by npm or pip are not quarantined, so
   Gatekeeper does not block them.
-- The visual check of a real window per platform is still owed for macOS and Linux (the host is
-  only drawn and clicked on Windows so far).
+- The visual check of a real window is still owed for macOS (the host is drawn and clicked on
+  Windows and on Linux, Ubuntu on WSL).
 - Only `x64` Windows and Linux and `arm64` macOS have a binary.
 - **The hosts in the GitHub release are unsigned.** A macOS host downloaded with a browser is
   quarantined and Gatekeeper blocks it until the user runs `xattr -d com.apple.quarantine` on it

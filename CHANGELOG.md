@@ -3,6 +3,43 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## 0.4.0 — 2026-11-04
+
+Every addition is a new class, an optional prop or a new event, so `PROTOCOL_VERSION` stays 1:
+an older host ignores the new props and classes (with a warning on stderr) and never sends the
+new events.
+
+- Free positioning on `div`: `absolute`, `relative`, `left-|top-|right-|bottom-` with `[Npx]`
+  (negatives allowed) or the spacing scale, and `w-[Npx]`/`h-[Npx]` (PROTOCOL.md §8). Position
+  classes on other node types are dropped with a warning.
+- Dragging in the host: `drag: true` on an absolute `div` lets the user move it inside its
+  parent with no round trip to the client; `magnetic` (`true` = 8 px) snaps it to the parent's
+  inner edges and to `drag` siblings. `dragEnd {x, y}` reports whole px for `left-`/`top-`, and
+  the dropped position wins over the classes until a `setProps` carries `class` (PROTOCOL.md §5
+  and §9, `conformance/drag.txt`).
+- Dropping a node on a zone: `dragData` (a string) on a `div` carries a see-through copy of it to
+  a `dropTarget` `div`; `drag-over:` styles the zone under the pointer, and the innermost zone
+  gets `dropNode {data, x, y}` (PROTOCOL.md §5 and §9, `conformance/drop-node.txt`). A free drag
+  never lands on a zone.
+- Node and React type `drag`, `magnetic`, `dragData` and `dropTarget`, with `dragEnd` and
+  `dropNode` (`onDragEnd`, `onDropNode` in React). Python and Go take them as they are.
+- Classes: `bg-gradient-to-{t|tr|r|br|b|bl|l|tl}` with `from-`/`to-` theme colors,
+  `shadow-sm|md|lg|xl|2xl` and `shadow-{color}` (a glow), `text-2xl|3xl|4xl`, and `bg-dots` (a
+  dotted background) (PROTOCOL.md §8).
+- `windowControl` areas work on Linux and macOS: a `drag` area moves the window and a double
+  click zooms it; `minimize`, `maximize` and `close` act on click, and `close` ends in
+  `windowClosed` (PROTOCOL.md §5).
+- Linux: on a Wayland compositor without server-side decorations (WSLg, GNOME) a normal window
+  now has a title bar with its title and buttons; a `frameless` window asks for client-side
+  decorations. On X11 without a compositing manager the window manager keeps its own frame
+  (PROTOCOL.md §3).
+- New example `examples/monitors.ts`: screens dragged and snapped on a dotted canvas, and
+  "Turned off" chips dropped on it.
+- Known limits: React cannot put a dragged node back by re-sending the same `class`; the host
+  does not stop dragged nodes from overlapping; nodes cannot be moved with the keyboard or a
+  screen reader; while anything is dragged, GPUI redraws the whole window on every move. macOS
+  is still untested in a real window, and the hosts are not code-signed.
+
 ## 0.3.0 — 2026-10-31
 
 Every addition is a new node type or an optional child node, so `PROTOCOL_VERSION` stays 1: an

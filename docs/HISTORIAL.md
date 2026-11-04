@@ -2189,3 +2189,94 @@ candidatas. El usuario eligió la opción 1, las tres que más valen. Cuatro nod
 **Criterio de aceptación:** inventario con decisión de protocolo; las ranuras elegidas abiertas
 como hijos sin romper las props de texto, en host, protocolo, conformance, los 4 clientes, un
 ejemplo y Narrator. Cumplido.
+
+### Fase 50 — M17: ventanas fuera de Windows (2026-11-03)
+
+Hallado el 2026-10-28 probando los ejemplos en Ubuntu sobre WSL: `windowControl` no hacía nada
+fuera de Windows y, en un compositor Wayland sin decoraciones del servidor (WSLg, GNOME), las
+ventanas salían sin barra de título. Solo host y documentación; el protocolo, `conformance/` y
+los clientes no cambian, y `PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (`windowControl`):** commit `5dd2225`. `window_control_area` solo lo lee el hit-test
+  de Windows. En Linux y macOS el host atiende las áreas él mismo, con el patrón del `TitleBar`
+  de gpui-component. Un `drag` llama a `start_window_move` en el primer movimiento tras
+  presionar: si lo llamara al presionar, el compositor se quedaría con el puntero y el segundo
+  clic de un doble clic no llegaría. El doble clic hace `zoom_window` (`titlebar_double_click`
+  en macOS). `minimize`, `maximize` y `close` actúan en `on_click`; `close` usa `remove_window`,
+  que termina en `windowClosed` igual que el cierre del sistema. Una ventana `frameless` pone
+  `app_owns_titlebar_drag`, para que AppKit no atienda también el doble clic.
+- **Paso 2 (marco en Linux):** commit `4c52c14`. El `Root` de gpui-component ya envolvía la
+  ventana en `window_border`, así que con decoraciones del cliente había bordes y sombra pero no
+  barra. Ahora `RootView` pone la `TitleBar` de gpui-component, con el `title` y los tres
+  botones, encima del contenido cuando `window_decorations()` es `Client` y la ventana no es
+  `frameless`. Una ventana `frameless` pide `WindowDecorations::Client`. En X11 solo se concede
+  si hay un compositor y `_GTK_FRAME_EXTENTS`; si no, el gestor pone su marco encima de la barra
+  propia (documentado en §3, `1b18d4f`).
+- **Documentación:** `PROTOCOL.md` §3 (`frameless` en Linux) y §5 (`windowControl` fuera de
+  Windows), y el comentario de `examples/frameless.ts`. El rodeo `WAYLAND_DISPLAY=` ya no hace
+  falta.
+- **Pruebas:** en Windows, `fmt`, `clippy` y `cargo test` (74 unitarios, conformidad y
+  `no_window`) en verde, sin cambios de comportamiento. En WSL Ubuntu, el usuario probó en
+  ventana real, en Wayland y en X11, `counter` (barra, botones, arrastre, doble clic, bordes),
+  `frameless` (arrastre, doble clic, minimizar, cerrar con `windowClosed`, bordes) y
+  `menus --frameless`: todo bien. No hay test unitario: son llamadas a la plataforma sin
+  ventana.
+- **Tamaño del host release (Windows):** 21.417.984 → **21.450.752 B** (+32.768 B, la `TitleBar` enlazada).
+- **Sin probar:** macOS (no hay máquina).
+
+**Criterio de aceptación:** `examples/frameless.ts` se arrastra, maximiza con doble clic,
+minimiza y cierra (con `windowClosed`) en Linux; una ventana normal en Wayland sin decoraciones
+del servidor tiene título, botones y bordes. Cumplido.
+
+### Fase 51 — M19: posición libre, arrastre y soltar nodos (2026-11-03)
+
+Pedido por el usuario para pasar a gpui-bridge su app de control de monitores (hoy en
+WebView2): un lienzo donde se arrastran las pantallas y se pegan a los bordes de las otras, y
+chips de «Turned off» que se sueltan en el lienzo para encender una pantalla. Decisión del
+usuario: el arrastre lo maneja el host, no el cliente con un `setProps` por movimiento. Cada
+propuesta de protocolo se aprobó antes de programar. Todo es aditivo (clases, props y eventos):
+`PROTOCOL_VERSION` sigue en 1.
+
+- **Paso 1 (posición):** commit `a980a77`. `absolute`, `relative` (no cambia nada: en GPUI todo
+  nodo ya es contenedor), `left-|top-|right-|bottom-` con `[Npx]` (admite negativos) o con la
+  escala, y `w-[Npx]`/`h-[Npx]`. La posición solo vale en `div`: en otros nodos las clases
+  caerían en un envoltorio, así que se quitan con un aviso.
+- **Paso 2 (arrastre en el host):** commit `0d559b5`. `drag: true` en un `div` `absolute`
+  arranca con el `on_drag` de GPUI, que espera 2 px y anula el clic. El `on_drag_move` del
+  padre mueve el nodo en cada frame dentro del borde del padre. `magnetic` (`true` = 8 px) lo
+  pega a los bordes internos del padre y a los hermanos `drag` que se le solapan, o casi, en el
+  otro eje, tocándolos o alineado. `dragEnd {x, y}` da px enteros listos para `left-`/`top-`.
+  La posición soltada gana a las clases hasta que llegue un `setProps` con `class` (vía
+  `value_writes`). El fin del arrastre se detecta en `render`, porque GPUI redibuja la ventana
+  al soltar. Sin `dragMove` ni teclado.
+- **Paso 3 (soltar en una zona):** commit `f765186`. `dragData` (string) en un `div`: el nodo
+  no se mueve y una copia suya (mismo tamaño, 80 % de opacidad) sigue al puntero. `dropTarget`
+  más la variante `drag-over:` (colores del tema). `dropNode {data, x, y}` llega a la zona más
+  interna, con la esquina de la copia dentro del borde y de la zona. Un arrastre libre nunca
+  cae en una zona porque usa otro tipo de valor de arrastre.
+- **Paso 4 (visual):** commit `f00bea0`. Degradados `bg-gradient-to-*` con `from-`/`to-` (dos
+  paradas de GPUI), `shadow-sm…2xl` y `shadow-{color}` (brillo al 50 %), `text-2xl|3xl|4xl` y
+  `bg-dots` (puntos de 2 px en `muted-foreground` al 50 %). Solo colores del tema. Los puntos
+  salieron casi invisibles en `border`, el color de la primera versión, y se corrigieron
+  durante la prueba.
+- **Paso 5 (ejemplo y clientes):** commit `fbb36f9`. `examples/monitors.ts` con datos falsos.
+  Node y React tipan las cuatro props y los dos eventos (`onDragEnd`, `onDropNode`); Python y
+  Go no necesitan cambios. Un test por cliente (el de Go pasa por `simulate` en el host real).
+- **Documentación y fixtures:** `PROTOCOL.md` §5, §8 y §9; `conformance/drag.txt` y
+  `conformance/drop-node.txt`.
+- **Pruebas:** `fmt`, `clippy` y `cargo test` (78 unitarios, conformidad y `no_window`); Node
+  31, React 29, Python 31, Go y el typecheck de los ejemplos. En ventana real, el usuario probó
+  a mano cada paso con sondas temporales (padres con `border p-8` para comprobar el origen de
+  `x`/`y`) y después `examples/monitors.ts`: todo bien.
+- **Rendimiento:** mientras hay cualquier arrastre, GPUI redibuja toda la ventana con cada
+  movimiento (`window.rs`). Con 10 nodos fueron 0,13 ms por pasada en debug; no se midió en un
+  árbol grande.
+- **Tamaño del host release (Windows):** 21.450.752 → **21.571.584 B** (+120.832 B).
+- **Límites conocidos:** React no puede devolver un nodo a su sitio reenviando la misma
+  `class`. El host no impide que los nodos se solapen (lo corrige el cliente). No hay teclado
+  ni Narrator para mover nodos, ni filtro por zona, ni `via-`, ni sombras en `hover:`.
+
+**Criterio de aceptación:** en `examples/monitors.ts` las pantallas se arrastran con fluidez y
+se pegan a los bordes de las otras, el cliente recibe la posición final, un chip apagado se
+suelta en el lienzo y llega `dropNode`, y el lienzo tiene degradado, sombra, número grande y
+puntos. Cumplido.

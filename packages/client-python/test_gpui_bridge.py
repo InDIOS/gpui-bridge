@@ -519,6 +519,26 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, [("shortcut", "f5", 1), ("key", "escape"), ("double",)])
 
+    def test_drag_props_reach_the_host_and_drag_events_pass_their_value(self):
+        app = App(headless=True)
+        errors, seen = [], []
+        app.on_error = errors.append
+        tile = app.div(
+            **{"class": "absolute left-[10px] top-[20px] w-[100px] h-[60px]", "drag": True, "magnetic": 12}
+        ).on("dragEnd", seen.append)
+        chip = app.div(dragData="monitor-2")
+        canvas = app.div(**{"class": "relative w-[400px] h-[300px] bg-dots", "dropTarget": True})
+        canvas.on("dropNode", seen.append).append(tile)
+        app.window(root=app.div().append(chip, canvas))
+        app.commit()
+        app._dispatch({"type": "event", "id": tile.id, "event": "dragEnd", "value": {"x": 98, "y": 20}})
+        app._dispatch(
+            {"type": "event", "id": canvas.id, "event": "dropNode", "value": {"data": "monitor-2", "x": 120, "y": 40}}
+        )
+        app.close()
+        self.assertEqual(errors, [])
+        self.assertEqual(seen, [{"x": 98, "y": 20}, {"data": "monitor-2", "x": 120, "y": 40}])
+
     def test_system_actions_get_their_results_and_drop_delivers_paths(self):
         app = App(headless=True)
         errors, dropped, clicks = [], [], []

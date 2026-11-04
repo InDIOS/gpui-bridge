@@ -46,6 +46,18 @@ export interface DivProps extends SharedProps {
   tooltip?: string;
   /** Files dropped on the div. */
   onDrop?: (paths: string[]) => void;
+  /** With the `absolute` class: the user moves it inside its parent; `dragEnd` gives where it was left (PROTOCOL.md section 8). */
+  drag?: boolean;
+  /** Snaps a `drag` div to its parent's edges and its `drag` siblings within this many px (`true` = 8). */
+  magnetic?: boolean | number;
+  /** The user can carry the div to a `dropTarget`, which gets this string in `dropNode`. */
+  dragData?: string;
+  /** Takes divs with `dragData`; its `drag-over:` classes apply while one is carried over it. */
+  dropTarget?: boolean;
+  /** Where the user left a `drag` div. */
+  onDragEnd?: (point: { x: number; y: number }) => void;
+  /** A `dragData` div left on this `dropTarget`. */
+  onDropNode?: (drop: { data: string; x: number; y: number }) => void;
   /** Makes the div focusable; called with keys such as `escape` or `ctrl-enter`. */
   onKeyDown?: (key: string) => void;
   children?: ReactNode;

@@ -57,6 +57,8 @@ pub enum PropKind {
     Questions,
     /// A list of plain strings (`Combobox`'s `value`, `ColorPicker`'s `palette`).
     StringList,
+    /// A div's `magnetic`: `true`, or a distance in px from 0.
+    Magnet,
 }
 
 impl PropKind {
@@ -87,6 +89,7 @@ impl PropKind {
                 .as_array()
                 .is_some_and(|arr| arr.iter().all(Value::is_string)),
             Self::Number => value.as_f64().is_some_and(f64::is_finite),
+            Self::Magnet => value.is_boolean() || Self::NonNegative.accepts(value),
             Self::NonNegative => value.as_f64().is_some_and(|n| n.is_finite() && n >= 0.),
             Self::Positive => value.as_f64().is_some_and(|n| n.is_finite() && n > 0.),
             Self::Base64 => value.is_string(),
@@ -148,6 +151,7 @@ impl PropKind {
             Self::Number => "a number".into(),
             Self::Positive => "a number above 0".into(),
             Self::NonNegative => "a number from 0".into(),
+            Self::Magnet => "a boolean or a number from 0".into(),
             Self::Base64 => "a base64-encoded string".into(),
             Self::Index => "a whole number from 0".into(),
             Self::Columns => "a list of columns".into(),
@@ -425,6 +429,10 @@ impl NodeType {
             (Self::Image, "src") => Some(Str),
             (Self::Image, "data") => Some(Base64),
             (Self::Div, "contextMenu") => Some(Menu),
+            (Self::Div, "drag") => Some(Bool),
+            (Self::Div, "magnetic") => Some(Magnet),
+            (Self::Div, "dragData") => Some(Str),
+            (Self::Div, "dropTarget") => Some(Bool),
             (Self::MenuBar, "menus") => Some(Menus),
             (Self::Image, "fit") => {
                 Some(OneOf(&["contain", "cover", "fill", "scale-down", "none"]))

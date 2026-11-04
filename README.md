@@ -62,8 +62,8 @@ Styles are Tailwind-like class strings (`"flex gap-2 p-4 bg-muted"`) that use th
 colors, so light and dark mode and custom themes come for free.
 
 **Status:** prebuilt for Windows x64, macOS arm64 and Linux x64 (glibc 2.35 or newer). The host
-builds and passes its tests on the three in CI, but it has only been drawn and clicked in a real
-window on Windows so far. Protocol version 1.
+builds and passes its tests on the three in CI; it has been drawn and clicked in a real window on
+Windows and on Linux (Ubuntu on WSL, Wayland and X11), not yet on macOS. Protocol version 1.
 
 ## What it has
 
@@ -87,15 +87,18 @@ window on Windows so far. Protocol version 1.
   the ARIA-like state: checked, selected, expanded, values and ranges), reported to screen
   readers through AccessKit; the window root and the controls name themselves too. `Slider`,
   `Rating`, `Tabs`, `Pagination` and `Accordion` titles are Tab stops driven by the keyboard.
-- **Windows:** several windows, frameless windows with a custom title bar, initial position,
+- **Windows:** several windows, frameless windows with a custom title bar (on Windows, Linux and
+  macOS), initial position,
   minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
   `visibility`), light/dark and custom themes.
 - **Interaction:** context menus and a menu bar with shortcuts, app shortcuts, `keyDown`,
-  focus, double click, tooltips, toasts, dropping files.
+  focus, double click, tooltips, toasts, dropping files, nodes the user drags (with magnetic
+  edges) and drops on zones.
 - **System:** tray icon with a native menu, open/save dialogs, clipboard, opening URLs and
   files, notifications in the Windows notification center.
-- **Styling:** layout, spacing, sizes, borders, text, theme colors, `hover:`, opacity,
-  transitions and `animate-spin`/`animate-pulse`.
+- **Styling:** layout, spacing, sizes, absolute positioning, borders, text, theme colors,
+  gradients, shadows and glow, dotted backgrounds, `hover:`, opacity, transitions and
+  `animate-spin`/`animate-pulse`.
 
 ## Clients
 
@@ -171,6 +174,7 @@ example; they import `gpui-bridge` like an installed package does):
 | `list.ts` | A List of 10,000 rows with search and the keyboard, a second one that loads rows as it scrolls, a row 40 nodes deep |
 | `dock.ts` | A Dock: panels the user drags into tabs and splits while the app updates them, files that open as closable panels |
 | `slots.ts` | Slots as children: Accordion sections that hold controls, a Dialog and an AlertDialog with their own footer buttons, a StatusBar built from nodes |
+| `monitors.ts` | Free positioning and drag and drop: screens the host drags and snaps to each other's edges on a dotted canvas, gradients and glow for the selected one, "Turned off" chips dropped on the canvas to turn a screen on |
 | `keyboard.ts` | Shortcuts, a list moved with the arrow keys, focus |
 | `image-bytes.ts` | An `Image` from a path and from base64 bytes (`data`), re-sent on click |
 | `system.ts` | Open/save dialogs, clipboard, opening URLs and files, dropping files |

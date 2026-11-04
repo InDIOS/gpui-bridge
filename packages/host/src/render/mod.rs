@@ -14,7 +14,7 @@ use gpui_kit::component::message::{MessageFooter, MessageHeader};
 use gpui_kit::component::scroll::{ScrollableElement, Scrollbar};
 use gpui_kit::component::theme::{ActiveTheme, Theme};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, VirtualListScrollHandle, WindowExt, v_virtual_list};
+use gpui_kit::component::{Icon, TitleBar, VirtualListScrollHandle, WindowExt, v_virtual_list};
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -93,6 +93,10 @@ pub struct RootView {
     transitions: HashMap<NodeId, Transition>,
     /// Hovered nodes among those whose `hover:` the host animates (GPUI's own `hover` cannot be).
     hovered: Rc<RefCell<HashSet<NodeId>>>,
+    /// The `drag` area pressed and not yet moved, outside Windows (see `drag_area`).
+    title_drag: Rc<Cell<Option<NodeId>>>,
+    /// Divs with `drag` the user moves, and where they were left (see `drag::Drags`).
+    drags: Rc<RefCell<drag::Drags>>,
     /// One view per node that keeps moving on its own (an `animate-*` loop, see
     /// `animated_nodes`), kept up to date by `sync_animated`. A frame redraws those nodes and not
     /// the whole window: a spinner on a tree of thousands of nodes should not rebuild all of it.
@@ -173,6 +177,8 @@ impl RootView {
             applied_commit: 0,
             transitions: HashMap::new(),
             hovered: Rc::default(),
+            title_drag: Rc::default(),
+            drags: Rc::default(),
             animated: HashMap::new(),
             texts: HashMap::new(),
             clock: Rc::default(),
@@ -309,6 +315,7 @@ impl RootView {
         } else {
             tree.value_writes()
         };
+        self.drags.borrow_mut().class_set(writes);
         let inputs = input::snapshot(tree, NodeType::Input, &members, writes);
         let textareas = input::snapshot(tree, NodeType::Textarea, &members, writes);
         let numbers = input::snapshot(tree, NodeType::NumberInput, &members, writes);
@@ -610,6 +617,8 @@ impl RootView {
             in_chip: false,
             transitions: &mut self.transitions,
             hovered,
+            title_drag: self.title_drag.clone(),
+            drags: self.drags.clone(),
             stateful: &mut self.stateful,
             focusables: &self.focusables,
             now,
@@ -751,6 +760,7 @@ impl RootView {
 }
 
 mod dialog;
+mod drag;
 mod sheet;
 
 /// One animation frame every 60th of a second, at most: a spinner or a fade does not need more, and
@@ -899,6 +909,12 @@ impl Render for RootView {
         // transition and its `hover:` (a node removed from the tree, a row scrolled out of a list,
         // a Dialog that closed).
         let keep = std::mem::take(&mut self.stateful);
+        // GPUI ends a drag on mouse up and redraws the window, so this is where it ends here.
+        let ended = self.drags.borrow_mut().finish(cx.has_active_drag());
+        if let Some((id, at)) = ended {
+            let tree = &self.session.read(cx).tree;
+            components::drag_ended(tree, id, f32::from(at.x).into(), f32::from(at.y).into());
+        }
         self.transitions.retain(|id, _| keep.contains(id));
         self.hovered.borrow_mut().retain(|id| keep.contains(id));
         let (session, window_id, focus) =
@@ -928,19 +944,36 @@ impl Render for RootView {
             .track_focus(&focus)
             .capture_key_down(shortcuts)
             .children(children);
+        let (title, frameless) = self
+            .session
+            .read(cx)
+            .tree
+            .windows()
+            .get(&window_id)
+            .map(|spec| {
+                let title = spec.title.clone().unwrap_or_default();
+                (title, spec.frameless.unwrap_or(false))
+            })
+            .unwrap_or_default();
         // The window's own focus (when nothing else has it) needs an accessibility node too.
-        let element = {
-            let tree = &self.session.read(cx).tree;
-            let title = tree
-                .windows()
-                .get(&window_id)
-                .and_then(|spec| spec.title.clone())
-                .unwrap_or_default();
-            element
-                .id(("window", window_id))
-                .role(Role::Window)
-                .aria_label(title)
-        };
+        let element = element
+            .id(("window", window_id))
+            .role(Role::Window)
+            .aria_label(title.clone());
+        // A Wayland compositor without server decorations leaves the frame to the app (Linux
+        // only); `Root` already draws the resize borders, the host adds the title bar.
+        let element =
+            if !frameless && matches!(window.window_decorations(), Decorations::Client { .. }) {
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .child(TitleBar::new().child(div().text_sm().child(title)))
+                    .child(div().flex_1().min_h_0().child(element))
+                    .into_any_element()
+            } else {
+                element.into_any_element()
+            };
         if animating {
             // Something in this pass moves, so the window draws another frame; the rest of the
             // window is only redrawn when a commit, the pointer or the theme changes it.
@@ -999,6 +1032,8 @@ struct RenderCx<'a> {
     /// a Dialog body or a list row runs in keeps it too.
     transitions: &'a mut HashMap<NodeId, Transition>,
     hovered: Rc<RefCell<HashSet<NodeId>>>,
+    title_drag: Rc<Cell<Option<NodeId>>>,
+    drags: Rc<RefCell<drag::Drags>>,
     /// Nodes this pass produced state for (a transition, or a tracked `hover:`).
     stateful: &'a mut HashSet<NodeId>,
     focusables: &'a HashMap<NodeId, FocusHandle>,
@@ -1012,6 +1047,9 @@ struct RenderCx<'a> {
 }
 
 static WARN_SPIN: Once = Once::new();
+static WARN_POSITION: Once = Once::new();
+static WARN_DRAG: Once = Once::new();
+static WARN_DRAG_DATA: Once = Once::new();
 
 impl RenderCx<'_> {
     fn node(&mut self, id: NodeId) -> AnyElement {
@@ -1045,6 +1083,17 @@ impl RenderCx<'_> {
                 log::warn!("'animate-spin' only rotates Icon nodes; ignored elsewhere")
             });
         }
+        // Elsewhere the classes may land inside a wrapper, which would then hold the node in place.
+        let classes = if node.node_type != NodeType::Div && classes.iter().any(Class::positions) {
+            WARN_POSITION.call_once(|| {
+                log::warn!(
+                    "'absolute', 'relative', 'left-', 'top-', 'right-' and 'bottom-' only apply to div nodes; ignored elsewhere"
+                )
+            });
+            classes.iter().copied().filter(|c| !c.positions()).collect()
+        } else {
+            classes
+        };
 
         let accessibility = a11y::of(node);
         if keyboard::takes_stop(node)
@@ -1678,7 +1727,19 @@ impl RenderCx<'_> {
 
     fn div_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let control = window_control(node);
-        let blocks = self.blocks_area() && (control.is_some() || node.events.contains("click"));
+        let dragging = drag::draggable(node) && classes.contains(&Class::Absolute);
+        if drag::draggable(node) && !dragging {
+            WARN_DRAG.call_once(|| log::warn!("'drag' needs the 'absolute' class; ignored"));
+        }
+        let data = node.props.get("dragData").and_then(Value::as_str);
+        if dragging && data.is_some() {
+            WARN_DRAG_DATA.call_once(|| {
+                log::warn!("a div with 'drag' moves itself; its 'dragData' is ignored")
+            });
+        }
+        let data = data.filter(|_| !dragging);
+        let blocks = self.blocks_area()
+            && (control.is_some() || node.events.contains("click") || dragging || data.is_some());
         let outer = self.in_control;
         self.in_control |= control.is_some();
         let children: Vec<AnyElement> = node
@@ -1690,12 +1751,66 @@ impl RenderCx<'_> {
         // With `transition`, the host follows the pointer itself to animate `hover:`.
         let track_hover = Timing::of(classes).is_some() && styles::has_hover(classes);
         let hovered = track_hover && self.hovered.borrow().contains(&id);
-        let mut element = self.style(id, div(), classes, hovered).children(children);
+        let mut element = self.style(id, div(), classes, hovered);
         if !track_hover {
             element = styles::apply_hover(element, classes, self.theme);
         }
+        // Where the user left it wins over its classes, until the client sets them again.
+        if let Some(at) = self.drags.borrow().placed.get(&id) {
+            element = element.left(at.x).top(at.y).right(auto()).bottom(auto());
+        }
+        // Dots first, under the children (so the children's bounds come one place later).
+        let dots = node.node_type == NodeType::Div && classes.contains(&Class::BgDots);
+        if dots {
+            // `border` is too close to `muted`, the usual canvas color, to see the dots on it.
+            let color = self.theme.muted_foreground.opacity(0.5);
+            let paint = move |bounds, _: (), window: &mut Window, _: &mut App| {
+                styles::paint_dots(bounds, color, window)
+            };
+            element = element.child(canvas(|_, _, _| (), paint).absolute().size_full());
+            element.extend(children);
+        } else {
+            element = element.children(children);
+        }
+        let mut movers = drag::draggable_children(self.tree, node);
+        for mover in &mut movers {
+            mover.0 += usize::from(dots);
+        }
+        if !movers.is_empty() {
+            element = self.move_children(id, element, classes, movers);
+        }
+        if data.is_some() {
+            // Its copy takes its size, border included (the canvas fills the inside).
+            let (drags, border) = (self.drags.clone(), styles::border_px(classes));
+            let measure = move |bounds: Bounds<Pixels>, _: &mut Window, _: &mut App| {
+                let outer = size(
+                    bounds.size.width + px(border.left + border.right),
+                    bounds.size.height + px(border.top + border.bottom),
+                );
+                drags.borrow_mut().sizes.insert(id, outer);
+            };
+            element = element.child(canvas(measure, |_, _, _, _| {}).absolute().size_full());
+        }
+        if node.props.get("dropTarget") == Some(&Value::Bool(true)) {
+            element = self.drop_target(id, element, classes);
+        }
+        // Only Windows reads the area; elsewhere the host moves the window and the buttons act on click.
+        let os_control = control.filter(|_| !cfg!(target_os = "windows"));
         if let Some(area) = control {
             element = element.window_control_area(area);
+        }
+        match os_control {
+            Some(WindowControlArea::Drag) => {
+                element = drag_area(element, id, &self.title_drag);
+            }
+            Some(_) => {
+                // Keeps the press from reaching a `drag` area around the button.
+                element = element.on_mouse_down(MouseButton::Left, |_, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                });
+            }
+            None => {}
         }
         if blocks {
             element = element.occlude();
@@ -1736,9 +1851,44 @@ impl RenderCx<'_> {
             .map(SharedString::from);
         let a11y = a11y::of(node);
         // An accessibility node needs an id too, so the div gets one even with nothing to click.
-        if clicks || menu.is_some() || track_hover || tooltip.is_some() || a11y.is_some() {
+        let button = os_control.filter(|area| *area != WindowControlArea::Drag);
+        if clicks
+            || menu.is_some()
+            || track_hover
+            || tooltip.is_some()
+            || a11y.is_some()
+            || button.is_some()
+            || dragging
+            || data.is_some()
+        {
             // A stable id keeps the context menu's open state across renders.
             let mut element = element.id(("node", id));
+            if dragging {
+                // GPUI starts the drag past a few px and then drops the click.
+                let drags = self.drags.clone();
+                element = element.on_drag(drag::NodeDrag(id), move |_, grab, _, cx| {
+                    drags.borrow_mut().active = Some((id, grab));
+                    cx.new(|_| EmptyView)
+                });
+            }
+            if let Some(data) = data {
+                let (drags, view) = (self.drags.clone(), self.view.downgrade());
+                let value = drag::NodeData(data.to_owned());
+                element = element.on_drag(value, move |_, grab, _, cx| {
+                    let size = drags.borrow().sizes.get(&id).copied();
+                    drags.borrow_mut().carried = Some((grab, size));
+                    let view = view.clone();
+                    cx.new(|_| drag::Preview { view, id, size })
+                });
+            }
+            if let Some(area) = button {
+                element = element.on_click(move |_, window, _| match area {
+                    WindowControlArea::Min => window.minimize_window(),
+                    WindowControlArea::Max => window.zoom_window(),
+                    // Ends in `windowClosed`, like the system's close (see `windows::window_closed`).
+                    _ => window.remove_window(),
+                });
+            }
             if clicks {
                 let session = self.session.clone();
                 element = element.on_click(move |event, _, cx| {
@@ -1776,6 +1926,80 @@ impl RenderCx<'_> {
         } else {
             scrollable(element, axis, id, None)
         }
+    }
+
+    /// A div whose children include `drag` ones: it moves the one the user drags, inside its
+    /// border, stuck to the edges `magnetic` asks for (see `drag::place`).
+    fn move_children(
+        &self,
+        id: NodeId,
+        element: Div,
+        classes: &[Class],
+        movers: Vec<(usize, NodeId, f32)>,
+    ) -> Div {
+        let border = styles::border_px(classes);
+        let (seen, drags) = (self.drags.clone(), self.drags.clone());
+        element
+            .on_children_prepainted(move |bounds, _, _| {
+                seen.borrow_mut().children.insert(id, bounds);
+            })
+            .on_drag_move(move |event: &DragMoveEvent<drag::NodeDrag>, _, cx| {
+                let dragged = event.drag(cx).0;
+                let Some(&(index, _, magnet)) = movers.iter().find(|m| m.1 == dragged) else {
+                    return;
+                };
+                let mut drags = drags.borrow_mut();
+                let (Some((_, grab)), Some(all)) = (drags.active, drags.children.get(&id)) else {
+                    return;
+                };
+                let Some(own) = all.get(index) else {
+                    return;
+                };
+                let inside = event.bounds.origin + point(px(border.left), px(border.top));
+                let inner = size(
+                    f32::from(event.bounds.size.width) - border.left - border.right,
+                    f32::from(event.bounds.size.height) - border.top - border.bottom,
+                );
+                let relative =
+                    |b: &Bounds<Pixels>| Bounds::new(b.origin - inside, b.size).map(f32::from);
+                let siblings: Vec<Bounds<f32>> = movers
+                    .iter()
+                    .filter(|m| m.1 != dragged)
+                    .filter_map(|m| all.get(m.0).map(relative))
+                    .collect();
+                let at = (event.event.position - inside - grab).map(f32::from);
+                let at = drag::place(at, own.size.map(f32::from), inner, &siblings, magnet);
+                drags.placed.insert(dragged, at.map(px));
+            })
+    }
+
+    /// A `dropTarget` div: `drag-over:` while a node is carried over it, and `dropNode` with
+    /// the node's `dragData` and where its copy was left, inside the border and the zone.
+    fn drop_target(&self, id: NodeId, element: Div, classes: &[Class]) -> Div {
+        let element = styles::apply_drag_over::<_, drag::NodeData>(element, classes, self.theme);
+        let (seen, drags) = (self.drags.clone(), self.drags.clone());
+        let (session, border) = (self.session.clone(), styles::border_px(classes));
+        element
+            .on_drag_move(move |event: &DragMoveEvent<drag::NodeData>, _, _| {
+                seen.borrow_mut().targets.insert(id, event.bounds);
+            })
+            .on_drop(move |value: &drag::NodeData, window, cx| {
+                let drags = drags.borrow();
+                let (Some(bounds), Some((grab, copy))) = (drags.targets.get(&id), drags.carried)
+                else {
+                    return;
+                };
+                let inside = bounds.origin + point(px(border.left), px(border.top));
+                let inner = size(
+                    f32::from(bounds.size.width) - border.left - border.right,
+                    f32::from(bounds.size.height) - border.top - border.bottom,
+                );
+                let at = (window.mouse_position() - inside - grab).map(f32::from);
+                let copy = copy.unwrap_or_default().map(f32::from);
+                let at = drag::place(at, copy, inner, &[], 0.);
+                let tree = &session.read(cx).tree;
+                components::node_dropped(tree, id, &value.0, at.x.into(), at.y.into());
+            })
     }
 
     fn menu_bar_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
@@ -2217,6 +2441,42 @@ fn window_control(node: &Node) -> Option<WindowControlArea> {
         "close" => Some(WindowControlArea::Close),
         _ => None,
     }
+}
+
+/// A `drag` area outside Windows, as gpui-component's `TitleBar` does it: the move starts on the
+/// first mouse move after a press, since starting it on the press hands the pointer to the
+/// compositor and the second click of a double click never arrives.
+fn drag_area(element: Div, id: NodeId, pressed: &Rc<Cell<Option<NodeId>>>) -> Div {
+    let (down, up, out, moved) = (
+        pressed.clone(),
+        pressed.clone(),
+        pressed.clone(),
+        pressed.clone(),
+    );
+    element
+        .on_mouse_down(MouseButton::Left, move |event, window, _| {
+            if event.click_count == 2 {
+                if cfg!(target_os = "macos") {
+                    window.titlebar_double_click();
+                } else {
+                    window.zoom_window();
+                }
+            } else {
+                down.set(Some(id));
+            }
+        })
+        .on_mouse_up(MouseButton::Left, move |_, _, _| up.set(None))
+        .on_mouse_down_out(move |_, _, _| {
+            if out.get() == Some(id) {
+                out.set(None);
+            }
+        })
+        .on_mouse_move(move |_, window, _| {
+            if moved.get() == Some(id) {
+                moved.set(None);
+                window.start_window_move();
+            }
+        })
 }
 
 /// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read again.

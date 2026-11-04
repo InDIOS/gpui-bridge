@@ -531,6 +531,28 @@ test("shortcuts, keyDown, doubleClick and focus are accepted and dispatched", as
   assert.deepEqual(seen, [["shortcut", { keys: "f5", window: 1 }], ["key", "escape"], ["double"], ["input", "down"]]);
 });
 
+test("drag props reach the host; dragEnd and dropNode deliver their value", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const seen: unknown[] = [];
+  const tile = app
+    .div({ class: "absolute left-[10px] top-[20px] w-[100px] h-[60px]", drag: true, magnetic: 12 })
+    .on("dragEnd", ({ value }) => seen.push(value));
+  const chip = app.div({ dragData: "monitor-2" });
+  const canvas = app
+    .div({ class: "relative w-[400px] h-[300px] bg-dots drag-over:bg-accent", dropTarget: true })
+    .on("dropNode", ({ value }) => seen.push(value));
+  canvas.append(tile);
+  app.window({ root: app.div().append(chip, canvas) });
+  app.commit();
+  app.handleMessage({ type: "event", id: tile.id, event: "dragEnd", value: { x: 98, y: 20 } });
+  app.handleMessage({ type: "event", id: canvas.id, event: "dropNode", value: { data: "monitor-2", x: 120, y: 40 } });
+  await app.close();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(seen, [{ x: 98, y: 20 }, { data: "monitor-2", x: 120, y: 40 }]);
+});
+
 test("system actions get their results; drop delivers paths", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

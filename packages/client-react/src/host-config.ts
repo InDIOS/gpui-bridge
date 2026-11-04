@@ -176,6 +176,8 @@ const EVENT_PROPS: Record<string, string> = {
   onMenu: "menu",
   onKeyDown: "keyDown",
   onDrop: "drop",
+  onDragEnd: "dragEnd",
+  onDropNode: "dropNode",
   onOk: "ok",
   onCancel: "cancel",
   onClose: "close",
