@@ -380,6 +380,9 @@ Unknown fields are ignored, so a newer client does not break an older host.
   impose one (for example, clearing the field after `submit`).
 - If the imposed `value` equals the current text, the host leaves the field alone, so an
   echo of the same text does not move the cursor. Controlled mode is described in section 5.
+- A text node (`Input`, `Textarea`, `NumberInput`, `InputGroup`) that already exists when its
+  window opens, or opens again after `closeWindow`, shows its `value` prop: the last value the
+  client sent, not text the user typed that the client never sent back.
 
 ## 8. Classes
 
@@ -387,7 +390,7 @@ The `class` prop takes a Tailwind-like class string. Unknown classes are ignored
 warning on stderr (once per class).
 
 - **Layout:** `flex`, `flex-row`, `flex-col`, `flex-1`, `flex-wrap`, `items-start|center|end`, `justify-start|center|end|between`
-- **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}` (GPUI's spacing scale)
+- **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}`, `mt|mr|mb|ml-{n}` (GPUI's spacing scale)
 - **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`;
   `w-[Npx]` and `h-[Npx]` in logical pixels (`N` a decimal number, at least 0)
 - **Position** (on `div` only; on other node types these classes are ignored, with a warning
@@ -745,12 +748,14 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 **notify** is an action (section 13): it shows a toast in a window now, not on `commit`.
 
 - `message` (required), `title`, `type` (`info` by default, `success`, `warning`, `error`),
-  `window` (default 1; a window that is not open is `invalid_operation`), `autohide`
-  (default `true`).
+  `window` (default 1; a window that is not open is `invalid_operation`, except with
+  `system: true`), `autohide` (default `true`).
 - `id`: a click on the toast sends `{"type":"notification","id":...,"window":...}`, and a new
   toast with the same `id` replaces the previous one.
 - `system: true` also posts it to the Windows notification center, where it shows under the
-  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet).
+  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
+  window open (a tray app), it goes to the notification center only; a click on it is not
+  reported, and the host removes it from the center when it exits.
 - With `--no-window` it is validated and nothing is shown.
 
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.

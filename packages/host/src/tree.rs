@@ -502,7 +502,10 @@ impl Tree {
                     .map_err(|msg| fail(ErrorCode::InvalidProps, msg))?;
                 if matches!(
                     node_type,
-                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                    NodeType::Input
+                        | NodeType::Textarea
+                        | NodeType::NumberInput
+                        | NodeType::InputGroup
                 ) && props.get("value").is_some_and(|v| !v.is_null())
                 {
                     self.value_writes.push(id);
@@ -578,7 +581,7 @@ impl Tree {
                 }
                 if matches!(
                     node_type,
-                    NodeType::Input | NodeType::Textarea | NodeType::InputGroup
+                    NodeType::Input | NodeType::Textarea | NodeType::NumberInput | NodeType::InputGroup
                 ) && props.contains_key("value")
                     // A div's `class` places it again after the user dragged it (PROTOCOL.md section 8).
                     || node_type == NodeType::Div && props.contains_key("class")
@@ -1236,6 +1239,20 @@ mod tests {
         run(&mut tree, vec![set_value()]);
         run(&mut tree, vec![]);
         assert_eq!(tree.value_writes(), &[] as &[NodeId]);
+
+        // A NumberInput's value is text, written like an Input's (issue #5).
+        run(
+            &mut tree,
+            vec![
+                json!({"op": "create", "id": 2, "type": "NumberInput", "props": {"value": "1920"}}),
+            ],
+        );
+        assert_eq!(tree.value_writes(), &[2]);
+        run(
+            &mut tree,
+            vec![json!({"op": "setProps", "id": 2, "props": {"value": "777"}})],
+        );
+        assert_eq!(tree.value_writes(), &[2]);
     }
 
     #[test]

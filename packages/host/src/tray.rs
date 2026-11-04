@@ -63,28 +63,36 @@ pub fn sync(session: &Entity<Session>, tray: &RefCell<Tray>, cx: &App) {
         .menu
         .as_ref()
         .map(|items| Box::new(build_menu(items)) as Box<dyn ContextMenu>);
-    match &tray.icon {
-        Some(shown) => {
-            log_err(shown.set_icon(icon));
-            log_err(shown.set_tooltip(spec.tooltip.as_deref()));
-            shown.set_menu(menu);
-        }
-        None => {
-            let mut builder = TrayIconBuilder::new().with_menu_on_left_click(false);
-            if let Some(icon) = icon {
-                builder = builder.with_icon(icon);
+    // shortcut: a failed update (issue #6, not reproduced) rebuilds the icon instead of finding why
+    // the shell refused it; look for the cause if users see the icon move or flicker.
+    if let Some(shown) = &tray.icon {
+        let updated = shown
+            .set_icon(icon.clone())
+            .and_then(|()| shown.set_tooltip(spec.tooltip.as_deref()));
+        match updated {
+            Ok(()) => {
+                shown.set_menu(menu);
+                return;
             }
-            if let Some(tooltip) = &spec.tooltip {
-                builder = builder.with_tooltip(tooltip);
-            }
-            if let Some(menu) = menu {
-                builder = builder.with_menu(menu);
-            }
-            match builder.build() {
-                Ok(icon) => tray.icon = Some(icon),
-                Err(err) => log::error!("failed to create the tray icon: {err}"),
+            Err(err) => {
+                log::warn!("failed to update the tray icon ({err}); creating it again");
+                tray.icon = None;
             }
         }
+    }
+    let mut builder = TrayIconBuilder::new().with_menu_on_left_click(false);
+    if let Some(icon) = icon {
+        builder = builder.with_icon(icon);
+    }
+    if let Some(tooltip) = &spec.tooltip {
+        builder = builder.with_tooltip(tooltip);
+    }
+    if let Some(menu) = menu {
+        builder = builder.with_menu(menu);
+    }
+    match builder.build() {
+        Ok(icon) => tray.icon = Some(icon),
+        Err(err) => log::error!("failed to create the tray icon: {err}"),
     }
 }
 

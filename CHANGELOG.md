@@ -3,6 +3,21 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## Unreleased
+
+Host fixes and two additions; `PROTOCOL_VERSION` stays 1.
+
+- `NumberInput` draws its `value`, at `create` and through `setProps` (#5).
+- A text input created before its window opens, or kept while the window is closed and opened
+  again, shows its `value` (#11).
+- Closing stdin ends the host when no window is open, with or without a tray; the tray icon is
+  removed first (#7).
+- A tray update the shell refuses recreates the icon instead of leaving the old tooltip and icon
+  (#6, mitigation: the failure did not reproduce here).
+- `notify` with `system: true` works with no window open: notification center only, clicks not
+  reported (#8).
+- Classes `mt-|mr-|mb-|ml-{n}` (#10).
+
 ## 0.4.0 — 2026-11-04
 
 Every addition is a new class, an optional prop or a new event, so `PROTOCOL_VERSION` stays 1:

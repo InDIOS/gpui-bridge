@@ -2280,3 +2280,48 @@ propuesta de protocolo se aprobó antes de programar. Todo es aditivo (clases, p
 se pegan a los bordes de las otras, el cliente recibe la posición final, un chip apagado se
 suelta en el lienzo y llega `dropNode`, y el lienzo tiene degradado, sombra, número grande y
 puntos. Cumplido.
+
+### Fase 52 — Issues #5 a #11 de GitHub (2026-11-04)
+
+El usuario abrió siete issues en GitHub mientras pasaba una app de bandeja a txiki.js con
+`gpui-bridge@0.4.0`. Se arreglaron seis en el host; #9 (ocultar una ventana) queda pendiente
+de decisión. Ningún cambio toca el protocolo: `PROTOCOL_VERSION` sigue en 1.
+
+- **#5, `NumberInput` sin valor:** `NumberInput` faltaba en las dos listas de tipos que apuntan
+  `value_writes` (`create` y `setProps`) en `tree.rs`, así que su `value` nunca llegaba al
+  `InputState`.
+- **#11, `Input` creado antes de su ventana:** el estado se crea en el primer `render` de la
+  ventana, y solo se aplicaban los `value_writes` del último commit. Ahora `input::sync` pone
+  el `value` del nodo al crear el estado. Vale para los cuatro tipos de texto y para una
+  ventana que se vuelve a abrir. El texto que el usuario escribió y el cliente no devolvió no
+  se conserva, porque las ediciones no se guardan en las props.
+- **#7, el host no salía al cerrar stdin sin ventana:** no dependía de la bandeja, porque
+  también se colgaba sin ella. GPUI (Windows) encola `PostQuitMessage` en una tarea, y esa
+  tarea no llegaba a correr cuando la tarea que llamó a `cx.quit()` terminaba justo después
+  sin ventanas que movieran el bucle de mensajes. Una prueba con un `await` posterior salió
+  bien. Ahora la tarea quita la bandeja, llama a `quit` y espera con `pending()`. Se probaron
+  sin ventana, con bandeja, con la bandeja quitada y con ventana, en debug y release: siempre
+  código 0. No se hizo el `App.kill()` del cliente que pedía el issue, ni se miró `tjs.exit`.
+- **#6, error 5 al actualizar la bandeja:** no se reprodujo, ni con un PNG de 1024 px ni en
+  release. `sync` ya corre en el hilo principal, así que la hipótesis del hilo equivocado del
+  issue queda descartada. El error 5 puede ser un `GetLastError` viejo, porque
+  `Shell_NotifyIconW` no documenta que lo ponga. Mitigación: si `set_icon` o `set_tooltip`
+  fallan, el icono se crea de nuevo (comentario `shortcut:` en `tray.rs`).
+- **#8, `notify` con `system: true` sin ventana:** va directo a `show_system_notification`
+  con una etiqueta `gpui-bridge:{id}`. El clic no se informa, porque gpui-component maneja la
+  única respuesta e ignora las etiquetas que no son suyas. Al salir, un toast que GPUI todavía
+  tenía cerraba el host con 0xC0000005, así que estos toasts se retiran en `on_app_quit`. Los
+  de una ventana ya los retira gpui-component cuando la ventana se cierra.
+- **#10, márgenes por lado:** `mt-|mr-|mb-|ml-{n}`, la misma tabla que el padding.
+- **#9, ocultar una ventana:** sin hacer. GPUI 0.3.10 no tiene una forma de ocultar una sola
+  ventana, y `App::hide` está vacío en Windows. Habría que llamar a `ShowWindow` sobre el HWND,
+  añadir una opción de ventana nueva en los cuatro clientes y no hacer nada en macOS ni en
+  Linux. Queda para que decida el usuario.
+- **Documentación:** `PROTOCOL.md` §7 (valor al abrir la ventana), §8 (márgenes) y §14
+  (`notify` sin ventana), y `CHANGELOG.md` (Unreleased).
+- **Pruebas:** `fmt`, `clippy` y `cargo test` (unitarios con `NumberInput` en
+  `value_writes` y las clases nuevas, conformidad y `no_window`). En una ventana real: una
+  captura muestra los cuatro valores (un `Input` y un `NumberInput` creados antes de la
+  ventana, uno creado con ella y uno puesto con `setProps`). El toast sin ventana aparece en
+  pantalla y el host sale con 0.
+- **Tamaño del host release (Windows):** 21.571.584 → **21.591.552 B** (+19.968 B).
