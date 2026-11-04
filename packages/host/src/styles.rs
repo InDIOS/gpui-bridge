@@ -466,6 +466,23 @@ pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
 }
 
 /// The last `overflow-*-scroll` class, if any.
+/// The border the classes draw, in px per side (every `border*` class is 1 px wide).
+pub fn border_px(classes: &[Class]) -> Edges<f32> {
+    let side = |one: Class| {
+        if classes.contains(&Class::Border) || classes.contains(&one) {
+            1.
+        } else {
+            0.
+        }
+    };
+    Edges {
+        top: side(Class::BorderT),
+        right: side(Class::BorderR),
+        bottom: side(Class::BorderB),
+        left: side(Class::BorderL),
+    }
+}
+
 pub fn scroll_axis(classes: &[Class]) -> Option<ScrollAxis> {
     classes.iter().rev().find_map(|class| match *class {
         Class::OverflowScroll(axis) => Some(axis),

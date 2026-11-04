@@ -77,7 +77,8 @@ pub struct Tree {
     pending: Vec<ClientMessage>,
     /// Number of commits applied, so each window view applies `value_writes` once.
     commits: u64,
-    /// Input nodes whose `value` the client imposed in the last commit (PROTOCOL.md section 7).
+    /// Input nodes whose `value` the client imposed in the last commit (PROTOCOL.md section 7),
+    /// and divs whose `class` it set (a dragged div goes back to its classes, section 8).
     value_writes: Vec<NodeId>,
     /// Image files to read again: a `src` the client sent, or the bytes it sent as `data`.
     image_reloads: Vec<PathBuf>,
@@ -579,6 +580,8 @@ impl Tree {
                     node_type,
                     NodeType::Input | NodeType::Textarea | NodeType::InputGroup
                 ) && props.contains_key("value")
+                    // A div's `class` places it again after the user dragged it (PROTOCOL.md section 8).
+                    || node_type == NodeType::Div && props.contains_key("class")
                 {
                     self.value_writes.push(id);
                 }

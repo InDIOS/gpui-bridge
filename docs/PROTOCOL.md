@@ -165,7 +165,7 @@ Rules:
 
 | type       | props                                                        | events             |
 |------------|--------------------------------------------------------------|--------------------|
-| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip` | `click`, `doubleClick`, `menu`, `keyDown`, `drop` |
+| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd` |
 | `text`     | `content`, `class`                                           | —                  |
 | `Button`   | `label`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
 | `Input`    | `value`, `placeholder`, `disabled`, `controlled`, `class`    | `change`, `submit`, `keyDown` |
@@ -399,6 +399,21 @@ warning on stderr (once per class).
   as in CSS), so the parent needs no class and the `relative` class changes nothing. In a
   scroll area an `absolute` child scrolls with the content. Nodes paint in child order (a
   later sibling covers an earlier one); there is no `z-`.
+- **Dragging** (`div` props): `drag: true` on an `absolute` div whose parent is a `div` lets
+  the user move it with the mouse (without `absolute`, `drag` is ignored with a warning). The
+  host moves it every frame, without the client, and keeps it inside the parent's border. The
+  drag starts once the pointer moves a few pixels, so a plain click still sends `click` and a
+  drag does not. `magnetic` (`true` = 8, or a distance in px) snaps it to the parent's inner
+  edges and to the edges of its `drag` siblings within that distance: touching a sibling
+  (side by side) or aligned with it, only with siblings it overlaps, or nearly, on the other
+  axis. The host does not keep nodes from overlapping. On drop, `dragEnd` (opt-in) sends
+  `{"type":"event","id":5,"event":"dragEnd","value":{"x":120,"y":40}}`: whole pixels inside
+  the parent's border, the values for `left-[120px] top-[40px]`. The node stays where it was
+  left, over its classes, until a `setProps` carrying `class` places it again (the client
+  accepts with that position or corrects it; one that arrives during the drag applies on
+  drop). A node placed with `right-`/`bottom-` gets left/top too, so the client switches to
+  `left-`/`top-`. React only resends a prop that changed, so it cannot put a node back by
+  sending the same `class` again. Mouse only: no keyboard moves.
 - **Overflow:** `overflow-hidden`; on `div` only, `overflow-scroll`, `overflow-x-scroll` and
   `overflow-y-scroll` make it a scroll area with the theme's scrollbar, which keeps its
   position across commits. A `flex-1` child that should scroll usually needs `min-h-0`
@@ -496,6 +511,9 @@ of the client contract: without `--no-window` it is `unknown_op`.
   `Input` and `doubleClick` on a `div` (which sends `click` first) report to that node. A key
   that does not parse is `invalid_json`.
 - `drop` on a `div` plays files dropped on it; `value` is the list of paths.
+- `dragEnd` on a `div` plays the user leaving it at `value` `{"x":..,"y":..}` and sends the
+  event (rounded to whole pixels); without a window there is no layout, so nothing is
+  clamped or snapped.
 - `ok` and `cancel` on an open `Dialog` play the user's answer: the event is sent and `open`
   becomes `false`. On a closed one they are `invalid_operation`.
 - `change` on `Tabs` works like on `RadioGroup` (over `tabs`, or over its `Tab` children).

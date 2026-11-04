@@ -95,6 +95,8 @@ pub struct RootView {
     hovered: Rc<RefCell<HashSet<NodeId>>>,
     /// The `drag` area pressed and not yet moved, outside Windows (see `drag_area`).
     title_drag: Rc<Cell<Option<NodeId>>>,
+    /// Divs with `drag` the user moves, and where they were left (see `drag::Drags`).
+    drags: Rc<RefCell<drag::Drags>>,
     /// One view per node that keeps moving on its own (an `animate-*` loop, see
     /// `animated_nodes`), kept up to date by `sync_animated`. A frame redraws those nodes and not
     /// the whole window: a spinner on a tree of thousands of nodes should not rebuild all of it.
@@ -176,6 +178,7 @@ impl RootView {
             transitions: HashMap::new(),
             hovered: Rc::default(),
             title_drag: Rc::default(),
+            drags: Rc::default(),
             animated: HashMap::new(),
             texts: HashMap::new(),
             clock: Rc::default(),
@@ -312,6 +315,7 @@ impl RootView {
         } else {
             tree.value_writes()
         };
+        self.drags.borrow_mut().class_set(writes);
         let inputs = input::snapshot(tree, NodeType::Input, &members, writes);
         let textareas = input::snapshot(tree, NodeType::Textarea, &members, writes);
         let numbers = input::snapshot(tree, NodeType::NumberInput, &members, writes);
@@ -614,6 +618,7 @@ impl RootView {
             transitions: &mut self.transitions,
             hovered,
             title_drag: self.title_drag.clone(),
+            drags: self.drags.clone(),
             stateful: &mut self.stateful,
             focusables: &self.focusables,
             now,
@@ -755,6 +760,7 @@ impl RootView {
 }
 
 mod dialog;
+mod drag;
 mod sheet;
 
 /// One animation frame every 60th of a second, at most: a spinner or a fade does not need more, and
@@ -903,6 +909,12 @@ impl Render for RootView {
         // transition and its `hover:` (a node removed from the tree, a row scrolled out of a list,
         // a Dialog that closed).
         let keep = std::mem::take(&mut self.stateful);
+        // GPUI ends a drag on mouse up and redraws the window, so this is where it ends here.
+        let ended = self.drags.borrow_mut().finish(cx.has_active_drag());
+        if let Some((id, at)) = ended {
+            let tree = &self.session.read(cx).tree;
+            components::drag_ended(tree, id, f32::from(at.x).into(), f32::from(at.y).into());
+        }
         self.transitions.retain(|id, _| keep.contains(id));
         self.hovered.borrow_mut().retain(|id| keep.contains(id));
         let (session, window_id, focus) =
@@ -1021,6 +1033,7 @@ struct RenderCx<'a> {
     transitions: &'a mut HashMap<NodeId, Transition>,
     hovered: Rc<RefCell<HashSet<NodeId>>>,
     title_drag: Rc<Cell<Option<NodeId>>>,
+    drags: Rc<RefCell<drag::Drags>>,
     /// Nodes this pass produced state for (a transition, or a tracked `hover:`).
     stateful: &'a mut HashSet<NodeId>,
     focusables: &'a HashMap<NodeId, FocusHandle>,
@@ -1035,6 +1048,7 @@ struct RenderCx<'a> {
 
 static WARN_SPIN: Once = Once::new();
 static WARN_POSITION: Once = Once::new();
+static WARN_DRAG: Once = Once::new();
 
 impl RenderCx<'_> {
     fn node(&mut self, id: NodeId) -> AnyElement {
@@ -1712,7 +1726,12 @@ impl RenderCx<'_> {
 
     fn div_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         let control = window_control(node);
-        let blocks = self.blocks_area() && (control.is_some() || node.events.contains("click"));
+        let dragging = drag::draggable(node) && classes.contains(&Class::Absolute);
+        if drag::draggable(node) && !dragging {
+            WARN_DRAG.call_once(|| log::warn!("'drag' needs the 'absolute' class; ignored"));
+        }
+        let blocks =
+            self.blocks_area() && (control.is_some() || node.events.contains("click") || dragging);
         let outer = self.in_control;
         self.in_control |= control.is_some();
         let children: Vec<AnyElement> = node
@@ -1727,6 +1746,14 @@ impl RenderCx<'_> {
         let mut element = self.style(id, div(), classes, hovered).children(children);
         if !track_hover {
             element = styles::apply_hover(element, classes, self.theme);
+        }
+        // Where the user left it wins over its classes, until the client sets them again.
+        if let Some(at) = self.drags.borrow().placed.get(&id) {
+            element = element.left(at.x).top(at.y).right(auto()).bottom(auto());
+        }
+        let movers = drag::draggable_children(self.tree, node);
+        if !movers.is_empty() {
+            element = self.move_children(id, element, classes, movers);
         }
         // Only Windows reads the area; elsewhere the host moves the window and the buttons act on click.
         let os_control = control.filter(|_| !cfg!(target_os = "windows"));
@@ -1792,9 +1819,18 @@ impl RenderCx<'_> {
             || tooltip.is_some()
             || a11y.is_some()
             || button.is_some()
+            || dragging
         {
             // A stable id keeps the context menu's open state across renders.
             let mut element = element.id(("node", id));
+            if dragging {
+                // GPUI starts the drag past a few px and then drops the click.
+                let drags = self.drags.clone();
+                element = element.on_drag(drag::NodeDrag(id), move |_, grab, _, cx| {
+                    drags.borrow_mut().active = Some((id, grab));
+                    cx.new(|_| EmptyView)
+                });
+            }
             if let Some(area) = button {
                 element = element.on_click(move |_, window, _| match area {
                     WindowControlArea::Min => window.minimize_window(),
@@ -1840,6 +1876,51 @@ impl RenderCx<'_> {
         } else {
             scrollable(element, axis, id, None)
         }
+    }
+
+    /// A div whose children include `drag` ones: it moves the one the user drags, inside its
+    /// border, stuck to the edges `magnetic` asks for (see `drag::place`).
+    fn move_children(
+        &self,
+        id: NodeId,
+        element: Div,
+        classes: &[Class],
+        movers: Vec<(usize, NodeId, f32)>,
+    ) -> Div {
+        let border = styles::border_px(classes);
+        let (seen, drags) = (self.drags.clone(), self.drags.clone());
+        element
+            .on_children_prepainted(move |bounds, _, _| {
+                seen.borrow_mut().children.insert(id, bounds);
+            })
+            .on_drag_move(move |event: &DragMoveEvent<drag::NodeDrag>, _, cx| {
+                let dragged = event.drag(cx).0;
+                let Some(&(index, _, magnet)) = movers.iter().find(|m| m.1 == dragged) else {
+                    return;
+                };
+                let mut drags = drags.borrow_mut();
+                let (Some((_, grab)), Some(all)) = (drags.active, drags.children.get(&id)) else {
+                    return;
+                };
+                let Some(own) = all.get(index) else {
+                    return;
+                };
+                let inside = event.bounds.origin + point(px(border.left), px(border.top));
+                let inner = size(
+                    f32::from(event.bounds.size.width) - border.left - border.right,
+                    f32::from(event.bounds.size.height) - border.top - border.bottom,
+                );
+                let relative =
+                    |b: &Bounds<Pixels>| Bounds::new(b.origin - inside, b.size).map(f32::from);
+                let siblings: Vec<Bounds<f32>> = movers
+                    .iter()
+                    .filter(|m| m.1 != dragged)
+                    .filter_map(|m| all.get(m.0).map(relative))
+                    .collect();
+                let at = (event.event.position - inside - grab).map(f32::from);
+                let at = drag::place(at, own.size.map(f32::from), inner, &siblings, magnet);
+                drags.placed.insert(dragged, at.map(px));
+            })
     }
 
     fn menu_bar_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {

@@ -1,0 +1,25 @@
+# Section 8: a div with `drag` the host moves. `dragEnd` gives where the user left it, in px inside
+# the parent's border: the `left-[Npx] top-[Npx]` the client writes back.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"class":"relative w-[400px] h-[300px]"}}
+> {"op":"create","id":2,"type":"div","props":{"class":"absolute left-[10px] top-[20px] w-[100px] h-[60px]","drag":true,"magnetic":true},"events":["dragEnd"]}
+> {"op":"create","id":3,"type":"div","props":{"class":"absolute left-[200px] top-[20px] w-[100px] h-[60px]","drag":true,"magnetic":12}}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":3}
+> {"op":"commit"}
+> {"op":"simulate","id":2,"event":"dragEnd","value":{"x":98,"y":20}}
+< {"type":"event","id":2,"event":"dragEnd","value":{"x":98,"y":20}}
+# Without a listener nothing is sent.
+> {"op":"simulate","id":3,"event":"dragEnd","value":{"x":0,"y":0}}
+> {"op":"simulate","id":2,"event":"dragEnd","value":{"x":5}}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# `drag` is a boolean; `magnetic` a boolean or a distance from 0.
+> {"op":"setProps","id":2,"props":{"drag":"yes"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":2,"props":{"magnetic":-1}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":2,"props":{"magnetic":false,"class":"absolute left-[98px] top-[20px] w-[100px] h-[60px]"}}
+> {"op":"commit"}

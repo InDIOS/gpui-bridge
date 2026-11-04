@@ -139,6 +139,13 @@ pub fn dropped(tree: &Tree, id: NodeId, paths: Vec<String>) {
     }
 }
 
+/// The user left a `drag` div at `x`, `y` (px inside its parent's border, PROTOCOL.md section 8),
+/// sent as whole px, as the window places it.
+pub fn drag_ended(tree: &Tree, id: NodeId, x: f64, y: f64) {
+    let at = serde_json::json!({"x": x.round() as i64, "y": y.round() as i64});
+    emit(tree, id, "dragEnd", Some(at), None);
+}
+
 /// The second click of a double click (the first one already sent `click`).
 pub fn double_clicked(tree: &Tree, id: NodeId) {
     emit(tree, id, "doubleClick", None, None);

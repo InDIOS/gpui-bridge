@@ -153,7 +153,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             "click"
         ) | (NodeType::Div, "doubleClick")
             | (NodeType::Div | NodeType::Input, "keyDown")
-            | (NodeType::Div, "drop")
+            | (NodeType::Div, "drop" | "dragEnd")
             | (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel")
             | (NodeType::Sheet | NodeType::DockPanel, "close")
             | (NodeType::Popover, "change")
@@ -340,6 +340,24 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
                 )
             })?;
             components::dropped(tree, id, paths);
+        }
+        (NodeType::Div, "dragEnd") => {
+            let at = sim.value.as_ref().and_then(|value| {
+                let coord = |key| {
+                    value
+                        .get(key)
+                        .and_then(Value::as_f64)
+                        .filter(|n| n.is_finite())
+                };
+                Some((coord("x")?, coord("y")?))
+            });
+            let (x, y) = at.ok_or_else(|| {
+                fail(
+                    ErrorCode::InvalidJson,
+                    "'dragEnd' needs {x, y} numbers in 'value'".into(),
+                )
+            })?;
+            components::drag_ended(tree, id, x, y);
         }
         (NodeType::Div | NodeType::Input, "keyDown") => {
             let keys = text()?;
