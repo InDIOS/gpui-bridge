@@ -1,6 +1,6 @@
 # Releasing
 
-Host and clients are versioned **in lockstep** (today `0.3.0`): the packages carry the host
+Host and clients are versioned **in lockstep** (today `0.4.0`): the packages carry the host
 binary, so a client version is also a host version. The protocol has its own number
 (`PROTOCOL_VERSION` in `packages/host/src/protocol.rs`, today 1) and only changes with an agreed
 protocol change.
@@ -47,7 +47,7 @@ quote, and `gpui-bridge-host --version` prints the same facts.
 3. Pack the client, the platform package for this machine and the platform-tagged wheel:
 
    ```sh
-   pnpm pack:node                         # packages/client-node/gpui-bridge-0.3.0.tgz
+   pnpm pack:node                         # packages/client-node/gpui-bridge-0.4.0.tgz
    pnpm --dir packages/host-<platform>-<arch> pack
    pnpm wheel                             # -> packages/client-python/dist/*.whl
    ```
@@ -136,8 +136,8 @@ From 0.2.1 on, a release is steps 2 and 6 only.
   a signing service (for example Azure Trusted Signing) that the maintainer owns; until then,
   the binary is unsigned. macOS binaries installed by npm or pip are not quarantined, so
   Gatekeeper does not block them.
-- The visual check of a real window per platform is still owed for macOS and Linux (the host is
-  only drawn and clicked on Windows so far).
+- The visual check of a real window is still owed for macOS (the host is drawn and clicked on
+  Windows and on Linux, Ubuntu on WSL).
 - Only `x64` Windows and Linux and `arm64` macOS have a binary.
 - **The hosts in the GitHub release are unsigned.** A macOS host downloaded with a browser is
   quarantined and Gatekeeper blocks it until the user runs `xattr -d com.apple.quarantine` on it
