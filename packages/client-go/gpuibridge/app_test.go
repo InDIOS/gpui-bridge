@@ -1,6 +1,7 @@
 package gpuibridge
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -430,6 +431,38 @@ func TestSlotChildrenAreAcceptedAndReport(t *testing.T) {
 	case <-clicked:
 	case <-time.After(5 * time.Second):
 		t.Fatal("click did not arrive")
+	}
+	app.Close()
+}
+
+func TestDragEventsCarryTheirValue(t *testing.T) {
+	app := mustApp(t)
+	seen := make(chan any, 2)
+	value := func(payload any) { seen <- payload.(map[string]any)["value"] }
+	tile := app.Div(Props{"class": "absolute left-[10px] top-[20px] w-[100px] h-[60px]", "drag": true, "magnetic": 12}).
+		On("dragEnd", value)
+	canvas := app.Div(Props{"class": "relative w-[400px] h-[300px] bg-dots", "dropTarget": true}).
+		On("dropNode", value).
+		Append(tile)
+	app.Window(WindowOptions{Root: app.Div(Props{}).Append(app.Div(Props{"dragData": "monitor-2"}), canvas)})
+	if err := app.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(tile.ID(), "dragEnd", map[string]any{"x": 98, "y": 20}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.Simulate(canvas.ID(), "dropNode", map[string]any{"data": "monitor-2", "x": 120, "y": 40}, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"map[x:98 y:20]", "map[data:monitor-2 x:120 y:40]"} {
+		select {
+		case got := <-seen:
+			if fmt.Sprint(got) != want {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s did not arrive", want)
+		}
 	}
 	app.Close()
 }

@@ -176,6 +176,25 @@ test("onDrop gets the dropped paths", async () => {
   assert.deepEqual(errors, []);
 });
 
+test("drag props pass through; onDragEnd and onDropNode get their value", async () => {
+  const got: unknown[] = [];
+  const { app, sent, errors } = await renderRecorded(
+    <Div class="relative w-[400px] h-[300px]" dropTarget onDropNode={(drop) => got.push(drop)}>
+      <Div class="absolute left-[10px] top-[20px] w-[100px] h-[60px]" drag magnetic onDragEnd={(point) => got.push(point)} />
+      <Div dragData="monitor-2" />
+    </Div>,
+  );
+  const divs = created(sent, "div");
+  const zone = divs.find((m) => m.props?.dropTarget === true);
+  const tile = divs.find((m) => m.props?.drag === true && m.props?.magnetic === true);
+  assert.ok(zone && tile && divs.some((m) => m.props?.dragData === "monitor-2"));
+  app.handleMessage({ type: "event", id: tile.id, event: "dragEnd", value: { x: 98, y: 20 } });
+  app.handleMessage({ type: "event", id: zone.id, event: "dropNode", value: { data: "monitor-2", x: 120, y: 40 } });
+  assert.deepEqual(got, [{ x: 98, y: 20 }, { data: "monitor-2", x: 120, y: 40 }]);
+  await app.close();
+  assert.deepEqual(errors, []);
+});
+
 test("Dialog renders its children as a node with onOk/onCancel; tooltip passes through", async () => {
   const got: string[] = [];
   function Rename() {
