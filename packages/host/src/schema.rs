@@ -431,6 +431,8 @@ impl NodeType {
             (Self::Div, "contextMenu") => Some(Menu),
             (Self::Div, "drag") => Some(Bool),
             (Self::Div, "magnetic") => Some(Magnet),
+            (Self::Div, "dragData") => Some(Str),
+            (Self::Div, "dropTarget") => Some(Bool),
             (Self::MenuBar, "menus") => Some(Menus),
             (Self::Image, "fit") => {
                 Some(OneOf(&["contain", "cover", "fill", "scale-down", "none"]))

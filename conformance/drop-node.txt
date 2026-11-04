@@ -1,0 +1,25 @@
+# Section 8: a div with `dragData` carried to a `dropTarget` div, which gets `dropNode` with the
+# data and where the copy's corner was left, in px inside the zone's border. The host moves nothing.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+> {"op":"create","id":1,"type":"div","props":{"class":"flex flex-row"}}
+> {"op":"create","id":2,"type":"div","props":{"class":"px-2 py-1 bg-muted","dragData":"monitor-2"}}
+> {"op":"create","id":3,"type":"div","props":{"class":"relative w-[400px] h-[300px] drag-over:bg-accent","dropTarget":true},"events":["dropNode"]}
+> {"op":"create","id":4,"type":"div","props":{"dropTarget":true}}
+> {"op":"append","parent":1,"child":2}
+> {"op":"append","parent":1,"child":3}
+> {"op":"append","parent":1,"child":4}
+> {"op":"commit"}
+> {"op":"simulate","id":3,"event":"dropNode","value":{"data":"monitor-2","x":120.4,"y":40}}
+< {"type":"event","id":3,"event":"dropNode","value":{"data":"monitor-2","x":120,"y":40}}
+# Without a listener nothing is sent; `data` is required.
+> {"op":"simulate","id":4,"event":"dropNode","value":{"data":"monitor-2","x":0,"y":0}}
+> {"op":"simulate","id":3,"event":"dropNode","value":{"x":1,"y":2}}
+< {"type":"error","code":"invalid_json","op":"simulate"}
+# `dragData` is a string; `dropTarget` a boolean.
+> {"op":"setProps","id":2,"props":{"dragData":7}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}
+> {"op":"setProps","id":3,"props":{"dropTarget":"yes"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"setProps"}

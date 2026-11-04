@@ -178,6 +178,10 @@ pub enum Class {
     HoverBg(ThemeRole),
     HoverTextColor(ThemeRole),
     HoverBorderColor(ThemeRole),
+    /// `drag-over:` colors, while a node is carried over a `dropTarget` div.
+    DragOverBg(ThemeRole),
+    DragOverTextColor(ThemeRole),
+    DragOverBorderColor(ThemeRole),
     /// 0 to 1.
     Opacity(f32),
     /// Animate color and opacity changes (see `animation`).
@@ -270,6 +274,14 @@ pub fn parse_class(name: &str) -> Option<Class> {
                     Bg(role) => Some(HoverBg(role)),
                     TextColor(role) => Some(HoverTextColor(role)),
                     BorderColor(role) => Some(HoverBorderColor(role)),
+                    _ => None,
+                };
+            }
+            if let Some(over) = name.strip_prefix("drag-over:") {
+                return match parse_color(over)? {
+                    Bg(role) => Some(DragOverBg(role)),
+                    TextColor(role) => Some(DragOverTextColor(role)),
+                    BorderColor(role) => Some(DragOverBorderColor(role)),
                     _ => None,
                 };
             }
@@ -452,11 +464,14 @@ pub fn apply<E: Styled>(element: E, classes: &[Class], theme: &Theme) -> E {
         Class::TextColor(role) => el.text_color(color(theme, role)),
         Class::BorderColor(role) => el.border_color(color(theme, role)),
         Class::Opacity(opacity) => el.opacity(opacity),
-        // Handled by `animation`, `scroll_axis` and `apply_hover`.
+        // Handled by `animation`, `scroll_axis`, `apply_hover` and `apply_drag_over`.
         Class::OverflowScroll(_)
         | Class::HoverBg(_)
         | Class::HoverTextColor(_)
         | Class::HoverBorderColor(_)
+        | Class::DragOverBg(_)
+        | Class::DragOverTextColor(_)
+        | Class::DragOverBorderColor(_)
         | Class::Transition
         | Class::DurationMs(_)
         | Class::Ease(_)
@@ -515,6 +530,29 @@ pub fn apply_hover<E: InteractiveElement>(element: E, classes: &[Class], theme: 
         return element;
     }
     element.hover(|style| apply(style, &hover, theme))
+}
+
+/// Applies the `drag-over:` classes while a `T` is dragged over the element.
+pub fn apply_drag_over<E: InteractiveElement, T: 'static>(
+    element: E,
+    classes: &[Class],
+    theme: &Theme,
+) -> E {
+    let over: Vec<Class> = classes
+        .iter()
+        .filter_map(|class| match *class {
+            Class::DragOverBg(role) => Some(Class::Bg(role)),
+            Class::DragOverTextColor(role) => Some(Class::TextColor(role)),
+            Class::DragOverBorderColor(role) => Some(Class::BorderColor(role)),
+            _ => None,
+        })
+        .collect();
+    if over.is_empty() {
+        return element;
+    }
+    // The closure outlives this frame: the colors are taken from the theme now.
+    let style = apply(StyleRefinement::default(), &over, theme);
+    element.drag_over::<T>(move |_, _, _, _| style.clone())
 }
 
 #[cfg(test)]
@@ -617,6 +655,11 @@ mod tests {
                 "hover:border-ring",
                 Class::HoverBorderColor(ThemeRole::Ring),
             ),
+            ("drag-over:bg-accent", Class::DragOverBg(ThemeRole::Accent)),
+            (
+                "drag-over:border-primary",
+                Class::DragOverBorderColor(ThemeRole::Primary),
+            ),
             ("opacity-0", Class::Opacity(0.0)),
             ("opacity-50", Class::Opacity(0.5)),
             ("opacity-100", Class::Opacity(1.0)),
@@ -694,6 +737,9 @@ mod tests {
             "h-[-1px]",
             "p-[4px]",
             "hover:left-0",
+            "drag-over:p-2",
+            "drag-over:",
+            "drag-over:hover:bg-accent",
         ] {
             assert_eq!(parse_class(name), None, "{name}");
         }

@@ -153,7 +153,7 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             "click"
         ) | (NodeType::Div, "doubleClick")
             | (NodeType::Div | NodeType::Input, "keyDown")
-            | (NodeType::Div, "drop" | "dragEnd")
+            | (NodeType::Div, "drop" | "dragEnd" | "dropNode")
             | (NodeType::Dialog | NodeType::AlertDialog, "ok" | "cancel")
             | (NodeType::Sheet | NodeType::DockPanel, "close")
             | (NodeType::Popover, "change")
@@ -341,23 +341,27 @@ fn run(message: Value, tree: &mut Tree) -> Result<Outcome, ProtocolError> {
             })?;
             components::dropped(tree, id, paths);
         }
-        (NodeType::Div, "dragEnd") => {
-            let at = sim.value.as_ref().and_then(|value| {
-                let coord = |key| {
-                    value
-                        .get(key)
-                        .and_then(Value::as_f64)
-                        .filter(|n| n.is_finite())
-                };
-                Some((coord("x")?, coord("y")?))
-            });
-            let (x, y) = at.ok_or_else(|| {
-                fail(
-                    ErrorCode::InvalidJson,
-                    "'dragEnd' needs {x, y} numbers in 'value'".into(),
-                )
-            })?;
-            components::drag_ended(tree, id, x, y);
+        (NodeType::Div, "dragEnd" | "dropNode") => {
+            let value = sim.value.as_ref();
+            let coord = |key| {
+                value?
+                    .get(key)
+                    .and_then(Value::as_f64)
+                    .filter(|n| n.is_finite())
+            };
+            let data = value.and_then(|value| value.get("data")?.as_str());
+            match (sim.event.as_str(), coord("x"), coord("y"), data) {
+                ("dragEnd", Some(x), Some(y), _) => components::drag_ended(tree, id, x, y),
+                ("dropNode", Some(x), Some(y), Some(data)) => {
+                    components::node_dropped(tree, id, data, x, y)
+                }
+                _ => {
+                    return Err(fail(
+                        ErrorCode::InvalidJson,
+                        "'dragEnd' needs {x, y} numbers in 'value', 'dropNode' {data, x, y}".into(),
+                    ));
+                }
+            }
         }
         (NodeType::Div | NodeType::Input, "keyDown") => {
             let keys = text()?;

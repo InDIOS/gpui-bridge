@@ -1049,6 +1049,7 @@ struct RenderCx<'a> {
 static WARN_SPIN: Once = Once::new();
 static WARN_POSITION: Once = Once::new();
 static WARN_DRAG: Once = Once::new();
+static WARN_DRAG_DATA: Once = Once::new();
 
 impl RenderCx<'_> {
     fn node(&mut self, id: NodeId) -> AnyElement {
@@ -1730,8 +1731,15 @@ impl RenderCx<'_> {
         if drag::draggable(node) && !dragging {
             WARN_DRAG.call_once(|| log::warn!("'drag' needs the 'absolute' class; ignored"));
         }
-        let blocks =
-            self.blocks_area() && (control.is_some() || node.events.contains("click") || dragging);
+        let data = node.props.get("dragData").and_then(Value::as_str);
+        if dragging && data.is_some() {
+            WARN_DRAG_DATA.call_once(|| {
+                log::warn!("a div with 'drag' moves itself; its 'dragData' is ignored")
+            });
+        }
+        let data = data.filter(|_| !dragging);
+        let blocks = self.blocks_area()
+            && (control.is_some() || node.events.contains("click") || dragging || data.is_some());
         let outer = self.in_control;
         self.in_control |= control.is_some();
         let children: Vec<AnyElement> = node
@@ -1754,6 +1762,21 @@ impl RenderCx<'_> {
         let movers = drag::draggable_children(self.tree, node);
         if !movers.is_empty() {
             element = self.move_children(id, element, classes, movers);
+        }
+        if data.is_some() {
+            // Its copy takes its size, border included (the canvas fills the inside).
+            let (drags, border) = (self.drags.clone(), styles::border_px(classes));
+            let measure = move |bounds: Bounds<Pixels>, _: &mut Window, _: &mut App| {
+                let outer = size(
+                    bounds.size.width + px(border.left + border.right),
+                    bounds.size.height + px(border.top + border.bottom),
+                );
+                drags.borrow_mut().sizes.insert(id, outer);
+            };
+            element = element.child(canvas(measure, |_, _, _, _| {}).absolute().size_full());
+        }
+        if node.props.get("dropTarget") == Some(&Value::Bool(true)) {
+            element = self.drop_target(id, element, classes);
         }
         // Only Windows reads the area; elsewhere the host moves the window and the buttons act on click.
         let os_control = control.filter(|_| !cfg!(target_os = "windows"));
@@ -1820,6 +1843,7 @@ impl RenderCx<'_> {
             || a11y.is_some()
             || button.is_some()
             || dragging
+            || data.is_some()
         {
             // A stable id keeps the context menu's open state across renders.
             let mut element = element.id(("node", id));
@@ -1829,6 +1853,16 @@ impl RenderCx<'_> {
                 element = element.on_drag(drag::NodeDrag(id), move |_, grab, _, cx| {
                     drags.borrow_mut().active = Some((id, grab));
                     cx.new(|_| EmptyView)
+                });
+            }
+            if let Some(data) = data {
+                let (drags, view) = (self.drags.clone(), self.view.downgrade());
+                let value = drag::NodeData(data.to_owned());
+                element = element.on_drag(value, move |_, grab, _, cx| {
+                    let size = drags.borrow().sizes.get(&id).copied();
+                    drags.borrow_mut().carried = Some((grab, size));
+                    let view = view.clone();
+                    cx.new(|_| drag::Preview { view, id, size })
                 });
             }
             if let Some(area) = button {
@@ -1920,6 +1954,35 @@ impl RenderCx<'_> {
                 let at = (event.event.position - inside - grab).map(f32::from);
                 let at = drag::place(at, own.size.map(f32::from), inner, &siblings, magnet);
                 drags.placed.insert(dragged, at.map(px));
+            })
+    }
+
+    /// A `dropTarget` div: `drag-over:` while a node is carried over it, and `dropNode` with
+    /// the node's `dragData` and where its copy was left, inside the border and the zone.
+    fn drop_target(&self, id: NodeId, element: Div, classes: &[Class]) -> Div {
+        let element = styles::apply_drag_over::<_, drag::NodeData>(element, classes, self.theme);
+        let (seen, drags) = (self.drags.clone(), self.drags.clone());
+        let (session, border) = (self.session.clone(), styles::border_px(classes));
+        element
+            .on_drag_move(move |event: &DragMoveEvent<drag::NodeData>, _, _| {
+                seen.borrow_mut().targets.insert(id, event.bounds);
+            })
+            .on_drop(move |value: &drag::NodeData, window, cx| {
+                let drags = drags.borrow();
+                let (Some(bounds), Some((grab, copy))) = (drags.targets.get(&id), drags.carried)
+                else {
+                    return;
+                };
+                let inside = bounds.origin + point(px(border.left), px(border.top));
+                let inner = size(
+                    f32::from(bounds.size.width) - border.left - border.right,
+                    f32::from(bounds.size.height) - border.top - border.bottom,
+                );
+                let at = (window.mouse_position() - inside - grab).map(f32::from);
+                let copy = copy.unwrap_or_default().map(f32::from);
+                let at = drag::place(at, copy, inner, &[], 0.);
+                let tree = &session.read(cx).tree;
+                components::node_dropped(tree, id, &value.0, at.x.into(), at.y.into());
             })
     }
 

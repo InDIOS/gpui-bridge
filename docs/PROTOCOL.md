@@ -165,7 +165,7 @@ Rules:
 
 | type       | props                                                        | events             |
 |------------|--------------------------------------------------------------|--------------------|
-| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd` |
+| `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic`, `dragData`, `dropTarget` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd`, `dropNode` |
 | `text`     | `content`, `class`                                           | —                  |
 | `Button`   | `label`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
 | `Input`    | `value`, `placeholder`, `disabled`, `controlled`, `class`    | `change`, `submit`, `keyDown` |
@@ -414,6 +414,19 @@ warning on stderr (once per class).
   drop). A node placed with `right-`/`bottom-` gets left/top too, so the client switches to
   `left-`/`top-`. React only resends a prop that changed, so it cannot put a node back by
   sending the same `class` again. Mouse only: no keyboard moves.
+- **Dropping a node on a zone** (`div` props): `dragData` (a string) lets the user carry a
+  div to a `dropTarget: true` div. The node stays where it is; a copy of it (same size, 80%
+  opacity) follows the pointer, and the drag starts once the pointer moves a few pixels, as
+  with `drag` (which wins, with a warning, on a div that has both). While the copy is over a
+  zone, its `drag-over:` classes apply: theme colors, as with `hover:`
+  (`drag-over:bg-accent`, `drag-over:border-primary`). Left on a zone, the innermost one
+  under the pointer gets `dropNode` (opt-in):
+  `{"type":"event","id":3,"event":"dropNode","value":{"data":"monitor-2","x":120,"y":40}}`,
+  where `x`/`y` is the copy's top-left corner in whole pixels inside the zone's border, kept
+  inside the zone: the `left-`/`top-` for a node placed there. Left anywhere else, nothing
+  is sent. The host moves no node: the client acts with the usual operations. A free `drag`
+  never lands on a zone. No filter of what a zone takes, no event on the source, no drop
+  between windows, mouse only.
 - **Overflow:** `overflow-hidden`; on `div` only, `overflow-scroll`, `overflow-x-scroll` and
   `overflow-y-scroll` make it a scroll area with the theme's scrollbar, which keeps its
   position across commits. A `flex-1` child that should scroll usually needs `min-h-0`
@@ -423,7 +436,8 @@ warning on stderr (once per class).
   monospace font), `truncate`, `whitespace-normal`, `whitespace-nowrap`, `whitespace-pre`
   (the same as `nowrap`: spaces and line breaks are always kept)
 - **Interaction:** `cursor-pointer`; on `div` only, `hover:` followed by a theme color class
-  (`hover:bg-accent`, `hover:text-primary`, `hover:border-ring`)
+  (`hover:bg-accent`, `hover:text-primary`, `hover:border-ring`), and `drag-over:` the same
+  way on a `dropTarget` (below)
 - **Opacity:** `opacity-{n}`, with `n` from 0 to 100 in steps of 5. On a `div` it fades its
   children too.
 - **Transitions:** `transition` makes a node's background, text and border colors and its
@@ -513,7 +527,8 @@ of the client contract: without `--no-window` it is `unknown_op`.
 - `drop` on a `div` plays files dropped on it; `value` is the list of paths.
 - `dragEnd` on a `div` plays the user leaving it at `value` `{"x":..,"y":..}` and sends the
   event (rounded to whole pixels); without a window there is no layout, so nothing is
-  clamped or snapped.
+  clamped or snapped. `dropNode` on a `div` plays a node left on it, with `value`
+  `{"data":..,"x":..,"y":..}`, the same way.
 - `ok` and `cancel` on an open `Dialog` play the user's answer: the event is sent and `open`
   becomes `false`. On a closed one they are `invalid_operation`.
 - `change` on `Tabs` works like on `RadioGroup` (over `tabs`, or over its `Tab` children).

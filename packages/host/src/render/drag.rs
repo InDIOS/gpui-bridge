@@ -1,16 +1,43 @@
 //! `drag` on an `absolute` div (PROTOCOL.md section 8): the host moves the node itself, inside its
 //! parent and stuck to the edges `magnetic` asks for, and reports where it was left with `dragEnd`.
+//! `dragData` on a div: the user carries a copy of it to a `dropTarget` div, which gets `dropNode`.
 
 use std::collections::HashMap;
 
 use gpui_kit::*;
 use serde_json::Value;
 
+use super::RootView;
 use crate::protocol::NodeId;
 use crate::tree::{Node, Tree};
 
 /// GPUI's drag value for a node being moved. Its own type, so a node drop target never takes it.
 pub struct NodeDrag(pub NodeId);
+
+/// GPUI's drag value for a node carried to a `dropTarget`, with the client's `dragData`.
+pub struct NodeData(pub String);
+
+/// The copy of a carried node that follows the pointer: the node drawn again, see-through.
+pub struct Preview {
+    pub view: WeakEntity<RootView>,
+    pub id: NodeId,
+    pub size: Option<Size<Pixels>>,
+}
+
+impl Render for Preview {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (id, owner) = (self.id, cx.entity().entity_id());
+        let copy = self
+            .view
+            .update(cx, |view, cx| view.render_animated(id, owner, cx).0)
+            .unwrap_or_else(|_| div().into_any_element());
+        let preview = div().opacity(0.8).child(copy);
+        match self.size {
+            Some(size) => preview.w(size.width).h(size.height),
+            None => preview,
+        }
+    }
+}
 
 /// One window's drags, shared by its passes and the handlers they install.
 #[derive(Default)]
@@ -24,6 +51,12 @@ pub struct Drags {
     pub reset: bool,
     /// The bounds of each parent's children, from the last frame (`on_children_prepainted`).
     pub children: HashMap<NodeId, Vec<Bounds<Pixels>>>,
+    /// The size of each `dragData` node in the last frame, which its copy takes.
+    pub sizes: HashMap<NodeId, Size<Pixels>>,
+    /// The node carried to a `dropTarget`: where the pointer holds it, and its size.
+    pub carried: Option<(Point<Pixels>, Option<Size<Pixels>>)>,
+    /// The bounds of each `dropTarget` while a node is carried.
+    pub targets: HashMap<NodeId, Bounds<Pixels>>,
 }
 
 impl Drags {
@@ -44,6 +77,10 @@ impl Drags {
         if still_dragging {
             return None;
         }
+        // Sizes are measured again this frame, and no node is carried any more.
+        self.sizes.clear();
+        self.carried = None;
+        self.targets.clear();
         let (id, _) = self.active.take()?;
         let at = self.placed.get(&id).copied();
         if std::mem::take(&mut self.reset) {
