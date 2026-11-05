@@ -763,7 +763,12 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 - `system: true` also posts it to the Windows notification center, where it shows under the
   app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
   window open (a tray app), it goes to the notification center only; a click on it is not
-  reported, and the host removes it from the center when it exits.
+  reported, and the host removes it from the center when it exits. With a window open, each
+  one logs a few `RefCell already borrowed` errors on stderr: the Windows toast call delivers
+  window messages while GPUI is busy, and GPUI drops them. They are harmless (the toast shows
+  and the window keeps drawing) and the host cannot avoid them (#15). Registering the app
+  identity writes to `HKCU`; a host launched with a restricted token (a sandbox) may log
+  "Access is denied" for it, and then the toast may not show.
 - With `--no-window` it is validated and nothing is shown.
 
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.

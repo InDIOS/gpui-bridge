@@ -9,6 +9,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
   bounds; nothing is reported while the window is minimized (#14).
 - A component with `a11y` and a relative size (`flex-1`, `w-full`) fills its row: the
   accessibility wrapper repeats the node's size classes (#16).
+- PROTOCOL §14 documents the harmless `RefCell already borrowed` log of `notify` with
+  `system: true` and a window open, and the "Access is denied" of a restricted launch token (#15).
 
 ## 0.4.1 — 2026-11-05
 
