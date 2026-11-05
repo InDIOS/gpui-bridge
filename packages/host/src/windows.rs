@@ -129,15 +129,17 @@ fn show_window(window: &Window, visible: bool) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     #[link(name = "user32")]
     unsafe extern "system" {
-        fn ShowWindow(hwnd: isize, command: i32) -> i32;
+        fn ShowWindowAsync(hwnd: isize, command: i32) -> i32;
     }
     const SW_HIDE: i32 = 0;
     const SW_SHOW: i32 = 5;
     if let Ok(handle) = HasWindowHandle::window_handle(window)
         && let RawWindowHandle::Win32(handle) = handle.as_raw()
     {
-        // SAFETY: the HWND belongs to this open GPUI window, on its own (the main) thread.
-        unsafe { ShowWindow(handle.hwnd.get(), if visible { SW_SHOW } else { SW_HIDE }) };
+        // Async: a synchronous ShowWindow runs GPUI's window procedure while the App is borrowed
+        // here ("RefCell already borrowed", #12); this posts it to the message loop instead.
+        // SAFETY: the HWND belongs to this open GPUI window.
+        unsafe { ShowWindowAsync(handle.hwnd.get(), if visible { SW_SHOW } else { SW_HIDE }) };
     }
 }
 
