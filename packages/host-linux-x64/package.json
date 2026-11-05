@@ -1,6 +1,6 @@
 {
   "name": "@indios/gpui-bridge-linux-x64",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "The gpui-bridge host binary for Linux x64 (installed by gpui-bridge, not directly)",
   "license": "MIT",
   "author": "gpui-bridge contributors",

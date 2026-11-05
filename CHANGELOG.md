@@ -3,7 +3,9 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
-## Unreleased
+## 0.4.2 — 2026-11-05
+
+Host fixes; `PROTOCOL_VERSION` stays 1.
 
 - Maximizing, entering fullscreen and restoring a window report `resize` with the current
   bounds; nothing is reported while the window is minimized (#14).
