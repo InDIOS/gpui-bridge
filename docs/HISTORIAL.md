@@ -2353,7 +2353,8 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   tamaño, y no se informa nada mientras la ventana está minimizada (`IsIconic` sobre el HWND,
   declarada a mano como `ShowWindowAsync`). Prueba con `ShowWindow` 3/9/3/6/9/6/9: maximizar da
   `resize 0 55 1920 1025`, restaurar da `resize 560 256 800 600`, y minimizar y volver no envían
-  nada.
+  nada. El usuario repitió la prueba a mano en Linux (WSL Ubuntu, `examples/windows.ts`):
+  maximizar, restaurar, arrastrar un borde y minimizar y volver se ven bien.
 - **#16, `NumberInput` con `a11y` sin valor:** el envoltorio genérico `a11y::wrap` es una fila
   flex sin tamaño, así que el `flex-1`/`w-full` del componente se medía contra ella. La causa no
   era de `NumberInput`: valía para todo componente con `a11y` y tamaño relativo. Un primer
