@@ -908,7 +908,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   `content`; with the `label` role it reads like text on a page (Narrator's scan mode reads it,
   Tab does not stop on it), which is how a conversation's messages are read. A component (`Button`,
   `Slider`…) is wrapped in one box that carries it, so the wrap only happens when `a11y` is
-  set; the wrapper is a row and does not change the sizes inside.
+  set. The wrapper takes the node's `class` where the component lets it (inputs, pickers,
+  `Switch`…), so `flex-1` or `w-full` size the wrapper and the control fills it; otherwise the
+  wrapper is a row and does not change the sizes inside.
 - A window's root is reported as a `window` with its title, so a window whose own focus has no
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
