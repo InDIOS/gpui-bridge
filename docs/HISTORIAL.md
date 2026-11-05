@@ -2356,12 +2356,19 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   nada.
 - **#16, `NumberInput` con `a11y` sin valor:** el envoltorio genérico `a11y::wrap` es una fila
   flex sin tamaño, así que el `flex-1`/`w-full` del componente se medía contra ella. La causa no
-  era de `NumberInput`, valía para todo componente con `a11y` y tamaño relativo. `node_raw`
-  anota ahora el `a11y` que le falta al nodo (`RenderCx::wraps`) antes de construirlo.
-  `component`, `blocking` e `input_node` lo ponen en el envoltorio que ya lleva las clases, y
-  solo lo que queda recibe `a11y::wrap`. La captura muestra 22/33/44 y un `Input` con `flex-1`
-  llenando su fila. `Button`, `Checkbox`, `Image` y los demás tipos que se estilan solos siguen
-  con el envoltorio genérico.
+  era de `NumberInput`: valía para todo componente con `a11y` y tamaño relativo. Un primer
+  arreglo (`203b030`) pasaba las clases del nodo al envoltorio. Una prueba por pares (cada tipo
+  de `blocking` con las mismas clases, con y sin `a11y`) mostró que así se perdía `h-12` en
+  `Select`, `DatePicker`, `Combobox`, `NumberInput` e `Input`, y que el `Toggle` con ancho dejaba
+  de centrar su texto. Poner `size_full` en el control lo arreglaba, pero encogía el `Toggle`.
+  Queda así: el componente conserva todas sus clases como antes, y el envoltorio repite solo las
+  de tamaño (`Class::sizes`: `w-*`, `h-*`, `size-*`, `flex-1`, `flex-none`, `shrink-0`,
+  `min-w-0`, `min-h-0`). No hay anchos fraccionarios, así que un `w-full` repetido sigue siendo
+  el ancho del padre. Con los pares, las columnas `flex-1` y `h-12 flex-1` salen iguales con y
+  sin `a11y` en los diez tipos. Solo difiere `w-[200px]` dentro de una fila de 130 px (el
+  envoltorio no encoge por debajo del ancho fijo), igual que antes del arreglo. La captura del
+  issue muestra 22/33/44 y el `Input` con `flex-1`. UI Automation sigue viendo los nombres Y, Z,
+  I y T (con `role`; sin `role` GPUI nunca crea el nodo).
 - **#15, `notify` con `system: true`:** aquí no aparecen ni el aviso del AppUserModelID ni el de
   la identidad de paquete. GPUI ya registra el AUMID en `HKCU\Software\Classes\AppUserModelId`
   (la clave existe y se puede escribir), así que el «Access is denied» viene del token con el
@@ -2370,6 +2377,11 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   abierta: la llamada de WinRT bombea mensajes hacia el procedimiento de ventana de GPUI
   mientras la `App` está prestada. No hay un equivalente asíncrono del lado del host como el
   `ShowWindowAsync` de #12. Es inofensivo: la ventana sigue pintando (la captura muestra el
-  texto actualizado después de tres toasts) y los toasts de la app se ven.
+  texto actualizado después de tres toasts) y los toasts de la app se ven. No se miró el
+  centro de notificaciones. Con bandeja y un toast después de cerrar la ventana aparecen además
+  dos `Invalid window handle (0x80070578)`, sin investigar. El `window not found` al cerrar una
+  ventana sale también sin `notify`.
+- **Documentación:** `PROTOCOL.md` §3 (maximizar, y que esos límites no sirven para guardar
+  la posición) y §16 (el envoltorio de `a11y`), y `CHANGELOG.md` (Unreleased).
 - **Pruebas:** `fmt`, `clippy -D warnings` y `cargo test` (80). Release del host (Windows):
-  **21.619.712 B**.
+  **21.593.088 B**.

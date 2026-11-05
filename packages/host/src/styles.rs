@@ -214,6 +214,29 @@ impl Class {
     pub fn positions(&self) -> bool {
         matches!(self, Class::Relative | Class::Absolute | Class::Inset(..))
     }
+
+    /// The size and flex-item classes, which a wrapper copies from the node it holds so the node
+    /// still sizes against its parent (issue #16). None is a fraction, so a `w-full` repeated
+    /// inside the wrapper is still the parent's width.
+    pub fn sizes(&self) -> bool {
+        use Class::*;
+        matches!(
+            self,
+            Flex1
+                | WFull
+                | HFull
+                | SizeFull
+                | W(_)
+                | H(_)
+                | Size(_)
+                | WPx(_)
+                | HPx(_)
+                | MinW0
+                | MinH0
+                | Shrink0
+                | FlexNone
+        )
+    }
 }
 
 pub fn parse_class(name: &str) -> Option<Class> {

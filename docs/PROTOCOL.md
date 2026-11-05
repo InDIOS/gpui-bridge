@@ -135,7 +135,9 @@ coordinates `x`, `y`, `width` and `height` take — the window frame's top-left 
 size — so a client can feed a reported `x`, `y`, `width`, `height` straight back into `window`
 to restore it. Maximizing, entering fullscreen and restoring report a `resize` (the size
 changes; the new position travels in the same event, with no separate `move`); maximized or
-fullscreen, the bounds are the client area itself, whose `y` is below the title bar. While the
+fullscreen, the bounds are the client area itself, whose `y` is below the title bar, and a
+change of position alone is not reported. Nothing in the event says the window is maximized,
+so a client that saves the bounds to restore them later should not save these. While the
 window is minimized the platform moves it off screen; the host does not report that, nor
 anything else until it comes back. They are sent while the user drags or resizes, at the
 platform's pace; a client that only needs the final size can debounce. Events for a window
@@ -908,9 +910,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   `content`; with the `label` role it reads like text on a page (Narrator's scan mode reads it,
   Tab does not stop on it), which is how a conversation's messages are read. A component (`Button`,
   `Slider`…) is wrapped in one box that carries it, so the wrap only happens when `a11y` is
-  set. The wrapper takes the node's `class` where the component lets it (inputs, pickers,
-  `Switch`…), so `flex-1` or `w-full` size the wrapper and the control fills it; otherwise the
-  wrapper is a row and does not change the sizes inside.
+  set. The wrapper is a row that repeats the node's size classes (`w-*`, `h-*`, `size-*`,
+  `flex-1`, `flex-none`, `shrink-0`, `min-w-0`, `min-h-0`), so a component with `flex-1` or
+  `w-full` still sizes against its parent; the component keeps all its classes.
 - A window's root is reported as a `window` with its title, so a window whose own focus has no
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name

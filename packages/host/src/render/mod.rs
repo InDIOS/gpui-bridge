@@ -633,7 +633,6 @@ impl RootView {
             elapsed: now.saturating_duration_since(self.epoch),
             animating: false,
             built: 0,
-            wraps: HashMap::new(),
         }
     }
 
@@ -1053,9 +1052,6 @@ struct RenderCx<'a> {
     animating: bool,
     /// Nodes this pass built, for the `RUST_LOG=debug` report of `RootView::render`.
     built: u32,
-    /// The `a11y` a node still needs a wrapper for, by node: `component` and `blocking` take it
-    /// onto the wrapper that holds the classes; what is left gets `a11y::wrap` (issue #16).
-    wraps: HashMap<NodeId, a11y::A11y>,
 }
 
 static WARN_SPIN: Once = Once::new();
@@ -1112,38 +1108,6 @@ impl RenderCx<'_> {
             && let Some(handle) = self.focusables.get(&id).cloned()
         {
             return self.keyboard_stop(id, node, &classes, &handle, accessibility);
-        }
-        // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
-        // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
-        // The overlays ignore the node's `a11y` (PROTOCOL.md section 24): in a `Popover`/`HoverCard`
-        // the trigger child carries its own, and an `AlertDialog`/`Sheet` is named by its title.
-        // Any other component cannot take an id or a role from outside, so it gets a wrapper
-        // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
-        // still reads as what it is; a Slider reports itself, and so do a Clipboard (a named
-        // button) and an InputGroup (a named group), so a wrapper would repeat them.
-        let wrap = match node.node_type {
-            NodeType::Slider | NodeType::Clipboard | NodeType::InputGroup => None,
-            NodeType::Rating | NodeType::Pagination => {
-                Some(keyboard::spec(self.tree, node, accessibility.clone()))
-            }
-            NodeType::Div
-            | NodeType::Text
-            | NodeType::Bubble
-            | NodeType::Tabs
-            | NodeType::Tree
-            | NodeType::Diff
-            | NodeType::Carousel
-            | NodeType::Sidebar
-            | NodeType::Chart
-            | NodeType::Canvas
-            | NodeType::AlertDialog
-            | NodeType::Sheet
-            | NodeType::Popover
-            | NodeType::HoverCard => None,
-            _ => accessibility.clone(),
-        };
-        if let Some(spec) = wrap {
-            self.wraps.insert(id, spec);
         }
         let element = match node.node_type {
             NodeType::Div => self.div_node(id, node, &classes),
@@ -1266,10 +1230,44 @@ impl RenderCx<'_> {
             // Drawn by its `Dock`.
             NodeType::DockPanel => div().into_any_element(),
         };
-        // A node `component` or `blocking` built has taken its `a11y` onto its classed wrapper.
-        match self.wraps.remove(&id) {
-            Some(spec) => a11y::wrap(&spec, id, element),
-            None => element,
+        // `div` and `text` apply `a11y` themselves; `Tabs` and the data components put it on their
+        // own sized wrapper (an extra flex wrapper would shrink a `size_full` component to nothing).
+        // The overlays ignore the node's `a11y` (PROTOCOL.md section 24): in a `Popover`/`HoverCard`
+        // the trigger child carries its own, and an `AlertDialog`/`Sheet` is named by its title.
+        // Any other component cannot take an id or a role from outside, so it gets a wrapper
+        // (only when the client asked for one). A disabled one of `keyboard`'s has no stop but
+        // still reads as what it is; a Slider reports itself, and so do a Clipboard (a named
+        // button) and an InputGroup (a named group), so a wrapper would repeat them.
+        let accessibility = match node.node_type {
+            NodeType::Slider | NodeType::Clipboard | NodeType::InputGroup => None,
+            NodeType::Rating | NodeType::Pagination => {
+                Some(keyboard::spec(self.tree, node, accessibility))
+            }
+            _ => accessibility,
+        };
+        match accessibility {
+            Some(spec)
+                if !matches!(
+                    node.node_type,
+                    NodeType::Div
+                        | NodeType::Text
+                        | NodeType::Bubble
+                        | NodeType::Tabs
+                        | NodeType::Tree
+                        | NodeType::Diff
+                        | NodeType::Carousel
+                        | NodeType::Sidebar
+                        | NodeType::Chart
+                        | NodeType::Canvas
+                        | NodeType::AlertDialog
+                        | NodeType::Sheet
+                        | NodeType::Popover
+                        | NodeType::HoverCard
+                ) =>
+            {
+                a11y::wrap(&spec, id, element, &classes, self.theme)
+            }
+            _ => element,
         }
     }
 
@@ -1295,8 +1293,7 @@ impl RenderCx<'_> {
         element: impl IntoElement + 'static,
         classes: &[Class],
     ) -> AnyElement {
-        let a11y = self.wraps.remove(&id);
-        self.component_a11y(id, element, classes, a11y.as_ref())
+        self.component_a11y(id, element, classes, None)
     }
 
     /// A component `keyboard` gives a Tab stop: the stop is its sized wrapper (as in
@@ -2297,30 +2294,17 @@ impl RenderCx<'_> {
 
     fn input_node(&mut self, id: NodeId, node: &Node, classes: &[Class]) -> AnyElement {
         match self.inputs.get(&id) {
-            // Input cannot occlude itself, listen to keys or carry `a11y`: a wrapper takes its
-            // classes instead (issue #16).
-            Some(slot)
-                if self.blocks_area()
-                    || node.events.contains("keyDown")
-                    || self.wraps.contains_key(&id) =>
-            {
+            // Input cannot occlude itself or listen to keys: a wrapper takes its classes instead.
+            Some(slot) if self.blocks_area() || node.events.contains("keyDown") => {
                 let wrapper = if self.blocks_area() {
                     div().occlude().flex()
                 } else {
                     div().flex()
                 };
                 let wrapper = self.key_down(id, wrapper);
-                let input = input::build(node, slot);
-                match self.wraps.remove(&id) {
-                    Some(spec) => self
-                        .style(id, a11y::apply(&spec, id, wrapper), classes, false)
-                        .child(input)
-                        .into_any_element(),
-                    None => self
-                        .style(id, wrapper, classes, false)
-                        .child(input)
-                        .into_any_element(),
-                }
+                self.style(id, wrapper, classes, false)
+                    .child(input::build(node, slot))
+                    .into_any_element()
             }
             Some(slot) => self
                 .style(id, input::build(node, slot), classes, false)
@@ -2357,26 +2341,15 @@ impl RenderCx<'_> {
     }
 
     /// A control that cannot `occlude` itself: where it must block what holds it a blocking
-    /// wrapper takes its classes; elsewhere it takes them itself. With `a11y`, a wrapper takes
-    /// them too and carries it, so `flex-1` or `w-full` size the wrapper and not the control
-    /// inside an unsized one (issue #16).
+    /// wrapper takes its classes; elsewhere it takes them itself.
     fn blocking<E: Styled + IntoElement + 'static>(
         &mut self,
         id: NodeId,
         element: E,
         classes: &[Class],
     ) -> AnyElement {
-        let wrapper = if self.blocks_area() {
-            div().occlude().flex()
-        } else {
-            div().flex()
-        };
-        if let Some(spec) = self.wraps.remove(&id) {
-            self.style(id, a11y::apply(&spec, id, wrapper), classes, false)
-                .child(element)
-                .into_any_element()
-        } else if self.blocks_area() {
-            self.style(id, wrapper, classes, false)
+        if self.blocks_area() {
+            self.style(id, div().occlude().flex(), classes, false)
                 .child(element)
                 .into_any_element()
         } else {

@@ -7,8 +7,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
 
 - Maximizing, entering fullscreen and restoring a window report `resize` with the current
   bounds; nothing is reported while the window is minimized (#14).
-- A component with `a11y` and a relative size (`flex-1`, `w-full`) fills its row again: the
-  accessibility wrapper takes the node's classes (`NumberInput`, `Input`, pickers…) (#16).
+- A component with `a11y` and a relative size (`flex-1`, `w-full`) fills its row: the
+  accessibility wrapper repeats the node's size classes (#16).
 
 ## 0.4.1 — 2026-11-05
 
