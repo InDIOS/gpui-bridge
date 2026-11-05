@@ -3,6 +3,13 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## Unreleased
+
+- Maximizing, entering fullscreen and restoring a window report `resize` with the current
+  bounds; nothing is reported while the window is minimized (#14).
+- A component with `a11y` and a relative size (`flex-1`, `w-full`) fills its row again: the
+  accessibility wrapper takes the node's classes (`NumberInput`, `Input`, pickers…) (#16).
+
 ## 0.4.1 — 2026-11-05
 
 Host fixes and three additions; `PROTOCOL_VERSION` stays 1.

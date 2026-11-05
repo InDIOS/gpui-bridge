@@ -2338,3 +2338,38 @@ Explorer. Todo es aditivo: `PROTOCOL_VERSION` sigue en 1.
   ventana) muestra los mismos valores tras `closeWindow` y reabrir. El toast sin ventana
   aparece en pantalla y el host sale con 0.
 - **Tamaño del host release (Windows):** 21.571.584 → **21.592.064 B** (+20.480 B).
+
+### Fase 53 — Issues #14 a #16 de GitHub (2026-11-05)
+
+Tres issues nuevos, abiertos sobre `gpui-bridge@0.4.1` desde txiki.js. Se arreglaron dos en el
+host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
+
+- **#14, maximizar no enviaba `resize`:** `bounds_of` leía `window_bounds()`, que en Windows sale
+  de `GetWindowPlacement().rcNormalPosition`, el rectángulo de restaurar. Maximizada, la ventana
+  seguía con el tamaño viejo y el evento se descartaba. Ahora, maximizada o a pantalla completa,
+  se informa el área cliente actual (`window.bounds()`). La primera prueba mostró dos restos: un
+  `move` con el origen nuevo y el tamaño viejo (Windows mueve antes de cambiar el tamaño) y un
+  `resize -32000 …` al volver de minimizada. Por eso, maximizada, solo cuenta un cambio de
+  tamaño, y no se informa nada mientras la ventana está minimizada (`IsIconic` sobre el HWND,
+  declarada a mano como `ShowWindowAsync`). Prueba con `ShowWindow` 3/9/3/6/9/6/9: maximizar da
+  `resize 0 55 1920 1025`, restaurar da `resize 560 256 800 600`, y minimizar y volver no envían
+  nada.
+- **#16, `NumberInput` con `a11y` sin valor:** el envoltorio genérico `a11y::wrap` es una fila
+  flex sin tamaño, así que el `flex-1`/`w-full` del componente se medía contra ella. La causa no
+  era de `NumberInput`, valía para todo componente con `a11y` y tamaño relativo. `node_raw`
+  anota ahora el `a11y` que le falta al nodo (`RenderCx::wraps`) antes de construirlo.
+  `component`, `blocking` e `input_node` lo ponen en el envoltorio que ya lleva las clases, y
+  solo lo que queda recibe `a11y::wrap`. La captura muestra 22/33/44 y un `Input` con `flex-1`
+  llenando su fila. `Button`, `Checkbox`, `Image` y los demás tipos que se estilan solos siguen
+  con el envoltorio genérico.
+- **#15, `notify` con `system: true`:** aquí no aparecen ni el aviso del AppUserModelID ni el de
+  la identidad de paquete. GPUI ya registra el AUMID en `HKCU\Software\Classes\AppUserModelId`
+  (la clave existe y se puede escribir), así que el «Access is denied» viene del token con el
+  que el issue lanzó el host, igual que el error 5 de la bandeja en #6. El
+  `RefCell already borrowed` sí aparece, de 2 a 6 veces por toast y solo con una ventana
+  abierta: la llamada de WinRT bombea mensajes hacia el procedimiento de ventana de GPUI
+  mientras la `App` está prestada. No hay un equivalente asíncrono del lado del host como el
+  `ShowWindowAsync` de #12. Es inofensivo: la ventana sigue pintando (la captura muestra el
+  texto actualizado después de tres toasts) y los toasts de la app se ven.
+- **Pruebas:** `fmt`, `clippy -D warnings` y `cargo test` (80). Release del host (Windows):
+  **21.619.712 B**.
