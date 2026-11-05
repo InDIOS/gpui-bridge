@@ -89,7 +89,7 @@ Windows and on Linux (Ubuntu on WSL, Wayland and X11), not yet on macOS. Protoco
   `Rating`, `Tabs`, `Pagination` and `Accordion` titles are Tab stops driven by the keyboard.
 - **Windows:** several windows, frameless windows with a custom title bar (on Windows, Linux and
   macOS), initial position,
-  minimum size, minimize/restore, window events (`focus`, `blur`, `resize`, `move`,
+  minimum size, minimize/restore, hide/show (Windows), window events (`focus`, `blur`, `resize`, `move`,
   `visibility`), light/dark and custom themes.
 - **Interaction:** context menus and a menu bar with shortcuts, app shortcuts, `keyDown`,
   focus, double click, tooltips, toasts, dropping files, nodes the user drags (with magnetic

@@ -3,7 +3,7 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
-## Unreleased
+## 0.4.1 — 2026-11-05
 
 Host fixes and three additions; `PROTOCOL_VERSION` stays 1.
 
