@@ -2377,8 +2377,9 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   abierta: la llamada de WinRT bombea mensajes hacia el procedimiento de ventana de GPUI
   mientras la `App` está prestada. No hay un equivalente asíncrono del lado del host como el
   `ShowWindowAsync` de #12. Es inofensivo: la ventana sigue pintando (la captura muestra el
-  texto actualizado después de tres toasts) y los toasts de la app se ven. No se miró el
-  centro de notificaciones. Con bandeja y un toast después de cerrar la ventana aparecen además
+  texto actualizado después de tres toasts) y los toasts de la app se ven. El usuario lanzó
+  la prueba desde una terminal normal: «open» y «closed» llegan al centro de notificaciones, y
+  el log no trae los avisos del AUMID ni de la identidad de paquete. Con bandeja y un toast después de cerrar la ventana aparecen además
   dos `Invalid window handle (0x80070578)`, sin investigar. El `window not found` al cerrar una
   ventana sale también sin `notify`.
 - **Documentación:** `PROTOCOL.md` §3 (maximizar, y que esos límites no sirven para guardar
