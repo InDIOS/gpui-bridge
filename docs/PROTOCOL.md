@@ -133,8 +133,11 @@ Only changes are sent: opening a window does not report its initial size or posi
 are the ones the client asked for). `resize` and `move` carry the full bounds, in the same
 coordinates `x`, `y`, `width` and `height` take — the window frame's top-left and the client
 size — so a client can feed a reported `x`, `y`, `width`, `height` straight back into `window`
-to restore it. While the window is minimized the platform moves it off screen; the host does
-not report that as a `move`. They are sent while the user drags or resizes, at the
+to restore it. Maximizing, entering fullscreen and restoring report a `resize` (the size
+changes; the new position travels in the same event, with no separate `move`); maximized or
+fullscreen, the bounds are the client area itself, whose `y` is below the title bar. While the
+window is minimized the platform moves it off screen; the host does not report that, nor
+anything else until it comes back. They are sent while the user drags or resizes, at the
 platform's pace; a client that only needs the final size can debounce. Events for a window
 whose `events` list does not include them are not sent at all.
 

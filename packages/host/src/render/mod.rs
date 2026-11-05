@@ -236,13 +236,21 @@ impl RootView {
         .detach();
 
         cx.observe_window_bounds(window, |this, window, cx| {
-            let state = bounds_of(window);
-            let Some(previous) = this.window_bounds.replace(state) else {
-                return;
-            };
-            if previous == state {
+            if crate::windows::is_minimized(window) {
                 return;
             }
+            let state = bounds_of(window);
+            let Some(previous) = this.window_bounds else {
+                return;
+            };
+            // Maximized or fullscreen, only a new size counts: the position follows it, and
+            // Windows moves the window before it resizes it (and still reports the -32000 a
+            // minimized window sat at when it comes back), which would read as a stray `move`.
+            let windowed = matches!(window.window_bounds(), WindowBounds::Windowed(_));
+            if previous == state || !windowed && (previous.2, previous.3) == (state.2, state.3) {
+                return;
+            }
+            this.window_bounds = Some(state);
             // A drag-resize changes both; report the size, then the position on the next change.
             let event = if (previous.2, previous.3) != (state.2, state.3) {
                 "resize"
@@ -2421,9 +2429,13 @@ fn loops(node: &Node, class: &str) -> bool {
 
 /// The window's frame origin and client size, as `x, y, width, height`: the coordinates a
 /// client sets with `window` and can persist from `windowEvent`. `Window::bounds()` is the
-/// client area, so its origin differs by the title bar height.
+/// client area, so its origin differs by the title bar height. Maximized or fullscreen,
+/// `window_bounds()` carries the restore rect (#14), so the current client area is reported.
 fn bounds_of(window: &Window) -> (f32, f32, f32, f32) {
-    let bounds = window.window_bounds().get_bounds();
+    let bounds = match window.window_bounds() {
+        WindowBounds::Windowed(bounds) => bounds,
+        _ => window.bounds(),
+    };
     (
         f32::from(bounds.origin.x),
         f32::from(bounds.origin.y),
