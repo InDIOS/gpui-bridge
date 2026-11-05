@@ -57,8 +57,8 @@ impl<M: TextKind> InputSlot<M> {
 /// What `sync` needs from the tree, copied out so the tree borrow ends before
 /// entities are created or updated.
 pub struct InputSnapshot {
-    /// Every text node of the kind, with its placeholder.
-    inputs: Vec<(NodeId, String)>,
+    /// Every text node of the kind, with its placeholder and value.
+    inputs: Vec<(NodeId, String, String)>,
     /// Imposed values to write, in order.
     values: Vec<(NodeId, String)>,
 }
@@ -75,7 +75,7 @@ pub fn snapshot(
         inputs: tree
             .nodes()
             .filter(|(id, node)| node.node_type == node_type && members.contains(id))
-            .map(|(id, node)| (id, text(node, "placeholder")))
+            .map(|(id, node)| (id, text(node, "placeholder"), text(node, "value")))
             .collect(),
         values: value_writes
             .iter()
@@ -98,11 +98,16 @@ pub fn sync<M: TextKind, V: 'static>(
     window: &mut Window,
     cx: &mut Context<V>,
 ) {
-    slots.retain(|id, _| snapshot.inputs.iter().any(|(input, _)| input == id));
+    slots.retain(|id, _| snapshot.inputs.iter().any(|(input, ..)| input == id));
 
-    for (id, placeholder) in snapshot.inputs {
+    for (id, placeholder, value) in snapshot.inputs {
         let slot = slots.entry(id).or_insert_with(|| {
-            let state = cx.new(|cx| M::new_state(window, cx));
+            // A node created before its window opened (or reopened) had its value write applied by no one.
+            let state = cx.new(|cx| {
+                let mut state = M::new_state(window, cx);
+                state.set_value(value, window, cx);
+                state
+            });
             let session = session.clone();
             let _changes = cx.subscribe_in(
                 &state,

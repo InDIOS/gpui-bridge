@@ -59,6 +59,9 @@ func TestValidTreeCommitsWithoutErrors(t *testing.T) {
 	root.Append(label, button, input, checkbox)
 	app.Window(WindowOptions{Title: "Test", Width: f64(400), Height: f64(300), Root: root, Theme: ThemeDark})
 	app.Commit()
+	// The host accepts `visible` (with --no-window there is no window to hide).
+	app.Window(WindowOptions{Visible: Ptr(false)})
+	app.Commit()
 
 	label.Set(Props{"content": "Clicks: 1"})
 	button.Set(Props{"variant": nil, "disabled": true}).Off("click")

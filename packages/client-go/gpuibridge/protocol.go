@@ -51,7 +51,7 @@ func commitMsg() ClientMessage {
 }
 
 func windowMsg(id WindowID, title string, width, height, x, y, minWidth, minHeight *float64,
-	root *NodeID, theme string, themeSet *ThemeSet, frameless, minimized *bool, events []string) ClientMessage {
+	root *NodeID, theme string, themeSet *ThemeSet, frameless, minimized, visible *bool, events []string) ClientMessage {
 
 	m := ClientMessage{"op": "window", "id": id}
 	if title != "" {
@@ -89,6 +89,9 @@ func windowMsg(id WindowID, title string, width, height, x, y, minWidth, minHeig
 	}
 	if minimized != nil {
 		m["minimized"] = *minimized
+	}
+	if visible != nil {
+		m["visible"] = *visible
 	}
 	if events != nil {
 		m["events"] = events

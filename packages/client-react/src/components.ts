@@ -261,6 +261,8 @@ export interface WindowProps {
   minHeight?: number;
   /** Minimizes (`true`) or restores (`false`) on the next commit. */
   minimized?: boolean;
+  /** Hides (`false`, no taskbar button) or shows and focuses (`true`); Windows only. */
+  visible?: boolean;
   /** No system title bar; only read when the window opens. */
   frameless?: boolean;
   /** Classes of the window's root div (default `size-full`). */

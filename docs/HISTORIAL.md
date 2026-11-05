@@ -2280,3 +2280,61 @@ propuesta de protocolo se aprobó antes de programar. Todo es aditivo (clases, p
 se pegan a los bordes de las otras, el cliente recibe la posición final, un chip apagado se
 suelta en el lienzo y llega `dropNode`, y el lienzo tiene degradado, sombra, número grande y
 puntos. Cumplido.
+
+### Fase 52 — Issues #5 a #11 de GitHub (2026-11-04)
+
+El usuario abrió siete issues en GitHub mientras pasaba una app de bandeja a txiki.js con
+`gpui-bridge@0.4.0`. Se arreglaron cinco en el host y se añadió `visible` (#9), elegido por
+el usuario: solo Windows. #6 (la bandeja no se actualiza) quedó acotado a un estado de
+Explorer. Todo es aditivo: `PROTOCOL_VERSION` sigue en 1.
+
+- **#5, `NumberInput` sin valor:** `NumberInput` faltaba en las dos listas de tipos que apuntan
+  `value_writes` (`create` y `setProps`) en `tree.rs`, así que su `value` nunca llegaba al
+  `InputState`.
+- **#11, `Input` creado antes de su ventana:** el estado se crea en el primer `render` de la
+  ventana, y solo se aplicaban los `value_writes` del último commit. Ahora `input::sync` pone
+  el `value` del nodo al crear el estado. Vale para los cuatro tipos de texto y para una
+  ventana que se vuelve a abrir. El texto que el usuario escribió y el cliente no devolvió no
+  se conserva, porque las ediciones no se guardan en las props.
+- **#7, el host no salía al cerrar stdin sin ventana:** no dependía de la bandeja, porque
+  también se colgaba sin ella. GPUI (Windows) encola `PostQuitMessage` en una tarea, y esa
+  tarea no llegaba a correr cuando la tarea que llamó a `cx.quit()` terminaba justo después
+  sin ventanas que movieran el bucle de mensajes. Una prueba con un `await` posterior salió
+  bien. Ahora la tarea quita la bandeja, llama a `quit` y espera con `pending()`. Se probaron
+  sin ventana, con bandeja, con la bandeja quitada y con ventana, en debug y release: siempre
+  código 0. `removeTray` + `commit` con stdin abierto ya salía bien (sin ventana, con una
+  ventana sin `root` y tras `closeWindow`, también con el binario 0.4.0 de CI). No se hizo el
+  `App.kill()` del cliente que pedía el issue, ni se miró `tjs.exit`.
+- **#6, error 5 al actualizar la bandeja:** sin cambio de código. Con los builds locales no
+  falla. Con el binario 0.4.0 de CI falla solo desde su ruta en
+  `D:\DEVELOP\Working\monitors-control\node_modules\…`. El mismo archivo copiado a otra ruta
+  funciona, y el build nuevo copiado a una ruta con `@indios` también. Explorer no tiene
+  entrada para esa ruta en `HKCU\Control Panel\NotifyIconSettings` y rechaza `NIM_MODIFY` y
+  `NIM_DELETE` de ese icono. Es un estado de Explorer ligado a esa ruta, no un error del host.
+  `sync` ya corre en el hilo principal, así que la hipótesis del hilo equivocado del issue
+  queda descartada. La idea de crear el icono de nuevo cuando falla se quitó sin probarla en
+  esa ruta: con `NIM_DELETE` rechazado, dejaría iconos repetidos.
+- **#8, `notify` con `system: true` sin ventana:** va directo a `show_system_notification`
+  con una etiqueta `gpui-bridge:{id}`. El clic no se informa, porque gpui-component maneja la
+  única respuesta e ignora las etiquetas que no son suyas. Al salir, un toast que GPUI todavía
+  tenía cerraba el host con 0xC0000005, así que estos toasts se retiran en `on_app_quit`. Los
+  de una ventana ya los retira gpui-component cuando la ventana se cierra.
+- **#10, márgenes por lado:** `mt-|mr-|mb-|ml-{n}`, la misma tabla que el padding.
+- **#9, ocultar una ventana:** GPUI 0.3.10 no tiene una forma de ocultar una sola ventana, y
+  `App::hide` está vacío en Windows. El usuario eligió una opción solo para Windows: `visible`,
+  una acción como `minimized` (`WindowRequest` en `tree.rs`). `false` llama a
+  `ShowWindow(SW_HIDE)` sobre el HWND (`raw-window-handle`, que ya estaba en el árbol; la
+  función de `user32` se declara a mano, sin crate nuevo). `true` llama a `SW_SHOW` y después
+  a `activate_window`. En macOS y Linux da un aviso. La ventana conserva su estado. Una prueba
+  con `IsWindowVisible` dio: abierta, oculta, visible de nuevo, y oculta cuando se abre con
+  `visible: false` en el mismo commit. La captura muestra el `Input` con su texto. Node y React
+  tipan la opción, Go suma `Visible` y Python la pasa tal cual; hay un test en Node, React y Go.
+- **Documentación:** `PROTOCOL.md` §3 (`visible`), §7 (valor al abrir la ventana), §8
+  (márgenes), §11 y §14 (`notify` sin ventana), y `CHANGELOG.md` (Unreleased).
+- **Pruebas:** `fmt`, `clippy` y `cargo test` (unitarios con `NumberInput` en
+  `value_writes` y las clases nuevas, conformidad y `no_window`). En una ventana real: una
+  captura muestra los cuatro valores (un `Input` y un `NumberInput` creados antes de la
+  ventana, uno creado con ella y uno puesto con `setProps`). Otra captura (PrintWindow, solo la
+  ventana) muestra los mismos valores tras `closeWindow` y reabrir. El toast sin ventana
+  aparece en pantalla y el host sale con 0.
+- **Tamaño del host release (Windows):** 21.571.584 → **21.592.064 B** (+20.480 B).

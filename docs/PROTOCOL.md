@@ -84,8 +84,12 @@ interpreted safely.
 - `minimized` (optional): `true` minimizes the window on the next `commit`, `false` restores
   it and brings it to the front. It is an **action, not a remembered state**: send it again
   to act again, and the user can restore or minimize the window at any time. A window that is
-  not open is not an error; the host warns on stderr. GPUI (0.3.9) has no "hide" for an open
-  window, so `minimized` is the way to take one out of sight without closing it.
+  not open is not an error; the host warns on stderr.
+- `visible` (optional, Windows only): `false` hides the window on the next `commit`, taskbar
+  button and Alt+Tab entry included; `true` shows it again, restores it and brings it to the
+  front. The window keeps its state (text, scroll, focus) and its `events`. An **action**,
+  like `minimized`; `{"visible":false}` in the commit that opens the window opens it hidden.
+  On macOS and Linux it is ignored with a warning on stderr.
 - `events` (optional): the window events the client wants (see "Window events" below). It
   **replaces** the previous list, so `[]` unsubscribes, and an unknown name is `invalid_json`.
   Like node events, they are opt-in; `windowClosed` is always sent.
@@ -380,6 +384,9 @@ Unknown fields are ignored, so a newer client does not break an older host.
   impose one (for example, clearing the field after `submit`).
 - If the imposed `value` equals the current text, the host leaves the field alone, so an
   echo of the same text does not move the cursor. Controlled mode is described in section 5.
+- A text node (`Input`, `Textarea`, `NumberInput`, `InputGroup`) that already exists when its
+  window opens, or opens again after `closeWindow`, shows its `value` prop: the last value the
+  client sent, not text the user typed that the client never sent back.
 
 ## 8. Classes
 
@@ -387,7 +394,7 @@ The `class` prop takes a Tailwind-like class string. Unknown classes are ignored
 warning on stderr (once per class).
 
 - **Layout:** `flex`, `flex-row`, `flex-col`, `flex-1`, `flex-wrap`, `items-start|center|end`, `justify-start|center|end|between`
-- **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}` (GPUI's spacing scale)
+- **Spacing:** `gap-{n}`, `p-{n}`, `px-{n}`, `py-{n}`, `pt|pr|pb|pl-{n}`, `m-{n}`, `mx-{n}`, `my-{n}`, `mt|mr|mb|ml-{n}` (GPUI's spacing scale)
 - **Size:** `w-full`, `h-full`, `size-full`, `w-{n}`, `h-{n}`, `size-{n}`, `min-w-0`, `min-h-0`, `shrink-0`, `flex-none`;
   `w-[Npx]` and `h-[Npx]` in logical pixels (`N` a decimal number, at least 0)
 - **Position** (on `div` only; on other node types these classes are ignored, with a warning
@@ -638,9 +645,8 @@ sends `windowClosed` and keeps running, so the app can live in the tray and open
 again with `window`. Removing the tray with no window open ends the host; so does closing
 stdin, which also removes the icon.
 
-Not supported: several tray icons, double click, notification balloons, and hiding a window
-without closing it (reopening it starts from the client's tree; an `Input`'s text that the
-client does not hold is lost).
+Not supported: several tray icons, double click and notification balloons. To keep a window
+out of sight while the app lives in the tray, use `visible: false` (Windows only, section 3).
 
 ## 12. Keyboard
 
@@ -745,12 +751,14 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 **notify** is an action (section 13): it shows a toast in a window now, not on `commit`.
 
 - `message` (required), `title`, `type` (`info` by default, `success`, `warning`, `error`),
-  `window` (default 1; a window that is not open is `invalid_operation`), `autohide`
-  (default `true`).
+  `window` (default 1; a window that is not open is `invalid_operation`, except with
+  `system: true`), `autohide` (default `true`).
 - `id`: a click on the toast sends `{"type":"notification","id":...,"window":...}`, and a new
   toast with the same `id` replaces the previous one.
 - `system: true` also posts it to the Windows notification center, where it shows under the
-  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet).
+  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
+  window open (a tray app), it goes to the notification center only; a click on it is not
+  reported, and the host removes it from the center when it exits.
 - With `--no-window` it is validated and nothing is shown.
 
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.

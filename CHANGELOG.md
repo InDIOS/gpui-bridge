@@ -3,6 +3,22 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## 0.4.1 — 2026-11-05
+
+Host fixes and three additions; `PROTOCOL_VERSION` stays 1.
+
+- `NumberInput` draws its `value`, at `create` and through `setProps` (#5).
+- A text input created before its window opens, or kept while the window is closed and opened
+  again, shows its `value` (#11).
+- Closing stdin ends the host when no window is open, with or without a tray; the tray icon is
+  removed first (#7).
+- `notify` with `system: true` works with no window open: notification center only, clicks not
+  reported (#8).
+- Classes `mt-|mr-|mb-|ml-{n}` (#10).
+- Window option `visible` (Windows only): `false` hides the window (no taskbar button or
+  Alt+Tab), `true` shows and focuses it; an action like `minimized`, and the window keeps its
+  state. Typed in Node, React and Go (#9).
+
 ## 0.4.0 — 2026-11-04
 
 Every addition is a new class, an optional prop or a new event, so `PROTOCOL_VERSION` stays 1:

@@ -16,6 +16,52 @@ use crate::windows::Windows;
 /// Groups the client's toasts, so one with the same `id` replaces the previous one.
 struct ClientNotification;
 
+/// System notifications posted with no window open (issue #8), and how many had no `id`.
+#[derive(Default)]
+struct WindowlessToasts {
+    tags: Vec<SharedString>,
+    unnamed: u64,
+}
+
+impl Global for WindowlessToasts {}
+
+/// Notification center only. gpui-component owns the click handler and ignores tags it did not
+/// post, so a click on this one is not reported.
+fn notify_without_window(id: Option<String>, title: Option<String>, message: String, cx: &mut App) {
+    let (title, body) = match title {
+        Some(title) => (title, message),
+        None => (message, String::new()),
+    };
+    if !cx.has_global::<WindowlessToasts>() {
+        // A toast still held when GPUI tears down crashes the host (0xC0000005); a window's own
+        // toasts are retracted when it closes, these ones when the app quits.
+        cx.on_app_quit(|cx| {
+            for tag in std::mem::take(&mut cx.global_mut::<WindowlessToasts>().tags) {
+                cx.dismiss_system_notification(&tag);
+            }
+            async {}
+        })
+        .detach();
+    }
+    let toasts = cx.default_global::<WindowlessToasts>();
+    // The same `id` replaces the previous notification; none gets a fresh tag.
+    let tag: SharedString = match id {
+        Some(id) => format!("gpui-bridge:{id}").into(),
+        None => {
+            toasts.unnamed += 1;
+            format!("gpui-bridge:#{}", toasts.unnamed).into()
+        }
+    };
+    toasts.tags.retain(|known| *known != tag);
+    toasts.tags.push(tag.clone());
+    cx.show_system_notification(SystemNotification {
+        tag,
+        title: title.into(),
+        body: body.into(),
+        actions: Vec::new(),
+    });
+}
+
 /// Rules serde cannot express. Checked in both modes, so `--no-window` reports them too.
 pub fn check(action: &ClientMessage) -> Result<(), ProtocolError> {
     match action {
@@ -45,7 +91,12 @@ pub fn run(action: ClientMessage, windows: &RefCell<Windows>, cx: &mut App) {
             system,
         } => {
             let window = window.unwrap_or(1);
-            let Some(handle) = windows.borrow().handle(window) else {
+            let handle = windows.borrow().handle(window);
+            if handle.is_none() && system == Some(true) {
+                notify_without_window(id, title, message, cx);
+                return;
+            }
+            let Some(handle) = handle else {
                 let message = format!("Window {window} is not open");
                 transport::send(&HostMessage::from(ProtocolError {
                     code: ErrorCode::InvalidOperation,

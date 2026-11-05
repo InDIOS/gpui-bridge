@@ -20,7 +20,10 @@ type WindowOptions struct {
 	ThemeSet  *ThemeSet
 	Frameless *bool
 	Minimized *bool
-	Events    []string
+	// Visible hides (false: no taskbar button) or shows and focuses (true) the window on commit,
+	// keeping its state. An action, like Minimized; Windows only.
+	Visible *bool
+	Events  []string
 }
 
 // ThemeSet is a gpui-component theme file (PROTOCOL.md §3).

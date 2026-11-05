@@ -90,7 +90,7 @@ interface WindowState {
   closed: boolean;
 }
 
-const WINDOW_OPTIONS = ["title", "width", "height", "x", "y", "minWidth", "minHeight", "minimized", "frameless"] as const;
+const WINDOW_OPTIONS = ["title", "width", "height", "x", "y", "minWidth", "minHeight", "minimized", "visible", "frameless"] as const;
 
 /** React handler prop per window event (PROTOCOL.md section 3). */
 const WINDOW_EVENT_PROPS: Record<string, WindowEventName> = {

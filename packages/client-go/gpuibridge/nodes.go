@@ -40,7 +40,7 @@ func (a *App) queueWindow(opts WindowOptions, id WindowID) {
 	a.mu.Lock()
 	a.tree.pending = append(a.tree.pending, windowMsg(id, opts.Title, opts.Width, opts.Height,
 		opts.X, opts.Y, opts.MinWidth, opts.MinHeight, rootId, opts.Theme, opts.ThemeSet,
-		opts.Frameless, opts.Minimized, opts.Events))
+		opts.Frameless, opts.Minimized, opts.Visible, opts.Events))
 	a.mu.Unlock()
 }
 

@@ -820,7 +820,8 @@ test("createWindow gives each window its own id, root and closed event", async (
 
   const main = app.div();
   const other = app.div();
-  app.window({ title: "Main", root: main });
+  // `visible` is accepted (it hides the window; `--no-window` has none to hide).
+  app.window({ title: "Main", root: main, visible: false });
   const settings = app.createWindow({ title: "Settings", root: other });
   const third = app.createWindow();
   assert.deepEqual([settings.id, third.id], [2, 3]);

@@ -105,7 +105,12 @@ fn main() {
                     }
                 }
                 // The client went away or must be dropped: nothing can drive the UI anymore.
+                // The tray goes first, while its hidden window still exists, so no stale icon stays.
+                *tray.borrow_mut() = tray::Tray::default();
                 cx.update(|cx| cx.quit());
+                // With no window open, GPUI (Windows) only ran the quit it queued if this task
+                // yielded again (issue #7): wait here until the app ends.
+                std::future::pending::<()>().await;
             })
             .detach();
         });
