@@ -2391,3 +2391,26 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   la posición) y §16 (el envoltorio de `a11y`), y `CHANGELOG.md` (Unreleased).
 - **Pruebas:** `fmt`, `clippy -D warnings` y `cargo test` (80). Release del host (Windows):
   **21.593.088 B**.
+
+### Fase 54 — Causa del issue #6 (2026-11-05)
+
+La Fase 52 dejó #6 como un estado de Explorer ligado a la ruta del binario en
+`monitors-control`. No lo era: es la integridad del proceso. `D:\DEVELOP\Working` lleva la etiqueta
+`Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)` (más un `DENY` de borrado para `Everyone` y un
+SID `S-1-4-…`, al parecer de un sandbox), y todo lo que hay dentro la hereda. Windows arranca un
+`.exe` con esa etiqueta a integridad baja: un `whoami.exe` copiado ahí da `Low Mandatory Level`,
+y desde `System32` da Medium. Explorer corre en Medium, así que UIPI rechaza `NIM_MODIFY` y
+`NIM_DELETE` con el error 5.
+
+- **Bisección:** con dos `tray` seguidos (sin icono, solo el tooltip), el build local falla
+  copiado en `…\bin`, `node_modules`, `monitors-control` y `D:\DEVELOP\Working`, y funciona en
+  `D:\DEVELOP\TestingLab`. El binario de CI copiado al scratchpad funciona. No depende del
+  binario ni del nombre del archivo. Por eso los builds locales nunca fallaban.
+- **Arreglo:** ninguno posible en el host: con `NIM_DELETE` también rechazado, recrear el icono
+  deja iconos repetidos. `tray::warn_update` añade al aviso del error 5 (solo Windows) que el host
+  corre a integridad baja, y `PROTOCOL.md` §11 documenta el caso y la salida: ejecutar el host
+  desde una carpeta sin esa etiqueta. No se miró por qué el `NIM_ADD` inicial sí pasa. El
+  «Access is denied» del AUMID en #15 probablemente tiene la misma causa, sin comprobar.
+- **Pruebas:** el aviso nuevo sale con el build release copiado a `D:\DEVELOP\Working`, y nada
+  sale desde `TestingLab`. `fmt`, `clippy -D warnings` y `cargo test`. Release del host (Windows):
+  **21.592.576 B**.

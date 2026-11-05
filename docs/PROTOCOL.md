@@ -650,6 +650,13 @@ sends `windowClosed` and keeps running, so the app can live in the tray and open
 again with `window`. Removing the tray with no window open ends the host; so does closing
 stdin, which also removes the icon.
 
+**Low integrity.** Windows runs an `.exe` at low integrity when its file carries a Low mandatory
+label, which it inherits from a labelled folder (`icacls <folder>` shows
+`Mandatory Label\Low Mandatory Level`; some sandboxes set it on a workspace). Such a host shows
+the icon, but Windows refuses it every later change: each `tray` update logs "failed to update
+the tray icon: Access is denied. (os error 5)" and the icon keeps its first tooltip and image.
+Run the host from a folder without that label.
+
 Not supported: several tray icons, double click and notification balloons. To keep a window
 out of sight while the app lives in the tray, use `visible: false` (Windows only, section 3).
 

@@ -65,8 +65,8 @@ pub fn sync(session: &Entity<Session>, tray: &RefCell<Tray>, cx: &App) {
         .map(|items| Box::new(build_menu(items)) as Box<dyn ContextMenu>);
     match &tray.icon {
         Some(shown) => {
-            log_err(shown.set_icon(icon));
-            log_err(shown.set_tooltip(spec.tooltip.as_deref()));
+            warn_update(shown.set_icon(icon));
+            warn_update(shown.set_tooltip(spec.tooltip.as_deref()));
             shown.set_menu(menu);
         }
         None => {
@@ -91,6 +91,20 @@ pub fn sync(session: &Entity<Session>, tray: &RefCell<Tray>, cx: &App) {
 fn log_err<E: std::fmt::Display>(result: Result<(), E>) {
     if let Err(err) = result {
         log::warn!("failed to update the tray icon: {err}");
+    }
+}
+
+/// Error 5 is Windows refusing a low-integrity process (UIPI) the update of Explorer's icon (#6).
+fn warn_update(result: tray_icon::Result<()>) {
+    if let Err(err) = result {
+        let low = cfg!(windows)
+            && matches!(&err, tray_icon::Error::OsError(e) if e.raw_os_error() == Some(5));
+        let hint = if low {
+            " (the host runs at low integrity, e.g. its .exe is in a folder labelled Low; see PROTOCOL.md section 11)"
+        } else {
+            ""
+        };
+        log::warn!("failed to update the tray icon: {err}{hint}");
     }
 }
 

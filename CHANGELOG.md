@@ -11,6 +11,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
   accessibility wrapper repeats the node's size classes (#16).
 - PROTOCOL §14 documents the harmless `RefCell already borrowed` log of `notify` with
   `system: true` and a window open, and the "Access is denied" of a restricted launch token (#15).
+- A tray update that Windows refuses because the host runs at low integrity (its `.exe` in a
+  folder labelled Low) says so in its warning; PROTOCOL §11 documents the case (#6).
 
 ## 0.4.1 — 2026-11-05
 
