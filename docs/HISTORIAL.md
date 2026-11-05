@@ -2369,7 +2369,11 @@ host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
   sin `a11y` en los diez tipos. Solo difiere `w-[200px]` dentro de una fila de 130 px (el
   envoltorio no encoge por debajo del ancho fijo), igual que antes del arreglo. La captura del
   issue muestra 22/33/44 y el `Input` con `flex-1`. UI Automation sigue viendo los nombres Y, Z,
-  I y T (con `role`; sin `role` GPUI nunca crea el nodo).
+  I y T (con `role`; sin `role` GPUI nunca crea el nodo). El usuario lo confirmó con Narrator.
+  Al enfocar un `NumberInput` con el lector activo, GPUI avisa `a11y: set_focus called more
+  than once in a single frame`. Pasa también sin `a11y` y no pasa con un `Input`: el
+  `NumberInput` de gpui-component sigue el mismo foco en dos elementos. Es anterior a este
+  arreglo y no afecta a lo que se lee (gana el último).
 - **#15, `notify` con `system: true`:** aquí no aparecen ni el aviso del AppUserModelID ni el de
   la identidad de paquete. GPUI ya registra el AUMID en `HKCU\Software\Classes\AppUserModelId`
   (la clave existe y se puede escribir), así que el «Access is denied» viene del token con el
