@@ -8,10 +8,12 @@
 //! The prop is applied to the `div` the host builds for `div` and `text`, and to a wrapper
 //! around the element of any other type (a component cannot take an id or a role from outside).
 
+use gpui_kit::component::theme::Theme;
 use gpui_kit::*;
 use serde_json::Value;
 
 use crate::protocol::NodeId;
+use crate::styles::{self, Class};
 use crate::tree::Node;
 
 /// The `a11y` prop of a node: what assistive technology reads, and what it may ask for.
@@ -260,9 +262,20 @@ fn numeric(a11y: &A11y) -> Option<f64> {
 }
 
 /// Wraps an element the host cannot give an id to (a component) so it still gets an
-/// accessibility node. The wrapper is a row, the way a component behaves inside a parent.
-pub fn wrap(a11y: &A11y, node: NodeId, child: AnyElement) -> AnyElement {
-    apply(a11y, node, div().flex().child(child)).into_any_element()
+/// accessibility node. The wrapper is a row, the way a component behaves inside a parent, and
+/// takes the node's size classes (`Class::sizes`): an unsized row would leave a `flex-1` or
+/// `w-full` component nothing to fill (issue #16).
+pub fn wrap(
+    a11y: &A11y,
+    node: NodeId,
+    child: AnyElement,
+    classes: &[Class],
+    theme: &Theme,
+) -> AnyElement {
+    let sizes: Vec<Class> = classes.iter().copied().filter(Class::sizes).collect();
+    styles::apply(apply(a11y, node, div().flex()), &sizes, theme)
+        .child(child)
+        .into_any_element()
 }
 
 /// The `a11y` prop of `node`, or `None` when it has none (or an empty one).

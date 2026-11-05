@@ -2338,3 +2338,79 @@ Explorer. Todo es aditivo: `PROTOCOL_VERSION` sigue en 1.
   ventana) muestra los mismos valores tras `closeWindow` y reabrir. El toast sin ventana
   aparece en pantalla y el host sale con 0.
 - **Tamaño del host release (Windows):** 21.571.584 → **21.592.064 B** (+20.480 B).
+
+### Fase 53 — Issues #14 a #16 de GitHub (2026-11-05)
+
+Tres issues nuevos, abiertos sobre `gpui-bridge@0.4.1` desde txiki.js. Se arreglaron dos en el
+host (#14 y #16). #15 no lleva cambio de código. `PROTOCOL_VERSION` sigue en 1.
+
+- **#14, maximizar no enviaba `resize`:** `bounds_of` leía `window_bounds()`, que en Windows sale
+  de `GetWindowPlacement().rcNormalPosition`, el rectángulo de restaurar. Maximizada, la ventana
+  seguía con el tamaño viejo y el evento se descartaba. Ahora, maximizada o a pantalla completa,
+  se informa el área cliente actual (`window.bounds()`). La primera prueba mostró dos restos: un
+  `move` con el origen nuevo y el tamaño viejo (Windows mueve antes de cambiar el tamaño) y un
+  `resize -32000 …` al volver de minimizada. Por eso, maximizada, solo cuenta un cambio de
+  tamaño, y no se informa nada mientras la ventana está minimizada (`IsIconic` sobre el HWND,
+  declarada a mano como `ShowWindowAsync`). Prueba con `ShowWindow` 3/9/3/6/9/6/9: maximizar da
+  `resize 0 55 1920 1025`, restaurar da `resize 560 256 800 600`, y minimizar y volver no envían
+  nada. El usuario repitió la prueba a mano en Linux (WSL Ubuntu, `examples/windows.ts`):
+  maximizar, restaurar, arrastrar un borde y minimizar y volver se ven bien.
+- **#16, `NumberInput` con `a11y` sin valor:** el envoltorio genérico `a11y::wrap` es una fila
+  flex sin tamaño, así que el `flex-1`/`w-full` del componente se medía contra ella. La causa no
+  era de `NumberInput`: valía para todo componente con `a11y` y tamaño relativo. Un primer
+  arreglo (`203b030`) pasaba las clases del nodo al envoltorio. Una prueba por pares (cada tipo
+  de `blocking` con las mismas clases, con y sin `a11y`) mostró que así se perdía `h-12` en
+  `Select`, `DatePicker`, `Combobox`, `NumberInput` e `Input`, y que el `Toggle` con ancho dejaba
+  de centrar su texto. Poner `size_full` en el control lo arreglaba, pero encogía el `Toggle`.
+  Queda así: el componente conserva todas sus clases como antes, y el envoltorio repite solo las
+  de tamaño (`Class::sizes`: `w-*`, `h-*`, `size-*`, `flex-1`, `flex-none`, `shrink-0`,
+  `min-w-0`, `min-h-0`). No hay anchos fraccionarios, así que un `w-full` repetido sigue siendo
+  el ancho del padre. Con los pares, las columnas `flex-1` y `h-12 flex-1` salen iguales con y
+  sin `a11y` en los diez tipos. Solo difiere `w-[200px]` dentro de una fila de 130 px (el
+  envoltorio no encoge por debajo del ancho fijo), igual que antes del arreglo. La captura del
+  issue muestra 22/33/44 y el `Input` con `flex-1`. UI Automation sigue viendo los nombres Y, Z,
+  I y T (con `role`; sin `role` GPUI nunca crea el nodo). El usuario lo confirmó con Narrator.
+  Al enfocar un `NumberInput` con el lector activo, GPUI avisa `a11y: set_focus called more
+  than once in a single frame`. Pasa también sin `a11y` y no pasa con un `Input`: el
+  `NumberInput` de gpui-component sigue el mismo foco en dos elementos. Es anterior a este
+  arreglo y no afecta a lo que se lee (gana el último).
+- **#15, `notify` con `system: true`:** aquí no aparecen ni el aviso del AppUserModelID ni el de
+  la identidad de paquete. GPUI ya registra el AUMID en `HKCU\Software\Classes\AppUserModelId`
+  (la clave existe y se puede escribir), así que el «Access is denied» viene del token con el
+  que el issue lanzó el host, igual que el error 5 de la bandeja en #6. El
+  `RefCell already borrowed` sí aparece, de 2 a 6 veces por toast y solo con una ventana
+  abierta: la llamada de WinRT bombea mensajes hacia el procedimiento de ventana de GPUI
+  mientras la `App` está prestada. No hay un equivalente asíncrono del lado del host como el
+  `ShowWindowAsync` de #12. Es inofensivo: la ventana sigue pintando (la captura muestra el
+  texto actualizado después de tres toasts) y los toasts de la app se ven. El usuario lanzó
+  la prueba desde una terminal normal: «open» y «closed» llegan al centro de notificaciones, y
+  el log no trae los avisos del AUMID ni de la identidad de paquete. Con bandeja y un toast después de cerrar la ventana aparecen además
+  dos `Invalid window handle (0x80070578)`, sin investigar. El `window not found` al cerrar una
+  ventana sale también sin `notify`.
+- **Documentación:** `PROTOCOL.md` §3 (maximizar, y que esos límites no sirven para guardar
+  la posición) y §16 (el envoltorio de `a11y`), y `CHANGELOG.md` (Unreleased).
+- **Pruebas:** `fmt`, `clippy -D warnings` y `cargo test` (80). Release del host (Windows):
+  **21.593.088 B**.
+
+### Fase 54 — Causa del issue #6 (2026-11-05)
+
+La Fase 52 dejó #6 como un estado de Explorer ligado a la ruta del binario en
+`monitors-control`. No lo era: es la integridad del proceso. `D:\DEVELOP\Working` lleva la etiqueta
+`Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)` (más un `DENY` de borrado para `Everyone` y un
+SID `S-1-4-…`, al parecer de un sandbox), y todo lo que hay dentro la hereda. Windows arranca un
+`.exe` con esa etiqueta a integridad baja: un `whoami.exe` copiado ahí da `Low Mandatory Level`,
+y desde `System32` da Medium. Explorer corre en Medium, así que UIPI rechaza `NIM_MODIFY` y
+`NIM_DELETE` con el error 5.
+
+- **Bisección:** con dos `tray` seguidos (sin icono, solo el tooltip), el build local falla
+  copiado en `…\bin`, `node_modules`, `monitors-control` y `D:\DEVELOP\Working`, y funciona en
+  `D:\DEVELOP\TestingLab`. El binario de CI copiado al scratchpad funciona. No depende del
+  binario ni del nombre del archivo. Por eso los builds locales nunca fallaban.
+- **Arreglo:** ninguno posible en el host: con `NIM_DELETE` también rechazado, recrear el icono
+  deja iconos repetidos. `tray::warn_update` añade al aviso del error 5 (solo Windows) que el host
+  corre a integridad baja, y `PROTOCOL.md` §11 documenta el caso y la salida: ejecutar el host
+  desde una carpeta sin esa etiqueta. No se miró por qué el `NIM_ADD` inicial sí pasa. El
+  «Access is denied» del AUMID en #15 probablemente tiene la misma causa, sin comprobar.
+- **Pruebas:** el aviso nuevo sale con el build release copiado a `D:\DEVELOP\Working`, y nada
+  sale desde `TestingLab`. `fmt`, `clippy -D warnings` y `cargo test`. Release del host (Windows):
+  **21.592.576 B**.

@@ -148,6 +148,27 @@ fn show_window(_: &Window, _: bool) {
     log::warn!("'visible' only works on Windows; ignored");
 }
 
+/// Whether the window is minimized, which GPUI does not tell: Windows parks it at -32000 then,
+/// and the restore rect it reports meanwhile is not where the window is (#14).
+#[cfg(windows)]
+pub fn is_minimized(window: &Window) -> bool {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn IsIconic(hwnd: isize) -> i32;
+    }
+    match HasWindowHandle::window_handle(window).map(|handle| handle.as_raw()) {
+        // SAFETY: the HWND belongs to this open GPUI window.
+        Ok(RawWindowHandle::Win32(handle)) => unsafe { IsIconic(handle.hwnd.get()) != 0 },
+        _ => false,
+    }
+}
+
+#[cfg(not(windows))]
+pub fn is_minimized(_: &Window) -> bool {
+    false
+}
+
 /// The user closed a platform window: report it, forget it, and quit after the last one unless there is a tray.
 pub fn window_closed(
     session: &Entity<Session>,

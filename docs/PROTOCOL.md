@@ -133,8 +133,13 @@ Only changes are sent: opening a window does not report its initial size or posi
 are the ones the client asked for). `resize` and `move` carry the full bounds, in the same
 coordinates `x`, `y`, `width` and `height` take — the window frame's top-left and the client
 size — so a client can feed a reported `x`, `y`, `width`, `height` straight back into `window`
-to restore it. While the window is minimized the platform moves it off screen; the host does
-not report that as a `move`. They are sent while the user drags or resizes, at the
+to restore it. Maximizing, entering fullscreen and restoring report a `resize` (the size
+changes; the new position travels in the same event, with no separate `move`); maximized or
+fullscreen, the bounds are the client area itself, whose `y` is below the title bar, and a
+change of position alone is not reported. Nothing in the event says the window is maximized,
+so a client that saves the bounds to restore them later should not save these. While the
+window is minimized the platform moves it off screen; the host does not report that, nor
+anything else until it comes back. They are sent while the user drags or resizes, at the
 platform's pace; a client that only needs the final size can debounce. Events for a window
 whose `events` list does not include them are not sent at all.
 
@@ -645,6 +650,13 @@ sends `windowClosed` and keeps running, so the app can live in the tray and open
 again with `window`. Removing the tray with no window open ends the host; so does closing
 stdin, which also removes the icon.
 
+**Low integrity.** Windows runs an `.exe` at low integrity when its file carries a Low mandatory
+label, which it inherits from a labelled folder (`icacls <folder>` shows
+`Mandatory Label\Low Mandatory Level`; some sandboxes set it on a workspace). Such a host shows
+the icon, but Windows refuses it every later change: each `tray` update logs "failed to update
+the tray icon: Access is denied. (os error 5)" and the icon keeps its first tooltip and image.
+Run the host from a folder without that label.
+
 Not supported: several tray icons, double click and notification balloons. To keep a window
 out of sight while the app lives in the tray, use `visible: false` (Windows only, section 3).
 
@@ -758,7 +770,12 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 - `system: true` also posts it to the Windows notification center, where it shows under the
   app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
   window open (a tray app), it goes to the notification center only; a click on it is not
-  reported, and the host removes it from the center when it exits.
+  reported, and the host removes it from the center when it exits. With a window open, each
+  one logs a few `RefCell already borrowed` errors on stderr: the Windows toast call delivers
+  window messages while GPUI is busy, and GPUI drops them. They are harmless (the toast shows
+  and the window keeps drawing) and the host cannot avoid them (#15). Registering the app
+  identity writes to `HKCU`; a host launched with a restricted token (a sandbox) may log
+  "Access is denied" for it, and then the toast may not show.
 - With `--no-window` it is validated and nothing is shown.
 
 **tooltip** (a string prop on `div` and `Button`) is shown when the pointer rests on the node.
@@ -905,7 +922,9 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   `content`; with the `label` role it reads like text on a page (Narrator's scan mode reads it,
   Tab does not stop on it), which is how a conversation's messages are read. A component (`Button`,
   `Slider`…) is wrapped in one box that carries it, so the wrap only happens when `a11y` is
-  set; the wrapper is a row and does not change the sizes inside.
+  set. The wrapper is a row that repeats the node's size classes (`w-*`, `h-*`, `size-*`,
+  `flex-1`, `flex-none`, `shrink-0`, `min-w-0`, `min-h-0`), so a component with `flex-1` or
+  `w-full` still sizes against its parent; the component keeps all its classes.
 - A window's root is reported as a `window` with its title, so a window whose own focus has no
   control still has an accessibility node.
 - A `Button` is already reported as a button with its label; the other components name
