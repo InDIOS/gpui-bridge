@@ -2498,3 +2498,9 @@ Iris Xe; aplicar con `benchmarks/tree.mjs` (tres corridas), dibujo con `sample.p
 El usuario eligió `s`: `opt-level = "s"` en el `[profile.release]` raíz. README (números de
 rendimiento) y CHANGELOG («Unreleased», con lo de las fases 56–58) al día. El «~1 % de un núcleo»
 en reposo del README no se volvió a medir.
+- **`Toggle` con nombre:** un `Toggle` con `label` y sin `a11y` salía en UIA como botón sin nombre:
+  el del crate solo se nombra desde su `tooltip`, sin `accessibility_label`. Ahora el `label` es un
+  `label` con nombre propio dentro del Toggle (como las pestañas del dock), y AccessKit nombra al
+  botón desde él: UIA da `Button [Orbit]` con su `Text [Orbit]`, con el mismo aspecto. Atajo
+  anotado para quitarlo cuando gpui-component lo resuelva. Uno de solo icono se nombra con su
+  `tooltip` (PROTOCOL §5). Sin pasada con Narrator.

@@ -22,7 +22,18 @@ pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Toggle {
             });
         });
     if let Some(label) = prop_str(node, "label") {
-        toggle = toggle.label(label.to_owned());
+        // shortcut: the crate names a Toggle only from its tooltip and AccessKit does not name a
+        // button from its children, so the label is a named `label` of its own (as dock tabs do);
+        // drop this when gpui-component's Toggle takes an accessibility label.
+        let spec = crate::a11y::A11y {
+            role: Some(Role::Label),
+            label: Some(label.to_owned()),
+            ..Default::default()
+        };
+        toggle = toggle.child(crate::a11y::apply_stateful(
+            &spec,
+            div().id(("toggle-label", id)).child(label.to_owned()),
+        ));
     }
     if let Some(icon) = super::basic::icon(node, "icon") {
         toggle = toggle.icon(icon);
