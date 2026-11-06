@@ -9,7 +9,6 @@ export default defineConfig({
   // GitHub Pages serves the project at https://indios.github.io/gpui-bridge/.
   base: "/gpui-bridge/",
   cleanUrls: true,
-  lastUpdated: true,
   head: [["link", { rel: "icon", href: logo }]],
   markdown: { theme: { light: "github-light", dark: "github-dark" } },
   themeConfig: {
