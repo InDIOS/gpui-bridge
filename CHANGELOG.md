@@ -19,6 +19,9 @@ Versions are lockstep across the host and the three clients; the protocol has it
   now walks it once, and not at all when the commit only changed props other than `class`
   (live data). With 20 000 nodes that was ~10 ms per commit; it is now ~1 µs for live data on
   text rows, and 2–5 ms when the commit changes the tree's shape.
+- Faster parsing: each line goes straight to its typed message instead of through a generic JSON
+  value first (the slow path now only explains a line that fails, so errors are unchanged).
+  Applying 50 000 nodes (`benchmarks/tree.mjs`) went from 143–156 ms to 57–71 ms.
 
 ## 0.5.0 — 2026-11-06
 

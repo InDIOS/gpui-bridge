@@ -185,7 +185,8 @@ impl Session {
             }
         }
 
-        if self.no_window {
+        // `simulate` is not a protocol message, so only a line that failed to parse can be one.
+        if self.no_window && message.is_err() {
             match simulate::handle(line, &mut self.tree) {
                 Some(Ok(simulate::Outcome::Done)) => return Flow::Continue,
                 Some(Ok(simulate::Outcome::Exit)) => return Flow::Exit,

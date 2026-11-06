@@ -343,6 +343,11 @@ impl From<ProtocolError> for HostMessage {
 
 /// Parses one line from the client, classifying failures into protocol error codes.
 pub fn parse_client_message(line: &str) -> Result<ClientMessage, ProtocolError> {
+    // Straight to the typed message: about three times faster than through a `Value`. Only a
+    // line that fails takes the slow path, which tells which error it is and for which `op`.
+    if let Ok(message) = serde_json::from_str(line) {
+        return Ok(message);
+    }
     let error = |code, message: String, op: Option<&str>| ProtocolError {
         code,
         message,
@@ -423,6 +428,28 @@ mod tests {
 
     fn props(value: Value) -> Props {
         value.as_object().unwrap().clone()
+    }
+
+    /// The direct parse must read every line the way the `Value` path does: same message,
+    /// over every line the conformance fixtures send.
+    #[test]
+    fn direct_parse_matches_the_value_path() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../conformance");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+            for line in text.lines().filter_map(|line| line.strip_prefix("> ")) {
+                let Ok(direct) = serde_json::from_str::<ClientMessage>(line) else {
+                    continue;
+                };
+                let value: Value = serde_json::from_str(line).unwrap();
+                let slow: ClientMessage = serde_json::from_value(value).unwrap();
+                // Debug, since a theme set compares by identity.
+                assert_eq!(format!("{direct:?}"), format!("{slow:?}"), "{line}");
+                checked += 1;
+            }
+        }
+        assert!(checked > 500, "only {checked} lines");
     }
 
     #[test]

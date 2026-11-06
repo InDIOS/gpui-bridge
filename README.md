@@ -220,9 +220,9 @@ over three runs):
 
 | nodes | apply ms (`tree.mjs`, parse + apply, no window) |
 |---|---|
-| 1 000 | 4.1–4.7 |
-| 10 000 | 26–30 |
-| 50 000 | 143–156 |
+| 1 000 | 1.6–2.2 |
+| 10 000 | 10–15 |
+| 50 000 | 57–71 |
 
 A window of 20 000 text nodes costs ~1 % of a core when nothing moves. One spinning icon makes
 every frame walk the whole tree: the host's own pass is ~14 ms, but the full frame (layout and

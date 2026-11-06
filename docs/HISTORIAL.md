@@ -2564,3 +2564,22 @@ frames/s.
 - **Pendiente (siguientes pasos):** parseo directo con el de dos pasos como respaldo (2,9× en el
   parseo); el parseo extra de `simulate::handle` en `--no-window`. Hallazgo aparte: con un spinner
   la ventana reconstruye los 20 001 nodos en cada frame aunque `AnimatedNode` diga lo contrario.
+
+### Fase 61 — Parseo directo (2026-11-06)
+
+Paso 2 del plan de rendimiento, aprobado por el usuario tras su prueba a mano del paso 1.
+
+- **Parseo:** `parse_client_message` prueba primero `serde_json::from_str::<ClientMessage>`; solo
+  si falla toma el camino de antes (a `Value`, comprobar `op`, `from_value`), que explica el error
+  con su código y su `op`. Medido en 100 000 líneas: 101 ms por `Value`, 35 ms directo.
+  `serde_json` no tiene `arbitrary_precision` (sí `preserve_order`, igual en los dos caminos).
+- **`simulate`:** con `--no-window` cada línea se parseaba otra vez a `Value` para ver si era un
+  `simulate`. Como no es un mensaje del protocolo, solo una línea que no se pudo parsear puede
+  serlo: ahora solo esas pasan por `simulate::handle`.
+- **Pruebas:** prueba nueva que lee cada línea `>` de los fixtures por los dos caminos y exige el
+  mismo mensaje (más de 500 líneas). `cargo test` (83), los fixtures de errores sin cambios,
+  clippy limpio, y los clientes Node (33), Python y Go pasan.
+- **Resultado** (`tree.mjs`, release, tres corridas): 1 000 nodos 4,1–4,7 → 1,6–2,2 ms; 10 000
+  26–30 → 10–15 ms; 50 000 143–156 → 57–71 ms. Parte de la mejora en estas cifras (que son sin
+  ventana) es el parseo de `simulate` que ya no se hace; con ventana cuenta solo el parseo directo.
+  Host de release: 15 646 720 B.
