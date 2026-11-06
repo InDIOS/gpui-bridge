@@ -1,6 +1,7 @@
 //! Protocol message types. Source of truth together with `client-node/src/protocol.ts`
 //! and PROTOCOL.md.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui_kit::component::theme::ThemeSet;
@@ -88,6 +89,10 @@ pub enum ClientMessage {
         menu: Option<Value>,
     },
     RemoveTray,
+    /// SVG icons usable in every `icon` prop (PROTOCOL.md section 29).
+    Icons {
+        icons: BTreeMap<String, String>,
+    },
     /// App-wide keyboard shortcuts (PROTOCOL.md section 12); each message replaces the list.
     Shortcuts {
         keys: Vec<String>,
@@ -280,6 +285,7 @@ impl ClientMessage {
             Self::CloseWindow { .. } => "closeWindow",
             Self::Tray { .. } => "tray",
             Self::RemoveTray => "removeTray",
+            Self::Icons { .. } => "icons",
             Self::Shortcuts { .. } => "shortcuts",
             Self::Focus { .. } => "focus",
             Self::OpenDialog { .. } => "openDialog",
@@ -354,7 +360,7 @@ pub fn parse_client_message(line: &str) -> Result<ClientMessage, ProtocolError> 
 }
 
 /// Wire names of every `ClientMessage` variant (kept in sync by a test).
-const OPS: [&str; 21] = [
+const OPS: [&str; 22] = [
     "hello",
     "window",
     "create",
@@ -366,6 +372,7 @@ const OPS: [&str; 21] = [
     "closeWindow",
     "tray",
     "removeTray",
+    "icons",
     "shortcuts",
     "focus",
     "openDialog",
@@ -712,6 +719,7 @@ mod tests {
             r#"{"op":"closeWindow","id":1}"#,
             r#"{"op":"tray"}"#,
             r#"{"op":"removeTray"}"#,
+            r#"{"op":"icons","icons":{}}"#,
             r#"{"op":"shortcuts","keys":[]}"#,
             r#"{"op":"focus","id":1}"#,
             r#"{"op":"openDialog","request":1}"#,

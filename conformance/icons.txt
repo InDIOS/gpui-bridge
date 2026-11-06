@@ -1,0 +1,41 @@
+# Section 29: icons the client registers (`icons`) and uses in any `icon` prop.
+> {"op":"hello","protocol":1}
+< {"type":"ready","protocol":1}
+# A name not registered (nor bundled) is invalid_props, as before.
+> {"op":"create","id":1,"type":"Icon","props":{"name":"conformance-logo"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# Registered first in the same batch, the name works in an Icon and in an `icon` prop.
+> {"op":"icons","icons":{"conformance-logo":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/></svg>"}}
+> {"op":"create","id":1,"type":"Icon","props":{"name":"conformance-logo"}}
+> {"op":"create","id":2,"type":"Badge","props":{"icon":"conformance-logo","label":"New"}}
+> {"op":"commit"}
+# Registering a name again replaces it.
+> {"op":"icons","icons":{"conformance-logo":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><rect width=\"20\" height=\"20\" x=\"2\" y=\"2\"/></svg>"}}
+> {"op":"commit"}
+# A bundled name, a bad name or an unreadable SVG rejects the whole message: nothing is registered.
+> {"op":"icons","icons":{"conformance-ok":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"/>","check":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"/>"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"icons"}
+> {"op":"icons","icons":{"Conformance Logo":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"/>"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"icons"}
+> {"op":"icons","icons":{"conformance-ok":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"/>","conformance-bad":"not an svg"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_operation","op":"icons"}
+> {"op":"create","id":3,"type":"Icon","props":{"name":"conformance-ok"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+# The SVG is text, not base64 or a number.
+> {"op":"icons","icons":{"conformance-logo":42}}
+< {"type":"error","code":"invalid_json","op":"icons"}
+> {"op":"icons","icons":["conformance-logo"]}
+< {"type":"error","code":"invalid_json","op":"icons"}
+# A Button takes an icon too, bundled or registered; an icon-only one is named by its tooltip.
+> {"op":"create","id":4,"type":"Button","props":{"icon":"conformance-logo","label":"Launch"},"events":["click"]}
+> {"op":"create","id":5,"type":"Button","props":{"icon":"search","tooltip":"Search"},"events":["click"]}
+> {"op":"create","id":6,"type":"Button","props":{"icon":"no-such-icon"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+> {"op":"simulate","id":5,"event":"click"}
+< {"type":"event","id":5,"event":"click"}

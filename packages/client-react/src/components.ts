@@ -72,6 +72,7 @@ export interface TextProps extends SharedProps {
 export interface ButtonProps extends SharedProps {
   /** Alternatively, pass the label as text children. */
   label?: string;
+  icon?: string;
   variant?: WireButtonProps["variant"];
   disabled?: boolean;
   tooltip?: string;

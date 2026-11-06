@@ -48,21 +48,7 @@ use crate::schema::NodeType;
 use crate::transport;
 use crate::tree::{Node, Tree};
 
-/// Asset path of a bundled icon (`folder` → `icons/folder.svg`).
-pub fn icon_path(name: &str) -> String {
-    format!("icons/{name}.svg")
-}
-
-/// Whether `name` is one of the icons bundled with gpui-component's default assets.
-pub fn icon_exists(name: &str) -> bool {
-    use gpui_kit::AssetSource as _;
-    // shortcut: only the 101 default icons; registering `AllAssets` gives all 1,830 Lucide icons (+1 MB).
-    !name.is_empty()
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && matches!(gpui_kit::assets::Assets.load(&icon_path(name)), Ok(Some(_)))
-}
+pub use crate::icons::{icon_exists, icon_path};
 
 fn prop_str<'a>(node: &'a Node, key: &str) -> Option<&'a str> {
     node.props.get(key).and_then(Value::as_str)

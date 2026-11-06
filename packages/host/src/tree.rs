@@ -442,6 +442,8 @@ impl Tree {
                 tray.menu = menu.or(tray.menu.take());
                 tray.revision += 1;
             }
+            ClientMessage::Icons { icons } => crate::icons::register(&icons)
+                .map_err(|msg| fail(ErrorCode::InvalidOperation, msg))?,
             ClientMessage::Shortcuts { keys } => {
                 if let Some(bad) = keys.iter().find(|keys| crate::keys::parse(keys).is_none()) {
                     return Err(fail(

@@ -176,7 +176,7 @@ Rules:
 |------------|--------------------------------------------------------------|--------------------|
 | `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic`, `dragData`, `dropTarget` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd`, `dropNode` |
 | `text`     | `content`, `class`                                           | —                  |
-| `Button`   | `label`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
+| `Button`   | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
 | `Input`    | `value`, `placeholder`, `disabled`, `controlled`, `class`    | `change`, `submit`, `keyDown` |
 | `Checkbox` | `checked`, `label`, `disabled`, `controlled`, `class`        | `change`           |
 | `Icon`     | `name`, `class`                                              | —                  |
@@ -282,9 +282,12 @@ sections 14 and 24: each is a slot of the node that holds it and draws nothing e
   `Button`, `Checkbox`, `Input`, a `div` with `click` and a nested `windowControl` div take
   their own clicks, so a title bar can hold a search box or buttons; everything else in it
   (text, icons, plain divs) is part of the area.
+- A `Button`'s `icon` goes before its `label`; without a `label` it is an icon-only button, and
+  its `tooltip` is then also its name for a screen reader (give it one). The same goes for a
+  `Toggle`: its `label` names it, and an icon-only one is named by its `tooltip`.
 - `Icon` draws one of gpui-component's bundled icons (Lucide). It takes the current text
   size and color unless `class` sets them (`size-4`, `text-muted-foreground`). `name` is
-  one of: `a-large-small`, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `asterisk`, `ban`, `battery-charging`, `battery-full`, `battery-low`, `battery-medium`, `battery-warning`, `battery`, `bell`, `book-open`, `bot`, `building-2`, `calendar`, `case-sensitive`, `chart-pie`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-up-down`, `circle-alert`, `circle-check`, `circle-user`, `circle-x`, `close`, `copy`, `cpu`, `dash`, `delete`, `ellipsis-vertical`, `ellipsis`, `external-link`, `eye-off`, `eye`, `file-text`, `file`, `folder-closed`, `folder-open`, `folder`, `frame`, `gallery-vertical-end`, `github`, `globe`, `hard-drive`, `heart-off`, `heart`, `inbox`, `info`, `inspector`, `layout-dashboard`, `loader-circle`, `loader`, `map`, `maximize`, `memory-stick`, `menu`, `mic`, `minimize`, `minus`, `moon`, `network`, `palette`, `panel-bottom-open`, `panel-bottom`, `panel-left-close`, `panel-left-open`, `panel-left`, `panel-right-close`, `panel-right-open`, `panel-right`, `pause`, `play`, `plus`, `redo-2`, `redo`, `refresh-cw`, `replace`, `resize-corner`, `rotate-cw`, `search`, `settings-2`, `settings`, `sort-ascending`, `sort-descending`, `square-terminal`, `square`, `star-fill`, `star-off`, `star`, `sun`, `thumbs-down`, `thumbs-up`, `triangle-alert`, `undo-2`, `undo`, `user`, `window-close`, `window-maximize`, `window-minimize`, `window-restore`. Any other name is `invalid_props`.
+  one of: `a-large-small`, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `asterisk`, `ban`, `battery-charging`, `battery-full`, `battery-low`, `battery-medium`, `battery-warning`, `battery`, `bell`, `book-open`, `bot`, `building-2`, `calendar`, `case-sensitive`, `chart-pie`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-up-down`, `circle-alert`, `circle-check`, `circle-user`, `circle-x`, `close`, `copy`, `cpu`, `dash`, `delete`, `ellipsis-vertical`, `ellipsis`, `external-link`, `eye-off`, `eye`, `file-text`, `file`, `folder-closed`, `folder-open`, `folder`, `frame`, `gallery-vertical-end`, `github`, `globe`, `hard-drive`, `heart-off`, `heart`, `inbox`, `info`, `inspector`, `layout-dashboard`, `loader-circle`, `loader`, `map`, `maximize`, `memory-stick`, `menu`, `mic`, `minimize`, `minus`, `moon`, `network`, `palette`, `panel-bottom-open`, `panel-bottom`, `panel-left-close`, `panel-left-open`, `panel-left`, `panel-right-close`, `panel-right-open`, `panel-right`, `pause`, `play`, `plus`, `redo-2`, `redo`, `refresh-cw`, `replace`, `resize-corner`, `rotate-cw`, `search`, `settings-2`, `settings`, `sort-ascending`, `sort-descending`, `square-terminal`, `square`, `star-fill`, `star-off`, `star`, `sun`, `thumbs-down`, `thumbs-up`, `triangle-alert`, `undo-2`, `undo`, `user`, `window-close`, `window-maximize`, `window-minimize`, `window-restore`. A name registered with `icons` (section 29) also works, here and in every `icon` prop the document calls a bundled icon. Any other name is `invalid_props`.
 - `contextMenu` and `MenuBar` are described in section 10; `Dialog` and `tooltip` in section 14;
   `AlertDialog`, `Sheet`, `Popover` and `HoverCard` in section 24; `VirtualList`, `Table` and
   `Tabs` in section 15.
@@ -1706,3 +1709,30 @@ panel's children are its content (any nodes):
 
 `PROTOCOL_VERSION` stays at 1: `Dock` and `DockPanel` are new node types. The transcript in
 `conformance/dock.txt` is the reference for their props and events.
+
+## 29. Icons
+
+```json
+{"op":"icons","icons":{"app-logo":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">…</svg>"}}
+```
+
+`icons` registers SVG icons for the whole app (every window). A registered name works wherever a
+bundled icon name does: an `Icon`'s `name` and every `icon` prop (`Badge`, `Menu` items,
+`Sidebar`, `Command`, `Settings`, `Tree`, `Empty`, …).
+
+- Applied in order on `commit`, like the tree operations: register a name before (or in the same
+  batch as) the nodes that use it, or they are `invalid_props`.
+- `icons` maps each name to the SVG's text (not base64). A name uses lowercase letters, digits and
+  `-`. Several messages add up; registering a name again replaces its picture everywhere on that
+  commit. There is no way to remove one.
+- An icon is drawn like a bundled one: in the current text color and size unless `class` sets
+  them. Only the SVG's shape counts, as a single-color mask: draw it with `currentColor` (or any
+  solid color); a multi-color SVG comes out in one color.
+- A name that is a bundled icon, a name with other characters or an SVG the host cannot read is
+  `invalid_operation`, and then nothing in that message is registered. A field that is not an
+  object of strings is `invalid_json`.
+- The host keeps each SVG in memory for as long as it runs; send each icon once, not with every
+  commit.
+
+`PROTOCOL_VERSION` stays at 1: `icons` is a new operation. The transcript in `conformance/icons.txt`
+is the reference.

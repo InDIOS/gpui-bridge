@@ -145,7 +145,9 @@ impl PropKind {
             Self::Str => "a string".into(),
             Self::Bool => "a boolean".into(),
             Self::OneOf(allowed) => format!("one of {}", allowed.join(", ")),
-            Self::Icon => "a bundled icon name (PROTOCOL.md section 5)".into(),
+            Self::Icon => {
+                "a bundled or registered icon name (PROTOCOL.md sections 5 and 29)".into()
+            }
             Self::Menu | Self::Menus => "a menu list (PROTOCOL.md section 10)".into(),
             Self::Options => "a list of options".into(),
             Self::Number => "a number".into(),
@@ -383,6 +385,7 @@ impl NodeType {
             (_, "a11y") => Some(Accessibility),
             (Self::Text, "content") => Some(Str),
             (Self::Button, "label") => Some(Str),
+            (Self::Button, "icon") => Some(Icon),
             (Self::Button | Self::DropdownButton, "variant") => {
                 Some(OneOf(&["primary", "secondary", "ghost", "danger"]))
             }

@@ -95,6 +95,25 @@ func TestImageBase64InvalidProps(t *testing.T) {
 	}
 }
 
+func TestRegisteredIconsWorkInIconProps(t *testing.T) {
+	app := mustApp(t)
+	var errors []HostError
+	app.OnError(func(err HostError) { errors = append(errors, err) })
+
+	svg := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>`
+	app.Icons(map[string]string{"go-logo": svg})
+	root := app.Div(Props{}).Append(app.Create("Icon", Props{"name": "go-logo"}), app.Badge(Props{"icon": "go-logo"}))
+	app.Window(WindowOptions{Root: root})
+	app.Commit()
+	app.Icons(map[string]string{"check": svg}) // a bundled name cannot be replaced
+	app.Commit()
+
+	app.Close()
+	if len(errors) != 1 || errors[0].Code != "invalid_operation" || errors[0].Op != "icons" {
+		t.Fatalf("want one invalid_operation on icons, got %#v", errors)
+	}
+}
+
 func TestHostErrorsTypedAndHostKeepsRunning(t *testing.T) {
 	app := mustApp(t)
 	var errors []HostError
