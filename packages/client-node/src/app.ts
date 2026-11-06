@@ -798,6 +798,15 @@ export class App {
     return this;
   }
 
+  /**
+   * Registers SVG icons (name → SVG text) on the next commit, for `Icon` and every `icon` prop
+   * (PROTOCOL.md section 29). Register a name before the nodes that use it; again to replace it.
+   */
+  icons(icons: Record<string, string>): this {
+    this.wire.queue({ op: "icons", icons });
+    return this;
+  }
+
   /** Shows or updates the system tray icon on the next commit. */
   tray(options: TrayOptions): this {
     this.wire.queue({ op: "tray", ...options });

@@ -684,6 +684,12 @@ class App:
         self._pending.append({"op": "shortcuts", "keys": list(keys)})
         return self
 
+    def icons(self, icons: dict[str, str]) -> "App":
+        """Registers SVG icons (name -> SVG text) on the next commit, for `Icon` and every `icon`
+        prop (PROTOCOL.md section 29). Register a name before the nodes that use it; again to replace it."""
+        self._pending.append({"op": "icons", "icons": dict(icons)})
+        return self
+
     def tray(self, **options) -> "App":
         """Shows or updates the system tray icon (PROTOCOL.md section 11): `icon`, `tooltip`, `menu`."""
         self._pending.append({"op": "tray", **options})

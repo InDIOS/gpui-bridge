@@ -32,6 +32,14 @@ func (a *App) CreateWindow(opts WindowOptions) *Window {
 	return w
 }
 
+// Icons registers SVG icons (name → SVG text) on the next commit, for `Icon` and every `icon`
+// prop (PROTOCOL.md §29). Register a name before the nodes that use it; again to replace it.
+func (a *App) Icons(icons map[string]string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.tree.pending = append(a.tree.pending, iconsMsg(icons))
+}
+
 func (a *App) queueWindow(opts WindowOptions, id WindowID) {
 	var rootId *NodeID
 	if opts.Root != nil {

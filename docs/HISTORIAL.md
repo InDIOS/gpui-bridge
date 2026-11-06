@@ -2462,3 +2462,8 @@ cuando haya un caso).
   `usvg` 0.46 (el que ya enlaza GPUI, sin crates nuevos); un nombre incluido, un nombre con otros
   caracteres o un SVG ilegible es `invalid_operation` y no registra nada del mensaje.
   `PROTOCOL_VERSION` sigue en 1. Sin mirar aún en ventana real (queda para el paso 3).
+- **Paso 2 — clientes:** `app.icons({...})` en Node (y React por `root.app`), `app.icons({...})` en
+  Python y `app.Icons(map[string]string{...})` en Go, en cola hasta `commit` como `tray`. Un test
+  por cliente contra el host sin ventana: el nombre registrado vale en `Icon` y en el `icon` de un
+  `Badge`, y registrar `check` da `invalid_operation`. React no lleva test propio: es el método
+  del cliente de Node.

@@ -149,6 +149,7 @@ export type ClientMessage =
   | { op: "closeWindow"; id: WindowId }
   | { op: "tray"; icon?: string; tooltip?: string; menu?: MenuItem[] }
   | { op: "removeTray" }
+  | { op: "icons"; icons: Record<string, string> }
   | { op: "shortcuts"; keys: string[] }
   | { op: "focus"; id: NodeId }
   | { op: "openDialog"; request: number; files?: boolean; directories?: boolean; multiple?: boolean; prompt?: string }

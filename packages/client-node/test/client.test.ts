@@ -119,6 +119,20 @@ test("menus are accepted by the host and report the chosen item", async () => {
   assert.deepEqual(seen, [["bar", "a"], ["area", "copy"]]);
 });
 
+test("registered icons work in icon props and bundled names cannot be replaced", async () => {
+  const app = await createApp(headless);
+  const errors: HostError[] = [];
+  app.on("error", (error) => errors.push(error));
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>';
+  app.icons({ "node-logo": svg });
+  app.window({ root: app.div().append(app.icon({ name: "node-logo" }), app.badge({ icon: "node-logo" })) });
+  app.commit();
+  app.icons({ check: svg }).commit();
+
+  await app.close();
+  assert.deepEqual(errors.map((e) => [e.code, e.op]), [["invalid_operation", "icons"]]);
+});
+
 test("the tray reports events and removing it with no window ends the host", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];
