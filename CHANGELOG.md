@@ -14,6 +14,10 @@ Versions are lockstep across the host and the three clients; the protocol has it
   Windows next to the name.
 - A `hello` the host cannot read is answered with `invalid_json` and the host exits; before,
   it was ignored and the client waited until its handshake timeout.
+- Faster commits in a window: after each commit the host walked the window's tree about 25
+  times (once per stateful component type) to keep its Inputs, Selects, dialogs… in step. It
+  now walks it once, and not at all when the commit only changed props other than `class`
+  (live data). With 20 000 nodes that was ~10 ms per commit and is now ~1 µs.
 
 ## 0.5.0 — 2026-11-06
 

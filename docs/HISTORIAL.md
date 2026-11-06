@@ -2530,3 +2530,37 @@ identidad para todas las apps. Ahora la app se nombra en el `hello`.
   ejecución anterior. Probado con una ventana real y `notify` con `system`: la clave quedó con
   `DisplayName` e `IconUri`, y una segunda ejecución sin icono lo quitó. El usuario confirmó en
   pantalla el nombre, el icono y el clic (2026-11-06).
+
+### Fase 60 — Commits más baratos en una ventana (2026-11-06)
+
+El usuario pidió optimizar el host en rendimiento, no solo en tamaño. Medido antes de tocar nada
+(host de release, este equipo): la ida y vuelta de un mensaje es de 0,1–0,2 ms y no merece
+trabajo; cargar 50 000 nodos tarda ~140 ms, ~100 de ellos en el parseo JSON en dos pasos; y con
+datos en vivo (un texto cambiado 60 veces por segundo) una ventana de 20 000 nodos dibujaba 4–5,5
+frames/s.
+
+- **Benchmark:** modo `update` en `benchmarks/render.mjs` (y en `run.ps1` y `sample.ps1`): ningún
+  benchmark hacía commits con una ventana abierta (`5b903f0`).
+- **Causa:** tras cada commit, cada ventana recorría su árbol unas 25 veces para mantener el
+  estado de sus componentes: el subárbol, `animated_nodes`, un escaneo de todo el árbol por cada
+  tipo con estado (Input, Select, Table…), VirtualList, MessageScroller, los focusables, y otra
+  vez el subárbol y dos escaneos en `sync_overlays_and_focus`. Con 20 000 nodos, ~10 ms por
+  commit; a 60 commits por segundo llenaba el hilo principal.
+- **Cambio:** `Tree::window_nodes` recorre la ventana una vez y agrupa sus nodos por tipo
+  (`WindowNodes`); cada snapshot lee solo su tipo, `animated_nodes` mira solo los nodos con una
+  clase `animate-` (y sube por sus padres buscando un `windowControl`), y los overlays reusan lo
+  mismo. El árbol lleva un contador `shape` que sube con toda operación salvo un `setProps` que
+  no toca `class` (y con `set_host_prop` de `class`); la ventana solo recorre de nuevo cuando
+  cambia. `texts.retain` también espera a un cambio de forma. `Tree::nodes` quedó sin uso y se
+  borró. No se juntan varios commits en un solo sync: `value_writes` es solo del último.
+- **Resultado:** el sync por commit pasó de ~10 ms a ~1 µs con datos en vivo (2–5 ms cuando cambia
+  la forma con 20 000 nodos). La ventana de 20 000 filas con `update` dibuja 9,1–9,5 frames/s, el
+  mismo techo que el spinner solo: el resto es layout y pintado de GPUI. Con 2 000 filas, ~45–53
+  frames/s (antes ~47: ahí el sync ya era pequeño). Host de release: 15 641 600 B.
+- **Pruebas:** `cargo test` (82, con dos nuevas: `window_nodes` y `shape`), clippy limpio. Ningún
+  test construye un `RootView`, así que se abrieron forms, data, list, dock, settings, overlays,
+  slots, chat y command en ventanas reales: sin pánicos. Falta que el usuario pruebe a mano los
+  controles con estado.
+- **Pendiente (siguientes pasos):** parseo directo con el de dos pasos como respaldo (2,9× en el
+  parseo); el parseo extra de `simulate::handle` en `--no-window`. Hallazgo aparte: con un spinner
+  la ventana reconstruye los 20 001 nodos en cada frame aunque `AnimatedNode` diga lo contrario.

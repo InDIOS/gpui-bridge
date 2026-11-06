@@ -12,6 +12,36 @@ use crate::protocol::{
 };
 use crate::schema::NodeType;
 
+/// One window's nodes from a single walk of its tree: which belong to it, those of each type, and
+/// those whose `class` names an animation. A window builds it once per sync, so each component
+/// reads only its own type instead of scanning the whole tree.
+#[derive(Debug, Default)]
+pub struct WindowNodes {
+    members: HashSet<NodeId>,
+    by_type: HashMap<NodeType, Vec<NodeId>>,
+    /// Nodes with an `animate-*` class, in no order.
+    pub animated: Vec<NodeId>,
+}
+
+impl WindowNodes {
+    pub fn contains(&self, id: NodeId) -> bool {
+        self.members.contains(&id)
+    }
+
+    /// This window's nodes of one type, in no order.
+    pub fn of<'a>(
+        &'a self,
+        tree: &'a Tree,
+        node_type: NodeType,
+    ) -> impl Iterator<Item = (NodeId, &'a Node)> + 'a {
+        self.by_type
+            .get(&node_type)
+            .into_iter()
+            .flatten()
+            .filter_map(|&id| Some((id, tree.node(id)?)))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub node_type: NodeType,
@@ -86,6 +116,9 @@ pub struct Tree {
     pending: Vec<ClientMessage>,
     /// Number of commits applied, so each window view applies `value_writes` once.
     commits: u64,
+    /// Bumped by every change that may alter what `window_nodes` returns, so a window walks its
+    /// tree again only then. Live data (a `setProps` that leaves `class` alone) does not bump it.
+    shape: u64,
     /// Input nodes whose `value` the client imposed in the last commit (PROTOCOL.md section 7),
     /// and divs whose `class` it set (a dragged div goes back to its classes, section 8).
     value_writes: Vec<NodeId>,
@@ -101,10 +134,6 @@ pub struct Tree {
 impl Tree {
     pub fn node(&self, id: NodeId) -> Option<&Node> {
         self.nodes.get(&id)
-    }
-
-    pub fn nodes(&self) -> impl Iterator<Item = (NodeId, &Node)> {
-        self.nodes.iter().map(|(&id, node)| (id, node))
     }
 
     pub fn windows(&self) -> &BTreeMap<WindowId, WindowSpec> {
@@ -166,6 +195,10 @@ impl Tree {
         self.commits
     }
 
+    pub fn shape(&self) -> u64 {
+        self.shape
+    }
+
     /// Forgets a window; `false` if it did not exist.
     pub fn close_window(&mut self, id: WindowId) -> bool {
         self.windows.remove(&id).is_some()
@@ -181,6 +214,24 @@ impl Tree {
             }
         }
         ids
+    }
+
+    /// One walk over the node and its descendants (see `WindowNodes`).
+    pub fn window_nodes(&self, root: NodeId) -> WindowNodes {
+        let mut nodes = WindowNodes::default();
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(&id).filter(|_| nodes.members.insert(id)) else {
+                continue;
+            };
+            nodes.by_type.entry(node.node_type).or_default().push(id);
+            let class = node.props.get("class").and_then(Value::as_str);
+            if class.is_some_and(|class| class.contains("animate-")) {
+                nodes.animated.push(id);
+            }
+            stack.extend(&node.children);
+        }
+        nodes
     }
 
     /// Whether the node subscribed to `event` (events are opt-in).
@@ -239,6 +290,9 @@ impl Tree {
 
     /// Updates a prop from host-side interaction (e.g. a checkbox toggled by the user).
     pub fn set_host_prop(&mut self, id: NodeId, key: &str, value: Value) {
+        if key == "class" {
+            self.shape += 1;
+        }
         if let Some(node) = self.nodes.get_mut(&id) {
             node.props.insert(key.into(), value);
         }
@@ -327,6 +381,9 @@ impl Tree {
     }
 
     fn apply(&mut self, op: ClientMessage) -> Result<(), ProtocolError> {
+        if !matches!(&op, ClientMessage::SetProps { props, .. } if !props.contains_key("class")) {
+            self.shape += 1;
+        }
         let op_name = op.op_name();
         let fail = |code, message: String| ProtocolError {
             code,
@@ -820,6 +877,58 @@ mod tests {
 
     fn children(tree: &Tree, id: NodeId) -> Vec<NodeId> {
         tree.node(id).unwrap().children.clone()
+    }
+
+    #[test]
+    fn window_nodes_holds_one_subtree_by_type() {
+        let mut tree = Tree::default();
+        let errors = run(
+            &mut tree,
+            vec![
+                create(1, "div"),
+                create(2, "Input"),
+                json!({"op": "create", "id": 3, "type": "div", "props": {"class": "animate-pulse"}}),
+                create(4, "Input"),
+                create(5, "div"),
+                append(1, 2),
+                append(1, 3),
+                append(3, 4),
+                // Not under 1: another window's nodes.
+                create(6, "Input"),
+                append(5, 6),
+            ],
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+        let nodes = tree.window_nodes(1);
+        let mut inputs: Vec<NodeId> = nodes.of(&tree, NodeType::Input).map(|(id, _)| id).collect();
+        inputs.sort();
+        assert_eq!(inputs, [2, 4]);
+        assert_eq!(nodes.of(&tree, NodeType::Select).count(), 0);
+        assert!(nodes.contains(4) && !nodes.contains(5) && !nodes.contains(6));
+        assert_eq!(nodes.animated, [3]);
+    }
+
+    #[test]
+    fn shape_moves_unless_a_set_props_leaves_class_alone() {
+        let mut tree = Tree::default();
+        run(
+            &mut tree,
+            vec![create(1, "div"), create(2, "text"), append(1, 2)],
+        );
+        let shape = tree.shape();
+        run(
+            &mut tree,
+            vec![json!({"op": "setProps", "id": 2, "props": {"content": "tick"}})],
+        );
+        assert_eq!(tree.shape(), shape, "live data keeps the window's walk");
+        run(
+            &mut tree,
+            vec![json!({"op": "setProps", "id": 2, "props": {"class": "animate-pulse"}})],
+        );
+        assert!(tree.shape() > shape, "a class can start a loop");
+        let shape = tree.shape();
+        run(&mut tree, vec![json!({"op": "remove", "id": 2})]);
+        assert!(tree.shape() > shape);
     }
 
     #[test]

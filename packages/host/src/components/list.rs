@@ -2,7 +2,7 @@
 //! One retained `ListState` per node; its delegate reads the rows from the tree when it draws
 //! them, and the selection follows `value`, as a Table's follows `selected`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui_kit::component::list::{List, ListDelegate, ListEvent, ListItem, ListState};
@@ -14,7 +14,7 @@ use super::{chosen, emit, prop_bool, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 /// Draws the content of one row (a `ListItem`'s children) in the list's own pass.
 pub type RenderItem = Rc<dyn Fn(NodeId, &mut Window, &mut App) -> Vec<AnyElement>>;
@@ -172,10 +172,10 @@ impl ListSlot {
 /// Each List among `members`: its selected row, `searchable` and `loadMoreThreshold`.
 pub struct ListSnapshot(Vec<(NodeId, Option<usize>, bool, usize)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> ListSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> ListSnapshot {
     ListSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::List && members.contains(id))
+        members
+            .of(tree, NodeType::List)
             .map(|(id, node)| {
                 let threshold = node
                     .props

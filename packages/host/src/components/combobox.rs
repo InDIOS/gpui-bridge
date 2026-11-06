@@ -3,7 +3,7 @@
 //! a Select's value, and `sync` makes the state show them. The trigger is the crate's own, drawn
 //! from `options`, `value` and `placeholder`: nothing of it comes from the client.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::combobox::{Combobox, ComboboxEvent, ComboboxState};
 use gpui_kit::component::select::SearchableVec;
@@ -15,7 +15,7 @@ use super::{options, prop_bool, prop_str, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 type State = ComboboxState<SearchableVec<Choice>>;
 
@@ -40,10 +40,10 @@ fn values(value: Option<&Value>) -> Vec<String> {
         .collect()
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> ComboboxSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> ComboboxSnapshot {
     ComboboxSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Combobox && members.contains(id))
+        members
+            .of(tree, NodeType::Combobox)
             .map(|(id, node)| {
                 let options = options(node, "options");
                 let chosen = values(node.props.get("value"));

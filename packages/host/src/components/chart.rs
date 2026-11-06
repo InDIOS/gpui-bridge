@@ -2,7 +2,7 @@
 //! `{label, value}` in props, kept parsed in a slot per node: a series of a thousand points is
 //! read once per change, not again on every frame.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::chart::{BarChart, LineChart, PieChart};
 use gpui_kit::component::plot::shape::BarAlignment;
@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 /// One datum: its label, its value and its position (the pie cycles the theme's chart colors).
 #[derive(Clone, Debug, PartialEq)]
@@ -135,10 +135,10 @@ fn parse(value: &Value) -> Vec<Datum> {
         .collect()
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> ChartSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> ChartSnapshot {
     ChartSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Chart && members.contains(id))
+        members
+            .of(tree, NodeType::Chart)
             .map(|(id, node)| {
                 let data = node.props.get("data").unwrap_or(&Value::Null);
                 (id, parse(data))

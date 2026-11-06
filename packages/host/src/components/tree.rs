@@ -16,7 +16,7 @@ use super::{icon_path, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree as NodeTree};
+use crate::tree::{Node, Tree as NodeTree, WindowNodes};
 
 /// One item, as comparable data: `items` is rebuilt only when this changes.
 #[derive(Clone, Debug, PartialEq)]
@@ -114,10 +114,10 @@ pub fn items(node: &Node) -> Vec<ItemSpec> {
         .collect()
 }
 
-pub fn snapshot(tree: &NodeTree, members: &HashSet<NodeId>) -> TreeSnapshot {
+pub fn snapshot(tree: &NodeTree, members: &WindowNodes) -> TreeSnapshot {
     TreeSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Tree && members.contains(id))
+        members
+            .of(tree, NodeType::Tree)
             .map(|(id, node)| {
                 let value = node
                     .props

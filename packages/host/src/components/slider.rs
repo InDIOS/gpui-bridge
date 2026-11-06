@@ -1,7 +1,7 @@
 //! `Slider`: one retained `SliderState` per node. The value lives in the tree (`value`), and
 //! `sync` makes the state show it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::*;
@@ -10,7 +10,7 @@ use super::{number, prop_bool, prop_f32, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 /// `min`, `max`, `step`.
 type Range = (f32, f32, f32);
@@ -24,10 +24,10 @@ pub struct SliderSlot {
 /// Each Slider among `members`: its range and the value to show.
 pub struct SliderSnapshot(Vec<(NodeId, Range, f32)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> SliderSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> SliderSnapshot {
     SliderSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Slider && members.contains(id))
+        members
+            .of(tree, NodeType::Slider)
             .map(|(id, node)| {
                 let min = prop_f32(node, "min").unwrap_or(0.);
                 // A `max` not above `min` would divide by zero in the thumb position.

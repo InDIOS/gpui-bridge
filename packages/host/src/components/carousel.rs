@@ -1,7 +1,7 @@
 //! `Carousel` (PROTOCOL.md section 18): one retained `CarouselState` per node. The slides are
 //! the node's children, one per item; `value` is the selected index.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::carousel::{
@@ -16,7 +16,7 @@ use super::{icon_path, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct CarouselSlot {
     state: Entity<CarouselState>,
@@ -35,10 +35,10 @@ fn axis(node: &Node) -> Axis {
     }
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> CarouselSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> CarouselSnapshot {
     CarouselSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Carousel && members.contains(id))
+        members
+            .of(tree, NodeType::Carousel)
             .map(|(id, node)| {
                 let selected = node
                     .props

@@ -3,7 +3,7 @@
 //! when it appears and removed when its node goes or is closed; everything in between (drags,
 //! splits, sizes) is the user's, so no commit undoes it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::dock::{
     self, DockArea, DockPlacement, DockSkin, PanelEvent, panel_handle,
@@ -15,7 +15,7 @@ use super::{emit, prop_bool, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::Tree;
+use crate::tree::{Tree, WindowNodes};
 
 /// The user closed a `DockPanel` (or a `simulate` did): it stays out of its Dock from now on.
 pub fn closed(tree: &mut Tree, id: NodeId) {
@@ -106,10 +106,10 @@ impl DockSlot {
 /// Each Dock among `members`, with its open `DockPanel` children and where each one starts.
 pub struct DockSnapshot(Vec<(NodeId, Vec<(NodeId, DockPlacement)>)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> DockSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> DockSnapshot {
     DockSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Dock && members.contains(id))
+        members
+            .of(tree, NodeType::Dock)
             .map(|(id, node)| {
                 let panels = node
                     .children
