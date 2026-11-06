@@ -2437,3 +2437,13 @@ sitios de GPUI y gpui-kit.
   `.lean.js` de las páginas en ceros (las páginas hidrataban a 404); el siguiente salió bien y no
   se repitió. No se miró el modo claro.
 - **Logo nuevo:** el usuario eligió entre seis propuestas y sus combinaciones la «AB2»: una llave `{` (el JSON del cliente) que se abre en una ventana con líneas (el host). `site/public/logo.svg` en el sitio y el README; `favicon.svg` es la misma figura en blanco sobre un cuadrado con el degradado.
+
+### Fase 56 — gpui-kit 0.9.0 (2026-11-06)
+
+- **Subida:** gpui-kit 0.8.1 → 0.9.0 (gpui-pre 0.3.11). Compiló sin cambios: el host no construye
+  temas con literales (lo que 0.9.0 rompe con `#[non_exhaustive]`).
+- **`scroller_row` fuera:** el `MessageScroller` de 0.9.0 pone él mismo el relleno de la lista en
+  la primera y la última fila (#3615), lo que hacía `scroller_row` con `py_0` en la lista; se
+  borraron los dos. No se miró en ventana real.
+- **Siguen:** los atajos de `highlight_ranges`, la cabecera del Accordion y el título de las
+  pestañas del dock (el código de esas partes no cambió en 0.9.0).
