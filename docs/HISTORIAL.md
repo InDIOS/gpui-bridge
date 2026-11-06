@@ -2480,3 +2480,21 @@ cuando haya un caso).
   `build`. PROTOCOL §5, tipos de Node/React, `conformance/icons.txt` y una fila de botones en
   `examples/icons.ts`, vista en ventana real. Visto de paso: un `Toggle` con `label` y sin `a11y`
   sale sin nombre en UIA (el `Toggle` del crate no tiene `accessibility_label`); sin tocar.
+
+### Fase 58 — Host de release optimizado para tamaño (2026-11-06)
+
+El usuario quería que el host bajara de tamaño en vez de crecer. El perfil ya tenía `lto`,
+`codegen-units = 1`, `strip` y `panic = "abort"`; quedaba `opt-level`. Tres hosts de release con el
+mismo código (`CARGO_PROFILE_RELEASE_OPT_LEVEL`, cada uno en `target/opt-<n>`), Windows 11, Intel
+Iris Xe; aplicar con `benchmarks/tree.mjs` (tres corridas), dibujo con `sample.ps1 -Mode spin -Log`
+(5 s):
+
+| opt-level | tamaño | compila | aplicar 10 000 | aplicar 50 000 | 20 000 nodos + spinner | 200 nodos + spinner |
+|---|---|---|---|---|---|---|
+| 3 | 21.756.928 B | 8,3 min | 21–26 ms | 116–120 ms | ~10 c/s, 14 ms/pasada | 60 c/s, 0,15 ms |
+| s | 15.626.752 B (−28 %) | 5,6 min | 26–30 ms | 143–156 ms | ~8,7 c/s, 14 ms | 60 c/s, 0,16 ms |
+| z | 13.246.976 B (−39 %) | 4,9 min | 29–41 ms | 151–165 ms | ~7,1 c/s, 22 ms | 60 c/s, 0,22 ms |
+
+El usuario eligió `s`: `opt-level = "s"` en el `[profile.release]` raíz. README (números de
+rendimiento) y CHANGELOG («Unreleased», con lo de las fases 56–58) al día. El «~1 % de un núcleo»
+en reposo del README no se volvió a medir.

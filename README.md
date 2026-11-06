@@ -215,17 +215,18 @@ pnpm bench                            # or: pwsh -File benchmarks/run.ps1
 
 See [benchmarks/README.md](benchmarks/README.md) for what each number means and its limits.
 
-Release host, Windows 11, Intel Iris Xe, 2026-10-25 (range over three runs):
+Release host (built for size, `opt-level = "s"`), Windows 11, Intel Iris Xe, 2026-11-06 (range
+over three runs):
 
 | nodes | apply ms (`tree.mjs`, parse + apply, no window) |
 |---|---|
-| 1 000 | 3.1–3.2 |
-| 10 000 | 19.5–21.9 |
-| 50 000 | 101–107 |
+| 1 000 | 4.1–4.7 |
+| 10 000 | 26–30 |
+| 50 000 | 143–156 |
 
 A window of 20 000 text nodes costs ~1 % of a core when nothing moves. One spinning icon makes
-every frame walk the whole tree: the host's own pass is ~10 ms, but the full frame (layout and
-paint included) runs at ~12 frames/s on one core. With 200 nodes the same spinner draws at 60
+every frame walk the whole tree: the host's own pass is ~14 ms, but the full frame (layout and
+paint included) runs at ~9 frames/s on one core. With 200 nodes the same spinner draws at 60
 frames/s in ~0.2 ms per pass. Use `VirtualList` or `Table` for long lists.
 
 ## Packaging
