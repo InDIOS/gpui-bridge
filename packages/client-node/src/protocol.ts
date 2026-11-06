@@ -301,6 +301,8 @@ export interface TextProps {
 
 export interface ButtonProps {
   label?: string;
+  /** An icon before the label; without a label, give a `tooltip` (it also names the button). */
+  icon?: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   disabled?: boolean;
   tooltip?: string;

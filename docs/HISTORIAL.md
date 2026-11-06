@@ -2473,3 +2473,10 @@ cuando haya un caso).
   de depuración (captura solo de la ventana con PrintWindow; el botón se pulsó por UI Automation,
   sin ratón): los iconos toman el color y tamaño de sus clases y el reemplazo cambia todos los
   sitios a la vez. Sin pánicos en el log.
+- **`Button` con `icon`:** el usuario notó que `Button` no aceptaba icono (solo `DropdownButton` y
+  `Toggle`), aunque el `Button` de gpui-kit sí. Ahora `icon` (incluido o registrado) va antes del
+  `label`; sin `label` es un botón de solo icono y su `tooltip` le da nombre (`accessibility_label`),
+  comprobado por UI Automation («Garden», «Search»). `DropdownButton` toma el icono del mismo
+  `build`. PROTOCOL §5, tipos de Node/React, `conformance/icons.txt` y una fila de botones en
+  `examples/icons.ts`, vista en ventana real. Visto de paso: un `Toggle` con `label` y sin `a11y`
+  sale sin nombre en UIA (el `Toggle` del crate no tiene `accessibility_label`); sin tocar.

@@ -31,3 +31,11 @@
 < {"type":"error","code":"invalid_json","op":"icons"}
 > {"op":"icons","icons":["conformance-logo"]}
 < {"type":"error","code":"invalid_json","op":"icons"}
+# A Button takes an icon too, bundled or registered; an icon-only one is named by its tooltip.
+> {"op":"create","id":4,"type":"Button","props":{"icon":"conformance-logo","label":"Launch"},"events":["click"]}
+> {"op":"create","id":5,"type":"Button","props":{"icon":"search","tooltip":"Search"},"events":["click"]}
+> {"op":"create","id":6,"type":"Button","props":{"icon":"no-such-icon"}}
+> {"op":"commit"}
+< {"type":"error","code":"invalid_props","op":"create"}
+> {"op":"simulate","id":5,"event":"click"}
+< {"type":"event","id":5,"event":"click"}

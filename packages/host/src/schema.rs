@@ -385,6 +385,7 @@ impl NodeType {
             (_, "a11y") => Some(Accessibility),
             (Self::Text, "content") => Some(Str),
             (Self::Button, "label") => Some(Str),
+            (Self::Button, "icon") => Some(Icon),
             (Self::Button | Self::DropdownButton, "variant") => {
                 Some(OneOf(&["primary", "secondary", "ghost", "danger"]))
             }

@@ -176,7 +176,7 @@ Rules:
 |------------|--------------------------------------------------------------|--------------------|
 | `div`      | `class`, `windowControl` (`drag`, `minimize`, `maximize`, `close`), `contextMenu`, `tooltip`, `drag`, `magnetic`, `dragData`, `dropTarget` (section 8) | `click`, `doubleClick`, `menu`, `keyDown`, `drop`, `dragEnd`, `dropNode` |
 | `text`     | `content`, `class`                                           | —                  |
-| `Button`   | `label`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
+| `Button`   | `label`, `icon`, `variant` (`primary`, `secondary`, `ghost`, `danger`), `disabled`, `tooltip`, `class` | `click` |
 | `Input`    | `value`, `placeholder`, `disabled`, `controlled`, `class`    | `change`, `submit`, `keyDown` |
 | `Checkbox` | `checked`, `label`, `disabled`, `controlled`, `class`        | `change`           |
 | `Icon`     | `name`, `class`                                              | —                  |
@@ -282,6 +282,8 @@ sections 14 and 24: each is a slot of the node that holds it and draws nothing e
   `Button`, `Checkbox`, `Input`, a `div` with `click` and a nested `windowControl` div take
   their own clicks, so a title bar can hold a search box or buttons; everything else in it
   (text, icons, plain divs) is part of the area.
+- A `Button`'s `icon` goes before its `label`; without a `label` it is an icon-only button, and
+  its `tooltip` is then also its name for a screen reader (give it one).
 - `Icon` draws one of gpui-component's bundled icons (Lucide). It takes the current text
   size and color unless `class` sets them (`size-4`, `text-muted-foreground`). `name` is
   one of: `a-large-small`, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `asterisk`, `ban`, `battery-charging`, `battery-full`, `battery-low`, `battery-medium`, `battery-warning`, `battery`, `bell`, `book-open`, `bot`, `building-2`, `calendar`, `case-sensitive`, `chart-pie`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-up-down`, `circle-alert`, `circle-check`, `circle-user`, `circle-x`, `close`, `copy`, `cpu`, `dash`, `delete`, `ellipsis-vertical`, `ellipsis`, `external-link`, `eye-off`, `eye`, `file-text`, `file`, `folder-closed`, `folder-open`, `folder`, `frame`, `gallery-vertical-end`, `github`, `globe`, `hard-drive`, `heart-off`, `heart`, `inbox`, `info`, `inspector`, `layout-dashboard`, `loader-circle`, `loader`, `map`, `maximize`, `memory-stick`, `menu`, `mic`, `minimize`, `minus`, `moon`, `network`, `palette`, `panel-bottom-open`, `panel-bottom`, `panel-left-close`, `panel-left-open`, `panel-left`, `panel-right-close`, `panel-right-open`, `panel-right`, `pause`, `play`, `plus`, `redo-2`, `redo`, `refresh-cw`, `replace`, `resize-corner`, `rotate-cw`, `search`, `settings-2`, `settings`, `sort-ascending`, `sort-descending`, `square-terminal`, `square`, `star-fill`, `star-off`, `star`, `sun`, `thumbs-down`, `thumbs-up`, `triangle-alert`, `undo-2`, `undo`, `user`, `window-close`, `window-maximize`, `window-minimize`, `window-restore`. A name registered with `icons` (section 29) also works, here and in every `icon` prop the document calls a bundled icon. Any other name is `invalid_props`.

@@ -39,11 +39,21 @@ root.append(
 );
 
 let swapped = false;
-const swap = app.button({ label: "Swap the rocket", variant: "primary" }).on("click", () => {
+const swap = app.button({ label: "Swap", icon: "refresh-cw", variant: "primary" }).on("click", () => {
   swapped = !swapped;
   app.icons({ rocket: swapped ? planet : rocket }).commit();
 });
-root.append(swap, app.empty({ icon: "rocket", title: "Nothing launched yet", description: "Every rocket here is the app's own SVG." }));
+// Buttons: icon + label, icon only (the tooltip names it), and the same with a bundled icon.
+root.append(
+  app.div({ class: "flex items-center gap-2" }).append(
+    swap,
+    app.button({ label: "Launch", icon: "rocket", variant: "secondary" }),
+    app.button({ icon: "leaf", tooltip: "Garden", variant: "ghost" }),
+    app.button({ icon: "search", tooltip: "Search", variant: "ghost" }),
+    app.button({ label: "Delete", icon: "delete", variant: "danger" }),
+  ),
+);
+root.append(app.empty({ icon: "rocket", title: "Nothing launched yet", description: "Every rocket here is the app's own SVG." }));
 
 app.window({ title: "Icons", width: 520, height: 420, root });
 app.commit();
