@@ -31,6 +31,34 @@ impl Global for WindowlessToasts {}
 /// `DisplayName`) with the first system notification, so this must run before any.
 pub fn set_identity(app: &AppIdentity, cx: &mut App) {
     cx.set_app_identity(&app.id, &app.name);
+    #[cfg(windows)]
+    set_notification_icon(&app.id, app.icon.as_deref());
+}
+
+/// Windows reads an unpackaged app's toast icon from `IconUri`, an absolute path, under the
+/// key GPUI gives the name. No icon removes one an earlier run left.
+#[cfg(windows)]
+fn set_notification_icon(id: &str, icon: Option<&str>) {
+    let key = match windows_registry::CURRENT_USER
+        .create(format!(r"Software\Classes\AppUserModelId\{id}"))
+    {
+        Ok(key) => key,
+        Err(err) => return log::warn!("cannot register the notification icon: {err}"),
+    };
+    let Some(icon) = icon else {
+        let _ = key.remove_value("IconUri"); // fails when there is none, which is the goal
+        return;
+    };
+    let path = match std::path::absolute(icon) {
+        Ok(path) => path,
+        Err(err) => return log::warn!("notification icon '{icon}': {err}"),
+    };
+    if !path.is_file() {
+        log::warn!("notification icon '{}' is not a file", path.display());
+    }
+    if let Err(err) = key.set_string("IconUri", path.to_string_lossy()) {
+        log::warn!("cannot register the notification icon: {err}");
+    }
 }
 
 /// Notification center only. gpui-component owns the click handler and ignores tags it did not

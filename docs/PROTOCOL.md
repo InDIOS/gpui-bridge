@@ -38,10 +38,14 @@ If the version is not supported, the host answers
 `hello` may name the app, which otherwise runs as `gpui-bridge`:
 
 ```json
-{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}
+{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes","icon":"C:\\app\\notes.png"}}
 ```
 
 - `name` is what Windows shows on the app's system notifications (section 14).
+- `icon` (optional): an image file (PNG, ICO) shown with that name. A relative path is taken
+  from the host's working directory; the host stores the absolute one in `HKCU` under the id
+  (`IconUri`), so the file must stay where it is. A missing file is a warning on stderr. Without
+  `icon`, an icon stored by an earlier run is removed.
 - `id` is the Windows AppUserModelID: it also groups the app's windows on the taskbar. 1 to 128
   characters, no spaces or `\`; a dotted name such as `Company.App` is the convention. Keep it
   the same across runs: Windows remembers notification settings per id.

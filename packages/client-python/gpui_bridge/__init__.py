@@ -185,8 +185,9 @@ class Window:
 class App:
     """Starts the host and completes the handshake. Raises with a clear message if the host cannot start.
 
-    `app` names the app for the system, e.g. `{"id": "Acme.Notes", "name": "Notes"}`: Windows shows
-    `name` on system notifications (default `gpui-bridge`). `id` is up to 128 characters, no spaces."""
+    `app` names the app for the system, e.g. `{"id": "Acme.Notes", "name": "Notes", "icon": "notes.png"}`:
+    Windows shows `name` and `icon` (optional) on system notifications (default `gpui-bridge`).
+    `id` is up to 128 characters, no spaces."""
 
     def __init__(
         self, host_path: str | None = None, *, debug: bool = False, headless: bool = False, app: dict | None = None

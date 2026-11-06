@@ -2457,3 +2457,9 @@ identidad para todas las apps. Ahora la app se nombra en el `hello`.
 - **Pruebas:** fixtures `app-identity.txt` y `app-identity-invalid.txt`; prueba de parseo en el
   host y una prueba por cliente (id válido y con espacio). `cargo test`, `npm test` (32),
   `unittest` (32) y `go test` pasan.
+- **Icono:** `app.icon` (opcional). GPUI solo registra `DisplayName`; el host escribe `IconUri`
+  (ruta absoluta) en la misma clave `HKCU\Software\Classes\AppUserModelId\<id>` con
+  `windows-registry` 0.6, la misma versión que ya usa GPUI. Sin `icon` borra el que dejó una
+  ejecución anterior. Probado con una ventana real y `notify` con `system`: la clave quedó con
+  `DisplayName` e `IconUri`, y una segunda ejecución sin icono lo quitó. No se miró el toast en
+  pantalla.

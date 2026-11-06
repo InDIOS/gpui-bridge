@@ -71,6 +71,8 @@ type AppOptions struct {
 type AppIdentity struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// Icon is an image file shown on the app's system notifications (PNG, ICO…).
+	Icon string `json:"icon,omitempty"`
 }
 
 // App is the client connected to a gpui-bridge host.

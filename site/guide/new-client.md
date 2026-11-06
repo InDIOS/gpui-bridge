@@ -40,7 +40,7 @@ Send `{"op":"hello","protocol":1}` first and wait for `{"type":"ready","protocol
 answer is an `error` with code `protocol_mismatch`, the host exits. Surface the versions to the
 user. Until `ready`, the host ignores anything else you send.
 
-Let the app name itself: an `app` option (`{"id":"Acme.Notes","name":"Notes"}`) that goes into
+Let the app name itself: an `app` option (`{"id":"Acme.Notes","name":"Notes","icon":"notes.png"}`) that goes into
 `hello` as is. Without it, system notifications show `gpui-bridge`. A bad `app` is an `error`
 with code `invalid_json`, and the host exits. See [Protocol §2](/protocol#_2-handshake).
 

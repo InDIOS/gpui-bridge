@@ -136,12 +136,13 @@ pub enum ClientMessage {
     Commit,
 }
 
-/// The app's own identity (`hello`): Windows shows `name` on its system notifications.
+/// The app's own identity (`hello`): Windows shows `name` and `icon` on its system notifications.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct AppIdentity {
     #[serde(deserialize_with = "app_id")]
     pub id: String,
     pub name: String,
+    pub icon: Option<String>,
 }
 
 /// The id becomes the process AppUserModelID and a registry key name: Windows allows at most
@@ -432,7 +433,8 @@ mod tests {
                 protocol: 1,
                 app: Some(AppIdentity {
                     id: "Acme.Notes".into(),
-                    name: "Notes".into()
+                    name: "Notes".into(),
+                    icon: None
                 })
             }
         );

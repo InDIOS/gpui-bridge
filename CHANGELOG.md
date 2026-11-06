@@ -10,6 +10,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
   groups its windows on the taskbar. The clients take it as an option: `createApp({ app })`
   (Node, React, txiki), `App(app=...)` (Python), `AppOptions.App` (Go). `PROTOCOL_VERSION`
   stays 1: an older host ignores the field.
+- `app.icon` (an image file) is the icon on those notifications; the host registers it on
+  Windows next to the name.
 - A `hello` the host cannot read is answered with `invalid_json` and the host exits; before,
   it was ignored and the client waited until its handshake timeout.
 
