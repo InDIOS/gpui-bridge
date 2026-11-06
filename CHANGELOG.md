@@ -160,4 +160,4 @@ older host answers `unknown_type` to the new nodes and nothing else changes.
   `examples/react/`; `pnpm dev <name>` runs any example with the repository host.
 - Docs: `CONTRIBUTING.md`, `docs/RELEASING.md`, ADR 0001 and a README per package.
 
-Earlier development is described phase by phase in [`docs/HISTORIAL.md`](docs/HISTORIAL.md).
+Earlier development is described phase by phase in [`docs/HISTORIAL.md`](https://github.com/InDIOS/gpui-bridge/blob/main/docs/HISTORIAL.md).

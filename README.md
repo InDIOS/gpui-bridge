@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="611" height="367" alt="gpui-bridge logo" src="https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259" />
+  <img width="160" height="160" alt="gpui-bridge logo" src="site/public/logo.svg" />
 </p>
 
 <h1 align="center">gpui-bridge</h1>
@@ -247,6 +247,10 @@ These commands print the path of the artifact they stage. The optimized host is 
 (6 MB zipped). With txiki.js, a whole app is about 19 MB.
 
 ## Documents
+
+The documentation site, [indios.github.io/gpui-bridge](https://indios.github.io/gpui-bridge/),
+covers how the clients work, the protocol, writing a new client and the changelog. Its source is
+[`site/`](site/).
 
 - [PROTOCOL.md](docs/PROTOCOL.md): the protocol, for client authors (English).
 - [GPUI_BRIDGE_PLAN.md](docs/GPUI_BRIDGE_PLAN.md): the project plan, design decisions and next

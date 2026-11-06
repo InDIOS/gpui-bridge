@@ -36,6 +36,7 @@ falls back to `target/release`; `--debug` prints which host it runs and forwards
 | `conformance/` | wire-level transcripts, shared by the host and every client |
 | `benchmarks/` | measurements, not tests |
 | `docs/` | protocol, plan, history, releasing, ADRs |
+| `site/` | the documentation site (VitePress), published to GitHub Pages by `docs.yml`; it includes the protocol, changelog and READMEs instead of copying them |
 | `scripts/` | `stage-host.mjs` (packaging), `check-package.mjs` (the packaging test) and `dev.mjs` (`pnpm dev`) |
 
 The root `Cargo.toml` holds the Cargo workspace and `[profile.release]` (a profile in a member is

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <title>gpui-bridge</title>
+  <defs>
+    <linearGradient id="gb" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#22b8cf"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#gb)"/>
+  <g transform="translate(8 8) scale(0.75)" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 10c-5 0-7 3-7 8v6c0 4-2 7-5 8 3 1 5 4 5 8v6c0 5 2 8 7 8"/>
+    <rect x="24" y="10" width="35" height="44" rx="8"/>
+    <path d="M24 21h35"/>
+    <path d="M32 30h17M32 37h10M32 44h14" stroke-width="4.7"/>
+  </g>
+</svg>

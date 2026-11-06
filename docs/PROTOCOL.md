@@ -482,7 +482,7 @@ warning on stderr (once per class).
 
 ## 9. Conformance fixtures
 
-[`conformance/`](../conformance/) holds wire-level transcripts of this protocol. Each `.txt`
+[`conformance/`](https://github.com/InDIOS/gpui-bridge/tree/main/conformance) holds wire-level transcripts of this protocol. Each `.txt`
 file is one session against `host --no-window`:
 
 ```

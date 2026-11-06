@@ -2414,3 +2414,26 @@ y desde `System32` da Medium. Explorer corre en Medium, así que UIPI rechaza `N
 - **Pruebas:** el aviso nuevo sale con el build release copiado a `D:\DEVELOP\Working`, y nada
   sale desde `TestingLab`. `fmt`, `clippy -D warnings` y `cargo test`. Release del host (Windows):
   **21.592.576 B**.
+
+### Fase 55 — Sitio de documentación (2026-11-06)
+
+Un sitio en inglés para GitHub Pages (`https://indios.github.io/gpui-bridge/`), centrado en cómo
+se usan los clientes, el protocolo y cómo escribir un cliente nuevo; los componentes quedan en los
+sitios de GPUI y gpui-kit.
+
+- **Sitio:** VitePress en `site/` (paquete privado del workspace de pnpm). Tema por defecto con
+  colores propios, búsqueda local, modo claro y oscuro. `PROTOCOL.md`, `CHANGELOG.md`,
+  `CONTRIBUTING.md`, `RELEASING.md` y los README de los clientes entran con
+  `<!--@include: -->`, sin copias. Páginas nuevas: la portada (el contador en los cuatro
+  clientes), «How it works» y «Writing a new client».
+- **Enlaces:** los dos enlaces relativos que salían del sitio (`../conformance/` en PROTOCOL y
+  `docs/HISTORIAL.md` en CHANGELOG) pasan a URLs de GitHub, porque VitePress falla con enlaces
+  muertos.
+- **Publicación:** `.github/workflows/docs.yml` construye y despliega en cada push a `main` que
+  toca el sitio o un documento incluido, y a mano. Falta activar Pages en el repositorio
+  (Settings → Pages → Source: GitHub Actions).
+- **Pruebas:** `pnpm --filter gpui-bridge-site build` sin errores; vista previa en Edge headless
+  de la portada, «How it works», el protocolo y «Writing a new client». Un primer build dejó los
+  `.lean.js` de las páginas en ceros (las páginas hidrataban a 404); el siguiente salió bien y no
+  se repitió. No se miró el modo claro.
+- **Logo nuevo:** el usuario eligió entre seis propuestas y sus combinaciones la «AB2»: una llave `{` (el JSON del cliente) que se abre en una ventana con líneas (el host). `site/public/logo.svg` en el sitio y el README; `favicon.svg` es la misma figura en blanco sobre un cuadrado con el degradado.

@@ -24,3 +24,7 @@ packages/client-python/gpui_bridge/bin/
 # Editor
 .vscode/
 .editorconfig
+
+# Docs site (VitePress)
+site/.vitepress/dist/
+site/.vitepress/cache/
