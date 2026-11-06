@@ -2447,3 +2447,18 @@ sitios de GPUI y gpui-kit.
   borraron los dos. No se miró en ventana real.
 - **Siguen:** los atajos de `highlight_ranges`, la cabecera del Accordion y el título de las
   pestañas del dock (el código de esas partes no cambió en 0.9.0).
+
+### Fase 57 — Iconos del cliente (2026-11-06)
+
+Que cada app use el icono que quiera sin que el host crezca (lo que da gpui-kit 0.9.0 para iconos
+no hacía falta: `set_icon_resolver` solo sirve para reemplazar los incluidos, y eso queda para
+cuando haya un caso).
+
+- **Paso 1 — host:** operación nueva `icons` (`{name: svg}`), en cola hasta `commit` como las del
+  árbol; PROTOCOL §29 y `conformance/icons.txt`. `src/icons.rs`: registro global (el
+  `AssetSource` y la comprobación de props no tienen la sesión), un `AssetSource` que sirve
+  `client-icons/<generación>/<nombre>.svg` y delega el resto en los iconos de gpui-kit; cada
+  registro cambia la ruta porque GPUI guarda el SVG dibujado por ruta. El SVG se comprueba con
+  `usvg` 0.46 (el que ya enlaza GPUI, sin crates nuevos); un nombre incluido, un nombre con otros
+  caracteres o un SVG ilegible es `invalid_operation` y no registra nada del mensaje.
+  `PROTOCOL_VERSION` sigue en 1. Sin mirar aún en ventana real (queda para el paso 3).

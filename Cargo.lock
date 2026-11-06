@@ -2176,6 +2176,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tray-icon",
+ "usvg 0.46.0",
 ]
 
 [[package]]
