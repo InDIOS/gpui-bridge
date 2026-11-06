@@ -40,6 +40,10 @@ Send `{"op":"hello","protocol":1}` first and wait for `{"type":"ready","protocol
 answer is an `error` with code `protocol_mismatch`, the host exits. Surface the versions to the
 user. Until `ready`, the host ignores anything else you send.
 
+Let the app name itself: an `app` option (`{"id":"Acme.Notes","name":"Notes"}`) that goes into
+`hello` as is. Without it, system notifications show `gpui-bridge`. A bad `app` is an `error`
+with code `invalid_json`, and the host exits. See [Protocol §2](/protocol#_2-handshake).
+
 ## 4. Model the tree on your side
 
 - **Allocate ids yourself.** Use a counter that starts at 1 and never reuses a value, even after
@@ -107,7 +111,7 @@ test your event dispatch without a screen. See [Protocol §9](/protocol#_9-confo
 
 ## 8. Before you call it done
 
-- [ ] `hello` and `ready`, with `protocol_mismatch` reported clearly.
+- [ ] `hello` and `ready`, with `protocol_mismatch` reported clearly, and an `app` option for the app's name.
 - [ ] Ids from 1 up, never reused.
 - [ ] Operations buffered until `commit`, one JSON object per line.
 - [ ] stderr drained, with its tail kept for crash reports.

@@ -35,6 +35,21 @@ The host answers:
 If the version is not supported, the host answers
 `{"type":"error","code":"protocol_mismatch","op":"hello",...}` and exits.
 
+`hello` may name the app, which otherwise runs as `gpui-bridge`:
+
+```json
+{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}
+```
+
+- `name` is what Windows shows on the app's system notifications (section 14).
+- `id` is the Windows AppUserModelID: it also groups the app's windows on the taskbar. 1 to 128
+  characters, no spaces or `\`; a dotted name such as `Company.App` is the convention. Keep it
+  the same across runs: Windows remembers notification settings per id.
+- Only the first `hello` names the app; `app` in a repeated one is ignored. With `--no-window`
+  it is validated and nothing is applied.
+- A `hello` the host cannot read (a bad `app`, a missing `protocol`) is answered with
+  `{"type":"error","code":"invalid_json","op":"hello",...}` and the host exits.
+
 Before the handshake, the host ignores everything that is not `hello` and does not answer
 (it only logs a warning to stderr). Until the version is agreed, no other message can be
 interpreted safely.
@@ -768,7 +783,7 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 - `id`: a click on the toast sends `{"type":"notification","id":...,"window":...}`, and a new
   toast with the same `id` replaces the previous one.
 - `system: true` also posts it to the Windows notification center, where it shows under the
-  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
+  app name set by `hello` (section 2), `gpui-bridge` if it set none. With no
   window open (a tray app), it goes to the notification center only; a click on it is not
   reported, and the host removes it from the center when it exits. With a window open, each
   one logs a few `RefCell already borrowed` errors on stderr: the Windows toast call delivers

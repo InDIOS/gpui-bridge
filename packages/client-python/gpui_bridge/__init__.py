@@ -183,9 +183,14 @@ class Window:
 
 
 class App:
-    """Starts the host and completes the handshake. Raises with a clear message if the host cannot start."""
+    """Starts the host and completes the handshake. Raises with a clear message if the host cannot start.
 
-    def __init__(self, host_path: str | None = None, *, debug: bool = False, headless: bool = False):
+    `app` names the app for the system, e.g. `{"id": "Acme.Notes", "name": "Notes"}`: Windows shows
+    `name` on system notifications (default `gpui-bridge`). `id` is up to 128 characters, no spaces."""
+
+    def __init__(
+        self, host_path: str | None = None, *, debug: bool = False, headless: bool = False, app: dict | None = None
+    ):
         self.on_error = None  # (HostError) -> None; without it errors are printed to stderr
         self.on_window_closed = None  # (window_id) -> None; the user closed a window
         self.on_window_event = None  # (message) -> None; a window event the app subscribed to
@@ -220,7 +225,10 @@ class App:
         self._stderr_thread = threading.Thread(target=self._read_stderr, args=(debug,), daemon=True)
         self._stderr_thread.start()
         threading.Thread(target=self._read_stdout, daemon=True).start()
-        self._write([{"op": "hello", "protocol": PROTOCOL_VERSION}])
+        hello = {"op": "hello", "protocol": PROTOCOL_VERSION}
+        if app:
+            hello["app"] = app
+        self._write([hello])
         self._handshake()
 
     def div(self, **props) -> Node:

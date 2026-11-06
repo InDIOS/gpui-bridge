@@ -2437,3 +2437,23 @@ sitios de GPUI y gpui-kit.
   `.lean.js` de las páginas en ceros (las páginas hidrataban a 404); el siguiente salió bien y no
   se repitió. No se miró el modo claro.
 - **Logo nuevo:** el usuario eligió entre seis propuestas y sus combinaciones la «AB2»: una llave `{` (el JSON del cliente) que se abre en una ventana con líneas (el host). `site/public/logo.svg` en el sitio y el README; `favicon.svg` es la misma figura en blanco sobre un cuadrado con el degradado.
+
+### Fase 59 — Identidad de la app (2026-11-06)
+
+Las notificaciones del sistema salían a nombre de `gpui-bridge`: el host fijaba una sola
+identidad para todas las apps. Ahora la app se nombra en el `hello`.
+
+- **Protocolo:** campo opcional `app: {id, name}` en `hello` (PROTOCOL §2). Sin subir
+  `PROTOCOL_VERSION`: el host ignora campos que no conoce, así que uno anterior lo descarta.
+  Solo cuenta el primer `hello`; con `--no-window` se valida y no se aplica.
+- **Host:** el `id` se valida al leer el mensaje (1 a 128 caracteres, sin espacios ni `\`,
+  porque es el AppUserModelID y un nombre de clave del registro). La identidad se aplica con
+  `set_app_identity` al recibir el primer `hello`, antes de cualquier ventana o notificación:
+  GPUI registra el `DisplayName` con la primera notificación. Un `hello` ilegible ahora se
+  contesta con `invalid_json` y el host sale, como `protocol_mismatch`; antes el cliente esperaba
+  hasta su timeout.
+- **Clientes:** opción `app` en Node (`createApp`, `createTxikiApp`, y React por herencia),
+  Python (`App(app=...)`) y Go (`AppOptions.App`). Sin ella el `hello` no cambia.
+- **Pruebas:** fixtures `app-identity.txt` y `app-identity-invalid.txt`; prueba de parseo en el
+  host y una prueba por cliente (id válido y con espacio). `cargo test`, `npm test` (32),
+  `unittest` (32) y `go test` pasan.

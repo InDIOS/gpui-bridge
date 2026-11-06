@@ -4,6 +4,7 @@
 
 import {
   PROTOCOL_VERSION,
+  type AppIdentity,
   type ClientMessage,
   type ErrorCode,
   type HostMessage,
@@ -944,7 +945,7 @@ export class App {
  * Starts the host through `start` and completes the handshake. Rejects with a
  * clear message if the host cannot start.
  */
-export function connect(hostPath: string, start: (events: HostEvents) => HostTransport): Promise<App> {
+export function connect(hostPath: string, start: (events: HostEvents) => HostTransport, identity?: AppIdentity): Promise<App> {
   return new Promise((resolve, reject) => {
     let app: App | undefined;
     let ready = false;
@@ -975,6 +976,7 @@ export function connect(hostPath: string, start: (events: HostEvents) => HostTra
       },
     });
     app = new App(host, hostPath);
-    host.send({ op: "hello", protocol: PROTOCOL_VERSION });
+    // JSON leaves out an undefined `app`, so the default hello stays `{"op":"hello","protocol":1}`.
+    host.send({ op: "hello", protocol: PROTOCOL_VERSION, app: identity });
   });
 }

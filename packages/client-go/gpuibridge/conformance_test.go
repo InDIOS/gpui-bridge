@@ -40,7 +40,7 @@ func TestMessagesMatchConformance(t *testing.T) {
 		got  ClientMessage
 		want string
 	}{
-		{helloMsg(), `{"op":"hello","protocol":1}`},
+		{helloMsg(nil), `{"op":"hello","protocol":1}`},
 		{commitMsg(), `{"op":"commit"}`},
 		{window, `{"op":"window","id":2,"root":3}`},
 		{closeWindowMsg(2), `{"op":"closeWindow","id":2}`},

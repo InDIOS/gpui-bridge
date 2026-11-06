@@ -23,6 +23,7 @@ pub type Props = Map<String, Value>;
 pub enum ClientMessage {
     Hello {
         protocol: u32,
+        app: Option<AppIdentity>,
     },
     Window {
         id: Option<WindowId>,
@@ -133,6 +134,27 @@ pub enum ClientMessage {
         system: Option<bool>,
     },
     Commit,
+}
+
+/// The app's own identity (`hello`): Windows shows `name` on its system notifications.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct AppIdentity {
+    #[serde(deserialize_with = "app_id")]
+    pub id: String,
+    pub name: String,
+}
+
+/// The id becomes the process AppUserModelID and a registry key name: Windows allows at most
+/// 128 characters and no spaces, and a `\` would open a subkey.
+fn app_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let id = String::deserialize(deserializer)?;
+    let bad = |c: char| c.is_whitespace() || c.is_control() || c == '\\';
+    if id.is_empty() || id.chars().count() > 128 || id.contains(bad) {
+        return Err(serde::de::Error::custom(
+            "app id must be 1 to 128 characters with no spaces or '\\'",
+        ));
+    }
+    Ok(id)
 }
 
 /// The look of a `notify` toast.
@@ -399,8 +421,28 @@ mod tests {
     fn parses_hello() {
         assert_eq!(
             parse(r#"{"op":"hello","protocol":1}"#),
-            ClientMessage::Hello { protocol: 1 }
+            ClientMessage::Hello {
+                protocol: 1,
+                app: None
+            }
         );
+        assert_eq!(
+            parse(r#"{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}"#),
+            ClientMessage::Hello {
+                protocol: 1,
+                app: Some(AppIdentity {
+                    id: "Acme.Notes".into(),
+                    name: "Notes".into()
+                })
+            }
+        );
+        for id in ["", "Acme Notes", r"Acme\Notes", &"a".repeat(129)] {
+            let line = format!(
+                r#"{{"op":"hello","protocol":1,"app":{{"id":"{}","name":"N"}}}}"#,
+                id.replace('\\', r"\\")
+            );
+            assert!(parse_client_message(&line).is_err(), "{id:?} was accepted");
+        }
     }
 
     #[test]

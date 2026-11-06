@@ -3,6 +3,16 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## Unreleased
+
+- `hello` may name the app: `{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}`.
+  Windows shows `name` on the app's system notifications instead of `gpui-bridge`, and `id`
+  groups its windows on the taskbar. The clients take it as an option: `createApp({ app })`
+  (Node, React, txiki), `App(app=...)` (Python), `AppOptions.App` (Go). `PROTOCOL_VERSION`
+  stays 1: an older host ignores the field.
+- A `hello` the host cannot read is answered with `invalid_json` and the host exits; before,
+  it was ignored and the client waited until its handshake timeout.
+
 ## 0.4.2 — 2026-11-05
 
 Host fixes; `PROTOCOL_VERSION` stays 1.

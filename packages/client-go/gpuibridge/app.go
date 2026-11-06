@@ -61,6 +61,16 @@ type AppOptions struct {
 	Debug bool
 	// Headless starts the host with --no-window (no real window; for tests).
 	Headless bool
+	// App names the app for the system: Windows shows its Name on system notifications.
+	// Nil keeps the host's default, `gpui-bridge`.
+	App *AppIdentity
+}
+
+// AppIdentity is the app's own identity, sent in `hello`. ID is a Windows AppUserModelID:
+// up to 128 characters, no spaces or `\`, e.g. "Acme.Notes".
+type AppIdentity struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // App is the client connected to a gpui-bridge host.
@@ -111,7 +121,7 @@ func NewApp(opts AppOptions) (*App, error) {
 	// Handshake: the client sends first and waits for `ready`. It runs synchronously and
 	// ONLY then starts the read loop, so stdout never has two concurrent readers
 	// (bufio.Reader is not safe for that).
-	if err := tr.Send(helloMsg()); err != nil {
+	if err := tr.Send(helloMsg(opts.App)); err != nil {
 		tr.Wait()
 		return nil, fmt.Errorf("could not write to the gpui-bridge host: %w", err)
 	}

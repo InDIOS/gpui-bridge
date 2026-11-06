@@ -11,6 +11,12 @@ from gpui_bridge import App, HostError, HostExitedError
 
 
 class ClientTest(unittest.TestCase):
+    def test_hello_names_the_app_and_a_bad_id_fails_the_handshake(self):
+        app = App(headless=True, app={"id": "Acme.Notes", "name": "Notes"})
+        self.assertEqual(app.close().code, 0)
+        with self.assertRaisesRegex(RuntimeError, r"handshake failed \(invalid_json\)"):
+            App(headless=True, app={"id": "Acme Notes", "name": "Notes"})
+
     def test_handshake_completes(self):
         app = App(headless=True)
         self.assertEqual(app.close().code, 0)

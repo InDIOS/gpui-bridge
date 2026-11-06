@@ -9,7 +9,9 @@ use gpui_kit::component::notification::{Notification, NotificationType};
 use gpui_kit::*;
 use serde_json::{Map, Value};
 
-use crate::protocol::{ClientMessage, ErrorCode, HostMessage, NotifyKind, ProtocolError};
+use crate::protocol::{
+    AppIdentity, ClientMessage, ErrorCode, HostMessage, NotifyKind, ProtocolError,
+};
 use crate::transport;
 use crate::windows::Windows;
 
@@ -24,6 +26,12 @@ struct WindowlessToasts {
 }
 
 impl Global for WindowlessToasts {}
+
+/// The app named in `hello` replaces the host's default identity. GPUI registers it (and its
+/// `DisplayName`) with the first system notification, so this must run before any.
+pub fn set_identity(app: &AppIdentity, cx: &mut App) {
+    cx.set_app_identity(&app.id, &app.name);
+}
 
 /// Notification center only. gpui-component owns the click handler and ignores tags it did not
 /// post, so a click on this one is not reported.
