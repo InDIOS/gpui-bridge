@@ -248,6 +248,10 @@ These commands print the path of the artifact they stage. The optimized host is 
 
 ## Documents
 
+The documentation site, [indios.github.io/gpui-bridge](https://indios.github.io/gpui-bridge/),
+covers how the clients work, the protocol, writing a new client and the changelog. Its source is
+[`site/`](site/).
+
 - [PROTOCOL.md](docs/PROTOCOL.md): the protocol, for client authors (English).
 - [GPUI_BRIDGE_PLAN.md](docs/GPUI_BRIDGE_PLAN.md): the project plan, design decisions and next
   steps (Spanish).

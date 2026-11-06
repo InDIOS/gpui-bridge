@@ -1,0 +1,56 @@
+name: Docs
+
+# Builds site/ (VitePress) and publishes it to GitHub Pages: https://indios.github.io/gpui-bridge/.
+# The site includes docs/PROTOCOL.md, CHANGELOG.md, CONTRIBUTING.md, docs/RELEASING.md and the
+# client READMEs, so a change to any of them republishes it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - docs/PROTOCOL.md
+      - docs/RELEASING.md
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - packages/client-*/README.md
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push waits instead of cancelling one in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # lastUpdated reads each page's date from git history.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile --filter gpui-bridge-site
+      - run: pnpm --filter gpui-bridge-site build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

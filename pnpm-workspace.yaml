@@ -7,3 +7,8 @@ packages:
   - packages/client-react
   - packages/host-*
   - examples
+  - site
+# The docs site (VitePress). esbuild's install script only checks its binary, which comes as an
+# optional dependency anyway.
+allowBuilds:
+  esbuild: false
