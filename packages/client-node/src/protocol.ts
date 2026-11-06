@@ -158,6 +158,7 @@ export type ClientMessage =
   | { op: "closeWindow"; id: WindowId }
   | { op: "tray"; icon?: string; tooltip?: string; menu?: MenuItem[] }
   | { op: "removeTray" }
+  | { op: "icons"; icons: Record<string, string> }
   | { op: "shortcuts"; keys: string[] }
   | { op: "focus"; id: NodeId }
   | { op: "openDialog"; request: number; files?: boolean; directories?: boolean; multiple?: boolean; prompt?: string }
@@ -309,6 +310,8 @@ export interface TextProps {
 
 export interface ButtonProps {
   label?: string;
+  /** An icon before the label; without a label, give a `tooltip` (it also names the button). */
+  icon?: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   disabled?: boolean;
   tooltip?: string;

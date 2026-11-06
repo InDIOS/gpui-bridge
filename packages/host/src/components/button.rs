@@ -10,12 +10,20 @@ use crate::a11y;
 use crate::protocol::NodeId;
 use crate::tree::Node;
 
-/// Props: `label`, `variant` (primary, secondary, ghost, danger), `disabled`. Events: `click`.
+/// Props: `label`, `icon`, `variant` (primary, secondary, ghost, danger), `disabled`, `tooltip`.
+/// Events: `click`. Without a `label`, the `tooltip` names the button for a screen reader.
 pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Button {
+    let label = prop_str(node, "label").unwrap_or("");
     let mut button = Button::new(("node", id))
-        .label(prop_str(node, "label").unwrap_or("").to_owned())
+        .label(label.to_owned())
         .disabled(prop_bool(node, "disabled"));
+    if let Some(icon) = basic::icon(node, "icon") {
+        button = button.icon(icon);
+    }
     if let Some(tooltip) = prop_str(node, "tooltip") {
+        if label.is_empty() {
+            button = button.accessibility_label(tooltip.to_owned());
+        }
         button = button.tooltip(tooltip.to_owned());
     }
     if node.events.contains("click") {
@@ -35,11 +43,8 @@ pub fn build(id: NodeId, node: &Node, session: &Entity<Session>) -> Button {
 /// Props: as `Button`, plus `icon`, `items` (a menu list) and `menuLabel` (the name of the caret).
 /// Events: `click` (the left half), `menu` (the chosen item's `id`).
 pub fn dropdown(id: NodeId, node: &Node, session: &Entity<Session>) -> DropdownButton {
-    // The left half is a `Button`: it keeps the label, the variant, the tooltip and `click`.
-    let mut button = build(id, node, session);
-    if let Some(icon) = basic::icon(node, "icon") {
-        button = button.icon(icon);
-    }
+    // The left half is a `Button`: it keeps the label, the icon, the variant, the tooltip and `click`.
+    let button = build(id, node, session);
     let items = node
         .props
         .get("items")

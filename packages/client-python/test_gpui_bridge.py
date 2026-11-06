@@ -124,6 +124,18 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(seen, [("bar", "open"), ("area", "copy")])
 
+    def test_registered_icons_work_in_icon_props(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'
+        app.icons({"py-logo": svg})
+        app.window(root=app.div().append(app.icon(name="py-logo"), app.badge(icon="py-logo")))
+        app.commit()
+        app.icons({"check": svg}).commit()  # a bundled name cannot be replaced
+        app.close()
+        self.assertEqual([(e.code, e.op) for e in errors], [("invalid_operation", "icons")])
+
     def test_tray_reports_events_and_removing_it_with_no_window_ends_the_host(self):
         app = App(headless=True)
         errors, seen = [], []

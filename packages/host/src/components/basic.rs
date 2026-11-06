@@ -283,7 +283,7 @@ pub fn label(node: &Node) -> Label {
 
 /// `highlight`, unless a character of the label or of `highlight` changes its UTF-8 length when
 /// lowercased (the Kelvin sign `K` becomes `k`, three bytes to one).
-/// shortcut: gpui-component 0.8.1 mixes offsets of the lowercased and the original text and
+/// shortcut: gpui-component 0.9.0 still mixes offsets of the lowercased and the original text and
 /// panics then, so the highlight is dropped; remove this when upstream fixes `highlight_ranges`.
 fn highlight(node: &Node) -> Option<&str> {
     let keeps_len = |key| {

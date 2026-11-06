@@ -15,6 +15,18 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - A `hello` the host cannot read is answered with `invalid_json` and the host exits; before,
   it was ignored and the client waited until its handshake timeout.
 
+## 0.5.0 — 2026-11-06
+
+App icons, icon buttons and a smaller host; `PROTOCOL_VERSION` stays 1.
+
+- gpui-kit 0.9.0 (gpui-pre 0.3.11).
+- `icons` registers the app's own SVG icons, usable in `Icon` and every `icon` prop
+  (PROTOCOL §29); `icons(...)` in Node and Python, `Icons(...)` in Go.
+- `Button` takes an `icon`; without a `label` it is an icon-only button named by its `tooltip`.
+- A `Toggle`'s `label` names it for a screen reader.
+- The release host is built for size (`opt-level = "s"`): about 28 % smaller (21.8 MB → 15.6 MB),
+  with work on very large trees 13–26 % slower and no change for usual windows.
+
 ## 0.4.2 — 2026-11-05
 
 Host fixes; `PROTOCOL_VERSION` stays 1.

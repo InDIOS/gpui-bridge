@@ -1,6 +1,7 @@
 mod a11y;
 mod animation;
 mod components;
+mod icons;
 mod image_data;
 mod keys;
 mod protocol;
@@ -54,9 +55,9 @@ fn main() {
         return;
     }
 
-    // Bundled icons: components such as Checkbox draw their marks from these SVGs.
+    // Bundled icons (components such as Checkbox draw their marks from them) and the client's.
     gpui_kit::application()
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(icons::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
             // Windows shows system notifications (`notify` with `system`) only for an app with an

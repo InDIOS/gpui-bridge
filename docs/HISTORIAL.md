@@ -2438,6 +2438,73 @@ sitios de GPUI y gpui-kit.
   se repitió. No se miró el modo claro.
 - **Logo nuevo:** el usuario eligió entre seis propuestas y sus combinaciones la «AB2»: una llave `{` (el JSON del cliente) que se abre en una ventana con líneas (el host). `site/public/logo.svg` en el sitio y el README; `favicon.svg` es la misma figura en blanco sobre un cuadrado con el degradado.
 
+### Fase 56 — gpui-kit 0.9.0 (2026-11-06)
+
+- **Subida:** gpui-kit 0.8.1 → 0.9.0 (gpui-pre 0.3.11). Compiló sin cambios: el host no construye
+  temas con literales (lo que 0.9.0 rompe con `#[non_exhaustive]`).
+- **`scroller_row` fuera:** el `MessageScroller` de 0.9.0 pone él mismo el relleno de la lista en
+  la primera y la última fila (#3615), lo que hacía `scroller_row` con `py_0` en la lista; se
+  borraron los dos. No se miró en ventana real.
+- **Siguen:** los atajos de `highlight_ranges`, la cabecera del Accordion y el título de las
+  pestañas del dock (el código de esas partes no cambió en 0.9.0).
+
+### Fase 57 — Iconos del cliente (2026-11-06)
+
+Que cada app use el icono que quiera sin que el host crezca (lo que da gpui-kit 0.9.0 para iconos
+no hacía falta: `set_icon_resolver` solo sirve para reemplazar los incluidos, y eso queda para
+cuando haya un caso).
+
+- **Paso 1 — host:** operación nueva `icons` (`{name: svg}`), en cola hasta `commit` como las del
+  árbol; PROTOCOL §29 y `conformance/icons.txt`. `src/icons.rs`: registro global (el
+  `AssetSource` y la comprobación de props no tienen la sesión), un `AssetSource` que sirve
+  `client-icons/<generación>/<nombre>.svg` y delega el resto en los iconos de gpui-kit; cada
+  registro cambia la ruta porque GPUI guarda el SVG dibujado por ruta. El SVG se comprueba con
+  `usvg` 0.46 (el que ya enlaza GPUI, sin crates nuevos); un nombre incluido, un nombre con otros
+  caracteres o un SVG ilegible es `invalid_operation` y no registra nada del mensaje.
+  `PROTOCOL_VERSION` sigue en 1. Sin mirar aún en ventana real (queda para el paso 3).
+- **Paso 2 — clientes:** `app.icons({...})` en Node (y React por `root.app`), `app.icons({...})` en
+  Python y `app.Icons(map[string]string{...})` en Go, en cola hasta `commit` como `tray`. Un test
+  por cliente contra el host sin ventana: el nombre registrado vale en `Icon` y en el `icon` de un
+  `Badge`, y registrar `check` da `invalid_operation`. React no lleva test propio: es el método
+  del cliente de Node.
+- **Paso 3 — ejemplo:** `examples/icons.ts` (`pnpm dev icons`) registra tres SVG propios y los usa
+  en `Icon` (cuatro tamaños y colores), `Tag`, `Toggle` y `Empty`, junto a un icono incluido;
+  «Swap the rocket» vuelve a registrar `rocket` con otro dibujo. Visto en ventana real con el host
+  de depuración (captura solo de la ventana con PrintWindow; el botón se pulsó por UI Automation,
+  sin ratón): los iconos toman el color y tamaño de sus clases y el reemplazo cambia todos los
+  sitios a la vez. Sin pánicos en el log.
+- **`Button` con `icon`:** el usuario notó que `Button` no aceptaba icono (solo `DropdownButton` y
+  `Toggle`), aunque el `Button` de gpui-kit sí. Ahora `icon` (incluido o registrado) va antes del
+  `label`; sin `label` es un botón de solo icono y su `tooltip` le da nombre (`accessibility_label`),
+  comprobado por UI Automation («Garden», «Search»). `DropdownButton` toma el icono del mismo
+  `build`. PROTOCOL §5, tipos de Node/React, `conformance/icons.txt` y una fila de botones en
+  `examples/icons.ts`, vista en ventana real. Visto de paso: un `Toggle` con `label` y sin `a11y`
+  sale sin nombre en UIA (el `Toggle` del crate no tiene `accessibility_label`); sin tocar.
+
+### Fase 58 — Host de release optimizado para tamaño (2026-11-06)
+
+El usuario quería que el host bajara de tamaño en vez de crecer. El perfil ya tenía `lto`,
+`codegen-units = 1`, `strip` y `panic = "abort"`; quedaba `opt-level`. Tres hosts de release con el
+mismo código (`CARGO_PROFILE_RELEASE_OPT_LEVEL`, cada uno en `target/opt-<n>`), Windows 11, Intel
+Iris Xe; aplicar con `benchmarks/tree.mjs` (tres corridas), dibujo con `sample.ps1 -Mode spin -Log`
+(5 s):
+
+| opt-level | tamaño | compila | aplicar 10 000 | aplicar 50 000 | 20 000 nodos + spinner | 200 nodos + spinner |
+|---|---|---|---|---|---|---|
+| 3 | 21.756.928 B | 8,3 min | 21–26 ms | 116–120 ms | ~10 c/s, 14 ms/pasada | 60 c/s, 0,15 ms |
+| s | 15.626.752 B (−28 %) | 5,6 min | 26–30 ms | 143–156 ms | ~8,7 c/s, 14 ms | 60 c/s, 0,16 ms |
+| z | 13.246.976 B (−39 %) | 4,9 min | 29–41 ms | 151–165 ms | ~7,1 c/s, 22 ms | 60 c/s, 0,22 ms |
+
+El usuario eligió `s`: `opt-level = "s"` en el `[profile.release]` raíz. README (números de
+rendimiento) y CHANGELOG («Unreleased», con lo de las fases 56–58) al día. El «~1 % de un núcleo»
+en reposo del README no se volvió a medir.
+- **`Toggle` con nombre:** un `Toggle` con `label` y sin `a11y` salía en UIA como botón sin nombre:
+  el del crate solo se nombra desde su `tooltip`, sin `accessibility_label`. Ahora el `label` es un
+  `label` con nombre propio dentro del Toggle (como las pestañas del dock), y AccessKit nombra al
+  botón desde él: UIA da `Button [Orbit]` con su `Text [Orbit]`, con el mismo aspecto. Atajo
+  anotado para quitarlo cuando gpui-component lo resuelva. Uno de solo icono se nombra con su
+  `tooltip` (PROTOCOL §5). Sin pasada con Narrator.
+
 ### Fase 59 — Identidad de la app (2026-11-06)
 
 Las notificaciones del sistema salían a nombre de `gpui-bridge`: el host fijaba una sola

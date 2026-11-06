@@ -160,6 +160,10 @@ func removeTrayMsg() ClientMessage {
 	return ClientMessage{"op": "removeTray"}
 }
 
+func iconsMsg(icons map[string]string) ClientMessage {
+	return ClientMessage{"op": "icons", "icons": icons}
+}
+
 func shortcutsMsg(keys []string) ClientMessage {
 	return ClientMessage{"op": "shortcuts", "keys": keys}
 }
