@@ -2467,3 +2467,9 @@ cuando haya un caso).
   por cliente contra el host sin ventana: el nombre registrado vale en `Icon` y en el `icon` de un
   `Badge`, y registrar `check` da `invalid_operation`. React no lleva test propio: es el método
   del cliente de Node.
+- **Paso 3 — ejemplo:** `examples/icons.ts` (`pnpm dev icons`) registra tres SVG propios y los usa
+  en `Icon` (cuatro tamaños y colores), `Tag`, `Toggle` y `Empty`, junto a un icono incluido;
+  «Swap the rocket» vuelve a registrar `rocket` con otro dibujo. Visto en ventana real con el host
+  de depuración (captura solo de la ventana con PrintWindow; el botón se pulsó por UI Automation,
+  sin ratón): los iconos toman el color y tamaño de sus clases y el reemplazo cambia todos los
+  sitios a la vez. Sin pánicos en el log.
