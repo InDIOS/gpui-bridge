@@ -10,7 +10,7 @@ edition = "2024"
 # slower to compile. It lives here because Cargo ignores `[profile.*]` in a workspace
 # member, and the host is built through this workspace.
 [profile.release]
-# Optimized for size: −28 % binary for ~13–26 % slower work on very large trees only (Fase 58).
+# Optimized for size: −28 % binary for ~13–26 % slower work on very large trees only (Phase 58).
 opt-level = "s"
 lto = true
 codegen-units = 1
