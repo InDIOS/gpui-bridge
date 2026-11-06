@@ -484,8 +484,9 @@ warning on stderr (once per class).
 - **Animations** (loop while the class is present): `animate-spin` turns an `Icon` once per
   second (it is ignored on other node types, which cannot rotate); `animate-pulse` takes any
   node's opacity from 1 to 0.5 and back every 2 seconds. The host only redraws while
-  something moves, at most 60 times a second, and a node that loops is drawn by a pass of its
-  own, so it does not rebuild the nodes around it on every frame.
+  something moves: a loop at 30 frames a second, a `transition` at up to 60. Each of those
+  frames redraws the whole window, so a loop in a window of thousands of nodes costs CPU for as
+  long as it runs (2 000 nodes and one spinner: about a quarter of a core).
 - **Theme colors** (gpui-component theme colors, not the Tailwind palette): `bg-{color}`,
   `text-{color}` and `border-{color}`, where `{color}` is one of `background`, `foreground`,
   `primary`, `primary-foreground`, `secondary`, `secondary-foreground`, `muted`,

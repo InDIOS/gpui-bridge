@@ -52,8 +52,8 @@ process scheduling.
 host involved: the floor that the numbers from `payload.mjs` sit on top of.
 
 **`render.mjs` + `run.ps1`** — a window with N nodes, sampled for 5 s of host CPU with the tree
-quiet (`idle`), with one spinning icon (`spin`, which keeps the window drawing at 60 frames a
-second) and with the client changing one row and committing 60 times a second (`update`, the
+quiet (`idle`), with one spinning icon (`spin`, which keeps the window drawing at 30 frames a
+second, the pace of `animate-*` loops) and with the client changing one row and committing 60 times a second (`update`, the
 cost of live data: each commit syncs the window's state before it redraws). CPU is `TotalProcessorTime` over the sample, as a percentage of one core; the client
 prints `READY` only after the first build settled, so the sample is steady state.
 

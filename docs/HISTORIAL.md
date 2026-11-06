@@ -2583,3 +2583,26 @@ Paso 2 del plan de rendimiento, aprobado por el usuario tras su prueba a mano de
   26–30 → 10–15 ms; 50 000 143–156 → 57–71 ms. Parte de la mejora en estas cifras (que son sin
   ventana) es el parseo de `simulate` que ya no se hace; con ventana cuenta solo el parseo directo.
   Host de release: 15 646 720 B.
+
+### Fase 62 — Loops de animación a 30 frames/s (2026-11-06)
+
+Revisión de lo que drena fps de nuestro lado, paso 1 de 3 (luego RAM y trabajo en el hilo
+principal).
+
+- **Hallazgo:** con un nodo `animate-*`, cada frame redibuja la ventana entera. GPUI marca sucios
+  al view notificado y a todos sus ancestros (`mark_view_dirty` en `window.rs`), y el view raíz
+  se renderiza en cada frame, así que el view propio de `AnimatedNode` no ahorraba nada (su campo
+  y PROTOCOL §8 decían lo contrario; corregidos). Los views en caché de GPUI (`cached`) se
+  maquetan como un solo bloque con un estilo fijo, así que no sirven para subárboles cuyo tamaño
+  viene del contenido.
+- **Costo medido** (release): 200 nodos + spinner 8,4 % de un núcleo; 2 000 nodos + spinner 54 %
+  a 60 frames/s; 5 000 nodos, 38–41 frames/s. Del frame, el pase del host es ~1,1 ms con 2 000
+  nodos; el resto es layout y pintado de GPUI.
+- **Opciones dadas al usuario:** (1) dibujar los loops en una capa fuera de un árbol cacheado
+  (el contenido de la ventana siempre la llena, así que ahí `cached` sí sirve), con riesgos de
+  recorte en scroll, opacidad de ancestros, accesibilidad y orden con diálogos: spike + ADR;
+  (2) loops a 30 frames/s; (3) dejarlo documentado. Eligió la 2; la 1 queda como posible spike.
+- **Cambio:** `FrameClock::next_frame` recibe el intervalo; `AnimatedNode` pide
+  `LOOP_FRAME_INTERVAL` (33,3 ms) y las transiciones y el resto siguen con `FRAME_INTERVAL`.
+- **Resultado:** 2 000 nodos + spinner 54 → 26,9 % a 29,8–30,3 frames/s; 200 nodos 8,4 → 5,9 %.
+  `cargo test` (83) y clippy limpios.

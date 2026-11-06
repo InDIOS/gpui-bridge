@@ -225,9 +225,9 @@ over three runs):
 | 50 000 | 57–71 |
 
 A window of 20 000 text nodes costs ~1 % of a core when nothing moves. One spinning icon makes
-every frame walk the whole tree: the host's own pass is ~14 ms, but the full frame (layout and
-paint included) runs at ~9 frames/s on one core. With 200 nodes the same spinner draws at 60
-frames/s in ~0.2 ms per pass. Live data costs the same: with the client changing one of 20 000
+every frame redraw the whole window: the host's own pass is ~14 ms, but the full frame (layout and
+paint included) runs at ~9 frames/s on one core. Loops are paced at 30 frames/s: with 2 000 nodes
+the spinner costs ~27 % of a core (54 % at 60), with 200 nodes ~6 %. Live data costs the same: with the client changing one of 20 000
 rows and committing 60 times a second, the window draws ~9 frames/s (the sync each commit adds
 before the frame is ~1 µs with text rows); with 2 000 rows, ~45–50 frames/s. Use `VirtualList` or `Table` for long lists.
 

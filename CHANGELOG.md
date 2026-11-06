@@ -22,6 +22,9 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - Faster parsing: each line goes straight to its typed message instead of through a generic JSON
   value first (the slow path now only explains a line that fails, so errors are unchanged).
   Applying 50 000 nodes (`benchmarks/tree.mjs`) went from 143–156 ms to 57–71 ms.
+- `animate-spin` and `animate-pulse` loops draw at 30 frames/s instead of 60 (transitions keep
+  60). Every frame of a loop redraws the whole window, so a spinner in a window of 2 000 nodes
+  now costs ~27 % of a core instead of ~54 %.
 
 ## 0.5.0 — 2026-11-06
 
