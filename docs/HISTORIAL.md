@@ -2461,5 +2461,5 @@ identidad para todas las apps. Ahora la app se nombra en el `hello`.
   (ruta absoluta) en la misma clave `HKCU\Software\Classes\AppUserModelId\<id>` con
   `windows-registry` 0.6, la misma versión que ya usa GPUI. Sin `icon` borra el que dejó una
   ejecución anterior. Probado con una ventana real y `notify` con `system`: la clave quedó con
-  `DisplayName` e `IconUri`, y una segunda ejecución sin icono lo quitó. No se miró el toast en
-  pantalla.
+  `DisplayName` e `IconUri`, y una segunda ejecución sin icono lo quitó. El usuario confirmó en
+  pantalla el nombre, el icono y el clic (2026-11-06).
