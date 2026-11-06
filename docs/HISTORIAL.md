@@ -2559,8 +2559,8 @@ frames/s.
   frames/s (antes ~47: ahí el sync ya era pequeño). Host de release: 15 641 600 B.
 - **Pruebas:** `cargo test` (82, con dos nuevas: `window_nodes` y `shape`), clippy limpio. Ningún
   test construye un `RootView`, así que se abrieron forms, data, list, dock, settings, overlays,
-  slots, chat y command en ventanas reales: sin pánicos. Falta que el usuario pruebe a mano los
-  controles con estado.
+  slots, chat y command en ventanas reales: sin pánicos. El usuario probó a mano los controles
+  con estado (overlays, forms, dock, list) y el spinner de `list` que aparece y desaparece: bien.
 - **Pendiente (siguientes pasos):** parseo directo con el de dos pasos como respaldo (2,9× en el
   parseo); el parseo extra de `simulate::handle` en `--no-window`. Hallazgo aparte: con un spinner
   la ventana reconstruye los 20 001 nodos en cada frame aunque `AnimatedNode` diga lo contrario.
