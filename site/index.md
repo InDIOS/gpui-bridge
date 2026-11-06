@@ -6,7 +6,7 @@ hero:
   text: Native GPUI apps from any language
   tagline: A Rust host draws the window with GPUI and gpui-kit. Your program, in Python, Node.js, React, Go or anything that can start a process, describes the UI over stdin and stdout.
   image:
-    src: https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259
+    src: /logo.svg
     alt: gpui-bridge
   actions:
     - theme: brand

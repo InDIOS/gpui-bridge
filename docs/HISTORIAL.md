@@ -2436,3 +2436,4 @@ sitios de GPUI y gpui-kit.
   de la portada, «How it works», el protocolo y «Writing a new client». Un primer build dejó los
   `.lean.js` de las páginas en ceros (las páginas hidrataban a 404); el siguiente salió bien y no
   se repitió. No se miró el modo claro.
+- **Logo nuevo:** el usuario eligió entre seis propuestas y sus combinaciones la «AB2»: una llave `{` (el JSON del cliente) que se abre en una ventana con líneas (el host). `site/public/logo.svg` en el sitio y el README; `favicon.svg` es la misma figura en blanco sobre un cuadrado con el degradado.

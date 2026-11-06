@@ -1,7 +1,6 @@
 import { defineConfig } from "vitepress";
 
 const repo = "https://github.com/InDIOS/gpui-bridge";
-const logo = "https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259";
 
 export default defineConfig({
   title: "gpui-bridge",
@@ -9,10 +8,10 @@ export default defineConfig({
   // GitHub Pages serves the project at https://indios.github.io/gpui-bridge/.
   base: "/gpui-bridge/",
   cleanUrls: true,
-  head: [["link", { rel: "icon", href: logo }]],
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/gpui-bridge/favicon.svg" }]],
   markdown: { theme: { light: "github-light", dark: "github-dark" } },
   themeConfig: {
-    logo,
+    logo: "/logo.svg",
     nav: [
       { text: "Guide", link: "/guide/how-it-works" },
       { text: "Clients", link: "/clients/python" },

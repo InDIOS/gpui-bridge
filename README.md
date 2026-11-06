@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="611" height="367" alt="gpui-bridge logo" src="https://github.com/user-attachments/assets/35c33e2e-2844-4091-98ca-5a3822cde259" />
+  <img width="160" height="160" alt="gpui-bridge logo" src="site/public/logo.svg" />
 </p>
 
 <h1 align="center">gpui-bridge</h1>
