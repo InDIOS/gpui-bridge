@@ -3,7 +3,10 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
-## Unreleased
+## 0.6.0 — 2026-11-06
+
+Apps name themselves on system notifications, and a faster, leaner host; `PROTOCOL_VERSION`
+stays 1.
 
 - `hello` may name the app: `{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}`.
   Windows shows `name` on the app's system notifications instead of `gpui-bridge`, and `id`
@@ -32,6 +35,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
   icon file again on the main thread, as PROTOCOL section 11 already said.
 - New `benchmarks/churn.mjs` + `soak.ps1`: create and remove stateful nodes for minutes while
   printing the host's memory, which must stay flat.
+- Known issue: each `Tree` node created and removed keeps ~2 KB, inside gpui-component 0.9.0 (its
+  row closure holds its own state). Apps that create and drop many Trees should reuse them.
 
 ## 0.5.0 — 2026-11-06
 
