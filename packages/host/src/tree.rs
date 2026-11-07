@@ -344,6 +344,12 @@ impl Tree {
         }
     }
 
+    /// Removes the node's `data` file, and the image GPUI decoded from it: each node has a path of
+    /// its own, so nothing else would ever drop that image from GPUI's cache.
+    fn forget_image_data(&mut self, id: NodeId) {
+        self.image_reloads.extend(self.image_data.remove(id));
+    }
+
     /// Decodes an `Image`'s or `Attachment`'s `data` into its own file, or removes that file when
     /// `data` is `null` or empty. The value is checked to be a string before this runs; base64 is
     /// checked here so an invalid payload never reaches the error message (it can be megabytes
@@ -357,13 +363,9 @@ impl Tree {
         let Some(value) = props.get("data") else {
             return Ok(());
         };
-        if value.is_null() {
-            self.image_data.remove(id);
-            return Ok(());
-        }
         let encoded = value.as_str().unwrap_or_default();
         if encoded.is_empty() {
-            self.image_data.remove(id);
+            self.forget_image_data(id);
             return Ok(());
         }
         let bytes = image_data::decode(encoded).map_err(|_| {
@@ -703,7 +705,7 @@ impl Tree {
                     self.closed_panels.remove(&id);
                     if let Some(node) = self.nodes.remove(&id) {
                         if node.node_type.takes_image() {
-                            self.image_data.remove(id);
+                            self.forget_image_data(id);
                         }
                         stack.extend(node.children);
                     }
@@ -1275,14 +1277,15 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"world");
         assert_eq!(tree.take_image_reloads(), vec![path.clone()]);
 
-        // Empty or null `data` goes back to `src` (if any) and removes the file.
+        // Empty or null `data` goes back to `src` (if any), removes the file and drops the image
+        // GPUI decoded from it.
         run(
             &mut tree,
             vec![json!({"op": "setProps", "id": 1, "props": {"data": null}})],
         );
         assert!(!path.exists());
         assert_eq!(tree.image_path(1), None);
-        assert_eq!(tree.take_image_reloads(), Vec::<PathBuf>::new());
+        assert_eq!(tree.take_image_reloads(), vec![path.clone()]);
 
         // Removing the node removes its file too.
         run(
@@ -1292,6 +1295,7 @@ mod tests {
         let path = tree.image_path(1).expect("the node has a file again");
         run(&mut tree, vec![json!({"op": "remove", "id": 1})]);
         assert!(!path.exists());
+        assert_eq!(tree.take_image_reloads(), vec![path]);
     }
 
     #[test]

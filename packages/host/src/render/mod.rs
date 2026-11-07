@@ -2514,10 +2514,17 @@ fn drag_area(element: Div, id: NodeId, pressed: &Rc<Cell<Option<NodeId>>>) -> Di
         })
 }
 
-/// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read again.
+/// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read
+/// again and the image of a removed node is freed. The texture it took in each window's atlas goes
+/// too: forgetting the cache entry alone leaves it there.
 pub fn reload_images(session: &Entity<Session>, cx: &mut App) {
     for path in session.update(cx, |session, _| session.tree.take_image_reloads()) {
-        ImageSource::from(path).remove_asset(cx);
+        let resource = Resource::from(path);
+        // Returns what is cached; one never drawn starts a load that `remove_asset` then drops.
+        if let Some(Ok(image)) = cx.fetch_asset::<ImgResourceLoader>(&resource) {
+            cx.drop_image(image, None);
+        }
+        cx.remove_asset::<ImgResourceLoader>(&resource);
     }
 }
 

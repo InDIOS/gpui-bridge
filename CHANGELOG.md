@@ -25,6 +25,11 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - `animate-spin` and `animate-pulse` loops draw at 30 frames/s instead of 60 (transitions keep
   60). Every frame of a loop redraws the whole window, so a spinner in a window of 2 000 nodes
   now costs ~27 % of a core instead of ~54 %.
+- Memory leak fixed: removing an `Image` or `Attachment` with `data` (or emptying its `data`)
+  left the decoded image in GPUI's cache and its texture in the window's atlas, ~9 KB for a small
+  icon and far more for a photo. Both are freed now, as they are when a `src` file is reloaded.
+- New `benchmarks/churn.mjs` + `soak.ps1`: create and remove stateful nodes for minutes while
+  printing the host's memory, which must stay flat.
 
 ## 0.5.0 — 2026-11-06
 

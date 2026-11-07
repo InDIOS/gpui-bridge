@@ -2606,3 +2606,31 @@ principal).
   `LOOP_FRAME_INTERVAL` (33,3 ms) y las transiciones y el resto siguen con `FRAME_INTERVAL`.
 - **Resultado:** 2 000 nodos + spinner 54 → 26,9 % a 29,8–30,3 frames/s; 200 nodos 8,4 → 5,9 %.
   `cargo test` (83) y clippy limpios.
+
+### Fase 63 — RAM sostenida: fuga de imágenes (2026-11-06)
+
+Paso 2 de 3 de la revisión de lo que drena recursos. El usuario confirmó a ojo que el spinner a 30
+frames/s se ve bien.
+
+- **Prueba:** `benchmarks/churn.mjs` crea y borra cada 200 ms un lote de nodos con estado (Input,
+  Textarea, NumberInput, Select, Slider, Checkbox, DatePicker, TimeField, ColorPicker, Combobox,
+  OtpInput, Calendar, Table, Tree, Chart, List, textos con `transition`, Image con `data`, Icon) y
+  `benchmarks/soak.ps1` imprime la memoria del host cada pocos segundos. Con todo junto, 5
+  minutos: 92 → 161 MB sin estabilizarse (~45 KB por ciclo).
+- **Por grupos** (60 s, 100 nodos por segundo): div, text, transition, icon, los 12 controles de
+  formulario, Table, Chart y List suben al principio y se quedan planos. Crecen sin parar: Image
+  con `data` (69 → 123 MB) y Tree (~2 KB por árbol).
+- **Image:** cada nodo con `data` tiene un archivo propio; al borrarlo se borraba el archivo pero
+  GPUI seguía con la imagen decodificada en su caché (por ruta) y su textura en el atlas de la
+  ventana. Ahora `Store::remove` devuelve la ruta, `forget_image_data` la pone en
+  `image_reloads`, y `reload_images` libera la textura (`fetch_asset` devuelve lo que ya está en
+  la caché, `drop_image`) antes de `remove_asset`. Solo `remove_asset` dejaba la mitad de la
+  fuga: era la textura. Lo mismo vale para las recargas de `src`, que antes también dejaban la
+  textura vieja. Medido: plano en 80,1 MB.
+- **Tree:** fallo de gpui-component 0.9.0: su `Tree` guarda en cada frame, dentro del
+  `TreeState`, un closure que retiene el propio `TreeState` (`context_menu_state = state.clone()`
+  en `gpui_component::tree`, asignado a `render_item` por `gpui_base::Tree`): un ciclo que nunca
+  se libera. Romperlo desde el host exigiría renderizar a mano el `gpui_base::Tree` interno; se
+  deja para reportar río arriba. `churn.mjs` lo excluye por defecto.
+- **Resultado:** todo menos Tree, 150 s: plano en ~92,5 MB. `cargo test` (83, la prueba de
+  `data` ahora espera la liberación al vaciar y al borrar), clippy limpio.

@@ -63,6 +63,13 @@ sit at one core while its own pass is a fraction of a millisecond. Run the host 
 `RUST_LOG=debug` (`benchmarks/sample.ps1 -Log`) to see the two separately: `window 1: 60.0 frames/s,
 0.2 ms and 14 nodes per pass` is the host's work, the rest is GPUI drawing and presenting.
 
+**`churn.mjs` + `soak.ps1`** — a window where a batch of stateful nodes (Inputs, Selects,
+Tables, Lists, Charts, data Images…) is created and removed every 200 ms for N seconds, with the
+host's working set and private memory printed every few seconds. After the first seconds the
+numbers must stay flat; a steady climb is a leak. A third argument picks the node types
+(`input,image`), which is how a leak is narrowed down. Measured 2026-11-06: ~92 MB flat over
+2.5 minutes for every type but `Tree` (gpui-component 0.9.0 never frees a `TreeState`).
+
 **`payload.mjs` + `run.ps1`** — one large value in one protocol line, and the host's working set and
 peak working set after it was applied:
 

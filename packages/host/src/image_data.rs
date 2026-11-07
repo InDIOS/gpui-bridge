@@ -55,13 +55,17 @@ impl Store {
         Ok(path)
     }
 
-    /// Forgets the node's file; a file that is already gone is fine.
-    pub fn remove(&self, node: NodeId) {
-        if let Some(path) = self.path(node)
-            && let Err(err) = fs::remove_file(&path)
-            && err.kind() != std::io::ErrorKind::NotFound
-        {
-            log::warn!("could not remove Image data file {}: {err}", path.display());
+    /// Forgets the node's file; a file that is already gone is fine. The path, when there was a
+    /// file, so GPUI can drop the image it decoded from it.
+    pub fn remove(&self, node: NodeId) -> Option<PathBuf> {
+        let path = self.path(node)?;
+        match fs::remove_file(&path) {
+            Ok(()) => Some(path),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => {
+                log::warn!("could not remove Image data file {}: {err}", path.display());
+                Some(path)
+            }
         }
     }
 }
