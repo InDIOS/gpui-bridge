@@ -2634,3 +2634,28 @@ frames/s se ve bien.
   deja para reportar río arriba. `churn.mjs` lo excluye por defecto.
 - **Resultado:** todo menos Tree, 150 s: plano en ~92,5 MB. `cargo test` (83, la prueba de
   `data` ahora espera la liberación al vaciar y al borrar), clippy limpio.
+
+### Fase 64 — Trabajo en el hilo principal (2026-11-06)
+
+Paso 3 de 3 de la revisión de lo que drena recursos. El usuario confirmó que `image-bytes` se ve
+bien tras el arreglo de la fuga (Fase 63).
+
+- **`Image.data`:** decodificar el base64 y escribir el archivo dentro del commit cuesta ~1 ms
+  por MB (release, sin ventana, sin logs: 0,25 MB ~1 ms; 4 MB ~4 ms; 16 MB ~15–18 ms, más ~8 ms
+  de parseo de la línea). Una foto normal cabe en un frame; no se mueve a otro hilo.
+- **Carga con ventana:** 50 000 nodos en un commit tardan lo mismo con ventana (72–75 ms) que sin
+  ella (63–72 ms): el `cx.update` por línea no añade nada. Medido con una petición que el host
+  rechaza al instante (`openDialog` sin archivos ni carpetas). Un primer intento usó `openUrl`
+  con url vacía, que el host no rechaza sino que ejecuta; se avisó al usuario.
+- **stdout:** cada mensaje se escribe y se vacía en el hilo principal. Solo bloquea si el cliente
+  deja de leer y se llena el pipe (64 KB, cientos de eventos): es contrapresión, y moverlo a un
+  hilo cambiaría el bloqueo por memoria sin límite. Se deja así.
+- **Bandeja (arreglado):** cualquier `tray`, aunque solo cambiara el tooltip, leía y decodificaba
+  otra vez el archivo del icono (`image::open` + `thumbnail`) en el hilo principal, contra lo que
+  dice PROTOCOL §11. `TraySpec.icon_revision` sube solo con los mensajes que traen `icon`, y
+  `tray::sync` solo entonces vuelve a cargarlo. El menú sigue reconstruyéndose con cada `tray`
+  (repone las marcas que tiene el cliente, a propósito).
+- **Sin otros bloqueos:** ningún `sleep`, `block_on` (salvo el bucle de `--no-window`), espera ni
+  lectura de archivos en el código del host fuera de lo anterior.
+- **Pruebas:** `cargo test` (84, una nueva de las revisiones de la bandeja), clippy limpio,
+  `examples/tray.ts` en ventana real sin pánicos.

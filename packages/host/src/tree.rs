@@ -82,13 +82,15 @@ pub struct WindowSpec {
 }
 
 /// The system tray icon (PROTOCOL.md section 11). `revision` grows with every `tray` message,
-/// so the host applies it again even when nothing changed (the icon file or a native check mark may have).
+/// so the host applies it again even when nothing changed (a native check mark may have);
+/// `icon_revision` only with those that carry `icon`, the only ones that read the file again.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TraySpec {
     pub icon: Option<String>,
     pub tooltip: Option<String>,
     pub menu: Option<Value>,
     pub revision: u64,
+    pub icon_revision: u64,
 }
 
 /// The theme is app-wide in gpui-component: any `window` message sets it for every window.
@@ -496,6 +498,7 @@ impl Tree {
                     log::warn!("Tray icon not found: {icon}");
                 }
                 let tray = self.tray.get_or_insert_default();
+                tray.icon_revision += u64::from(icon.is_some());
                 tray.icon = icon.or(tray.icon.take());
                 tray.tooltip = tooltip.or(tray.tooltip.take());
                 tray.menu = menu.or(tray.menu.take());
@@ -908,6 +911,29 @@ mod tests {
         assert_eq!(nodes.of(&tree, NodeType::Select).count(), 0);
         assert!(nodes.contains(4) && !nodes.contains(5) && !nodes.contains(6));
         assert_eq!(nodes.animated, [3]);
+    }
+
+    #[test]
+    fn only_a_tray_message_with_an_icon_reads_the_file_again() {
+        let mut tree = Tree::default();
+        let tray = |tree: &mut Tree, props: serde_json::Value| {
+            let mut op = json!({"op": "tray"});
+            op.as_object_mut()
+                .unwrap()
+                .extend(props.as_object().unwrap().clone());
+            run(tree, vec![op]);
+            let spec = tree.tray().unwrap();
+            (spec.revision, spec.icon_revision)
+        };
+        assert_eq!(
+            tray(&mut tree, json!({"icon": "a.png", "tooltip": "x"})),
+            (1, 1)
+        );
+        // The tooltip changes and the icon stays: applied again, the file not read.
+        assert_eq!(tray(&mut tree, json!({"tooltip": "y"})), (2, 1));
+        assert_eq!(tree.tray().unwrap().icon.as_deref(), Some("a.png"));
+        // The same path again: read again, the file may have changed.
+        assert_eq!(tray(&mut tree, json!({"icon": "a.png"})), (3, 2));
     }
 
     #[test]

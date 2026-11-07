@@ -15,11 +15,12 @@ use crate::components::menu::flag;
 use crate::protocol::HostMessage;
 use crate::transport;
 
-/// The tray icon shown, and the `TraySpec` revision it shows.
+/// The tray icon shown, and the `TraySpec` revisions it shows.
 #[derive(Default)]
 pub struct Tray {
     icon: Option<TrayIcon>,
     revision: u64,
+    icon_revision: u64,
 }
 
 /// Reports clicks and menu choices. The handlers run on the main thread, from GPUI's message loop.
@@ -58,20 +59,26 @@ pub fn sync(session: &Entity<Session>, tray: &RefCell<Tray>, cx: &App) {
         return;
     }
     tray.revision = spec.revision;
-    let icon = spec.icon.as_deref().and_then(load_icon);
+    // Decoding the file runs on the main thread: only a message that carries `icon` pays it, not
+    // one that changes the tooltip.
+    let new_icon =
+        std::mem::replace(&mut tray.icon_revision, spec.icon_revision) != spec.icon_revision;
+    let icon = || spec.icon.as_deref().and_then(load_icon);
     let menu = spec
         .menu
         .as_ref()
         .map(|items| Box::new(build_menu(items)) as Box<dyn ContextMenu>);
     match &tray.icon {
         Some(shown) => {
-            warn_update(shown.set_icon(icon));
+            if new_icon {
+                warn_update(shown.set_icon(icon()));
+            }
             warn_update(shown.set_tooltip(spec.tooltip.as_deref()));
             shown.set_menu(menu);
         }
         None => {
             let mut builder = TrayIconBuilder::new().with_menu_on_left_click(false);
-            if let Some(icon) = icon {
+            if let Some(icon) = icon() {
                 builder = builder.with_icon(icon);
             }
             if let Some(tooltip) = &spec.tooltip {
