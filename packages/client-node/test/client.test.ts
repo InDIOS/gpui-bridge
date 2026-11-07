@@ -14,6 +14,12 @@ test("handshake completes", async () => {
   assert.equal(exit.code, 0);
 });
 
+test("hello names the app, and a bad app id fails the handshake", async () => {
+  const app = await createApp({ ...headless, app: { id: "Acme.Notes", name: "Notes" } });
+  assert.equal((await app.close()).code, 0);
+  await assert.rejects(createApp({ ...headless, app: { id: "Acme Notes", name: "Notes" } }), /handshake failed \(invalid_json\)/);
+});
+
 test("a valid tree commits without errors", async () => {
   const app = await createApp(headless);
   const errors: HostError[] = [];

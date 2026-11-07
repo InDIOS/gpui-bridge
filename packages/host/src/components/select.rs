@@ -1,7 +1,7 @@
 //! `Select`: one retained `SelectState` per node. The chosen value lives in the tree (`value`),
 //! like `checked` for a Checkbox, and `sync` makes the state show it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState};
 use gpui_kit::*;
@@ -11,7 +11,7 @@ use super::{options, prop_bool, prop_str, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 #[derive(Clone)]
 pub struct Choice {
@@ -64,10 +64,10 @@ pub struct SelectSlot {
 /// Each Select among `members`: options, `searchable` and the value to show.
 pub struct SelectSnapshot(Vec<(NodeId, Options, bool, Option<String>)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> SelectSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> SelectSnapshot {
     SelectSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Select && members.contains(id))
+        members
+            .of(tree, NodeType::Select)
             .map(|(id, node)| {
                 (
                     id,

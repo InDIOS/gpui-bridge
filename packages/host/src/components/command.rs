@@ -13,7 +13,7 @@ use super::{emit, icon_exists, icon_path, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 /// One entry of a section: `{id, label, icon?, keywords?, checked?, disabled?}`.
 #[derive(Clone, Debug, PartialEq)]
@@ -175,14 +175,10 @@ impl CommandSlot {
 }
 
 /// The Commands among `members`.
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> HashSet<NodeId> {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> HashSet<NodeId> {
     members
-        .iter()
-        .copied()
-        .filter(|&id| {
-            tree.node(id)
-                .is_some_and(|node| node.node_type == NodeType::Command)
-        })
+        .of(tree, NodeType::Command)
+        .map(|(id, _)| id)
         .collect()
 }
 

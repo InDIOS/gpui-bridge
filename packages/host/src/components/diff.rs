@@ -2,7 +2,7 @@
 //! `patch` changes. The patch is parsed when the props are validated, so a malformed one is
 //! `invalid_props` instead of an empty view.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::diff::{Diff, DiffEvent, DiffFile, DiffMode, DiffState};
 use gpui_kit::*;
@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct DiffSlot {
     state: Entity<DiffState>,
@@ -40,10 +40,10 @@ pub fn check_patch(value: &Value) -> Result<(), String> {
         .map_err(|err| format!("a unified diff ({err})"))
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> DiffSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> DiffSnapshot {
     DiffSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Diff && members.contains(id))
+        members
+            .of(tree, NodeType::Diff)
             .map(|(id, node)| {
                 let patch = node
                     .props

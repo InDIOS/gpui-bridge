@@ -52,8 +52,9 @@ process scheduling.
 host involved: the floor that the numbers from `payload.mjs` sit on top of.
 
 **`render.mjs` + `run.ps1`** — a window with N nodes, sampled for 5 s of host CPU with the tree
-quiet (`idle`) and with one spinning icon (`spin`, which keeps the window drawing at 60 frames a
-second). CPU is `TotalProcessorTime` over the sample, as a percentage of one core; the client
+quiet (`idle`), with one spinning icon (`spin`, which keeps the window drawing at 30 frames a
+second, the pace of `animate-*` loops) and with the client changing one row and committing 60 times a second (`update`, the
+cost of live data: each commit syncs the window's state before it redraws). CPU is `TotalProcessorTime` over the sample, as a percentage of one core; the client
 prints `READY` only after the first build settled, so the sample is steady state.
 
 Because the spinner keeps drawing, `spin` also measures the platform: on the machine the numbers
@@ -61,6 +62,13 @@ below were taken from, a frame of a small window already costs a few millisecond
 sit at one core while its own pass is a fraction of a millisecond. Run the host with
 `RUST_LOG=debug` (`benchmarks/sample.ps1 -Log`) to see the two separately: `window 1: 60.0 frames/s,
 0.2 ms and 14 nodes per pass` is the host's work, the rest is GPUI drawing and presenting.
+
+**`churn.mjs` + `soak.ps1`** — a window where a batch of stateful nodes (Inputs, Selects,
+Tables, Lists, Charts, data Images…) is created and removed every 200 ms for N seconds, with the
+host's working set and private memory printed every few seconds. After the first seconds the
+numbers must stay flat; a steady climb is a leak. A third argument picks the node types
+(`input,image`), which is how a leak is narrowed down. Measured 2026-11-06: ~92 MB flat over
+2.5 minutes for every type but `Tree` (gpui-component 0.9.0 never frees a `TreeState`).
 
 **`payload.mjs` + `run.ps1`** — one large value in one protocol line, and the host's working set and
 peak working set after it was applied:

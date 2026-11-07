@@ -70,7 +70,7 @@ if ($Only -in "all", "render") {
   Write-Host "| nodes | mode | run | rss MB | cpu % first | cpu % second |"
   Write-Host "|---|---|---|---|---|---|"
   foreach ($nodes in 200, 20000, 50000) {
-    foreach ($mode in "idle", "spin") {
+    foreach ($mode in "idle", "spin", "update") {
       foreach ($run in 1, 2) {
         $known = Get-RunningHostIds
         $process = Start-Bench "benchmarks/render.mjs" @($nodes, $mode) -Redirect

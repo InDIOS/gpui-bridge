@@ -2504,3 +2504,158 @@ en reposo del README no se volvió a medir.
   botón desde él: UIA da `Button [Orbit]` con su `Text [Orbit]`, con el mismo aspecto. Atajo
   anotado para quitarlo cuando gpui-component lo resuelva. Uno de solo icono se nombra con su
   `tooltip` (PROTOCOL §5). Sin pasada con Narrator.
+
+### Fase 59 — Identidad de la app (2026-11-06)
+
+Las notificaciones del sistema salían a nombre de `gpui-bridge`: el host fijaba una sola
+identidad para todas las apps. Ahora la app se nombra en el `hello`.
+
+- **Protocolo:** campo opcional `app: {id, name}` en `hello` (PROTOCOL §2). Sin subir
+  `PROTOCOL_VERSION`: el host ignora campos que no conoce, así que uno anterior lo descarta.
+  Solo cuenta el primer `hello`; con `--no-window` se valida y no se aplica.
+- **Host:** el `id` se valida al leer el mensaje (1 a 128 caracteres, sin espacios ni `\`,
+  porque es el AppUserModelID y un nombre de clave del registro). La identidad se aplica con
+  `set_app_identity` al recibir el primer `hello`, antes de cualquier ventana o notificación:
+  GPUI registra el `DisplayName` con la primera notificación. Un `hello` ilegible ahora se
+  contesta con `invalid_json` y el host sale, como `protocol_mismatch`; antes el cliente esperaba
+  hasta su timeout.
+- **Clientes:** opción `app` en Node (`createApp`, `createTxikiApp`, y React por herencia),
+  Python (`App(app=...)`) y Go (`AppOptions.App`). Sin ella el `hello` no cambia.
+- **Pruebas:** fixtures `app-identity.txt` y `app-identity-invalid.txt`; prueba de parseo en el
+  host y una prueba por cliente (id válido y con espacio). `cargo test`, `npm test` (32),
+  `unittest` (32) y `go test` pasan.
+- **Icono:** `app.icon` (opcional). GPUI solo registra `DisplayName`; el host escribe `IconUri`
+  (ruta absoluta) en la misma clave `HKCU\Software\Classes\AppUserModelId\<id>` con
+  `windows-registry` 0.6, la misma versión que ya usa GPUI. Sin `icon` borra el que dejó una
+  ejecución anterior. Probado con una ventana real y `notify` con `system`: la clave quedó con
+  `DisplayName` e `IconUri`, y una segunda ejecución sin icono lo quitó. El usuario confirmó en
+  pantalla el nombre, el icono y el clic (2026-11-06).
+
+### Fase 60 — Commits más baratos en una ventana (2026-11-06)
+
+El usuario pidió optimizar el host en rendimiento, no solo en tamaño. Medido antes de tocar nada
+(host de release, este equipo): la ida y vuelta de un mensaje es de 0,1–0,2 ms y no merece
+trabajo; cargar 50 000 nodos tarda ~140 ms, ~100 de ellos en el parseo JSON en dos pasos; y con
+datos en vivo (un texto cambiado 60 veces por segundo) una ventana de 20 000 nodos dibujaba 4–5,5
+frames/s.
+
+- **Benchmark:** modo `update` en `benchmarks/render.mjs` (y en `run.ps1` y `sample.ps1`): ningún
+  benchmark hacía commits con una ventana abierta (`5b903f0`).
+- **Causa:** tras cada commit, cada ventana recorría su árbol unas 25 veces para mantener el
+  estado de sus componentes: el subárbol, `animated_nodes`, un escaneo de todo el árbol por cada
+  tipo con estado (Input, Select, Table…), VirtualList, MessageScroller, los focusables, y otra
+  vez el subárbol y dos escaneos en `sync_overlays_and_focus`. Con 20 000 nodos, ~10 ms por
+  commit; a 60 commits por segundo llenaba el hilo principal.
+- **Cambio:** `Tree::window_nodes` recorre la ventana una vez y agrupa sus nodos por tipo
+  (`WindowNodes`); cada snapshot lee solo su tipo, `animated_nodes` mira solo los nodos con una
+  clase `animate-` (y sube por sus padres buscando un `windowControl`), y los overlays reusan lo
+  mismo. El árbol lleva un contador `shape` que sube con toda operación salvo un `setProps` que
+  no toca `class` (y con `set_host_prop` de `class`); la ventana solo recorre de nuevo cuando
+  cambia. `texts.retain` también espera a un cambio de forma. `Tree::nodes` quedó sin uso y se
+  borró. No se juntan varios commits en un solo sync: `value_writes` es solo del último.
+- **Resultado:** el sync por commit pasó de ~10 ms a ~1 µs con datos en vivo (2–5 ms cuando cambia
+  la forma con 20 000 nodos). La ventana de 20 000 filas con `update` dibuja 9,1–9,5 frames/s, el
+  mismo techo que el spinner solo: el resto es layout y pintado de GPUI. Con 2 000 filas, ~45–53
+  frames/s (antes ~47: ahí el sync ya era pequeño). Host de release: 15 641 600 B.
+- **Pruebas:** `cargo test` (82, con dos nuevas: `window_nodes` y `shape`), clippy limpio. Ningún
+  test construye un `RootView`, así que se abrieron forms, data, list, dock, settings, overlays,
+  slots, chat y command en ventanas reales: sin pánicos. El usuario probó a mano los controles
+  con estado (overlays, forms, dock, list) y el spinner de `list` que aparece y desaparece: bien.
+- **Pendiente (siguientes pasos):** parseo directo con el de dos pasos como respaldo (2,9× en el
+  parseo); el parseo extra de `simulate::handle` en `--no-window`. Hallazgo aparte: con un spinner
+  la ventana reconstruye los 20 001 nodos en cada frame aunque `AnimatedNode` diga lo contrario.
+
+### Fase 61 — Parseo directo (2026-11-06)
+
+Paso 2 del plan de rendimiento, aprobado por el usuario tras su prueba a mano del paso 1.
+
+- **Parseo:** `parse_client_message` prueba primero `serde_json::from_str::<ClientMessage>`; solo
+  si falla toma el camino de antes (a `Value`, comprobar `op`, `from_value`), que explica el error
+  con su código y su `op`. Medido en 100 000 líneas: 101 ms por `Value`, 35 ms directo.
+  `serde_json` no tiene `arbitrary_precision` (sí `preserve_order`, igual en los dos caminos).
+- **`simulate`:** con `--no-window` cada línea se parseaba otra vez a `Value` para ver si era un
+  `simulate`. Como no es un mensaje del protocolo, solo una línea que no se pudo parsear puede
+  serlo: ahora solo esas pasan por `simulate::handle`.
+- **Pruebas:** prueba nueva que lee cada línea `>` de los fixtures por los dos caminos y exige el
+  mismo mensaje (más de 500 líneas). `cargo test` (83), los fixtures de errores sin cambios,
+  clippy limpio, y los clientes Node (33), Python y Go pasan.
+- **Resultado** (`tree.mjs`, release, tres corridas): 1 000 nodos 4,1–4,7 → 1,6–2,2 ms; 10 000
+  26–30 → 10–15 ms; 50 000 143–156 → 57–71 ms. Parte de la mejora en estas cifras (que son sin
+  ventana) es el parseo de `simulate` que ya no se hace; con ventana cuenta solo el parseo directo.
+  Host de release: 15 646 720 B.
+
+### Fase 62 — Loops de animación a 30 frames/s (2026-11-06)
+
+Revisión de lo que drena fps de nuestro lado, paso 1 de 3 (luego RAM y trabajo en el hilo
+principal).
+
+- **Hallazgo:** con un nodo `animate-*`, cada frame redibuja la ventana entera. GPUI marca sucios
+  al view notificado y a todos sus ancestros (`mark_view_dirty` en `window.rs`), y el view raíz
+  se renderiza en cada frame, así que el view propio de `AnimatedNode` no ahorraba nada (su campo
+  y PROTOCOL §8 decían lo contrario; corregidos). Los views en caché de GPUI (`cached`) se
+  maquetan como un solo bloque con un estilo fijo, así que no sirven para subárboles cuyo tamaño
+  viene del contenido.
+- **Costo medido** (release): 200 nodos + spinner 8,4 % de un núcleo; 2 000 nodos + spinner 54 %
+  a 60 frames/s; 5 000 nodos, 38–41 frames/s. Del frame, el pase del host es ~1,1 ms con 2 000
+  nodos; el resto es layout y pintado de GPUI.
+- **Opciones dadas al usuario:** (1) dibujar los loops en una capa fuera de un árbol cacheado
+  (el contenido de la ventana siempre la llena, así que ahí `cached` sí sirve), con riesgos de
+  recorte en scroll, opacidad de ancestros, accesibilidad y orden con diálogos: spike + ADR;
+  (2) loops a 30 frames/s; (3) dejarlo documentado. Eligió la 2; la 1 queda como posible spike.
+- **Cambio:** `FrameClock::next_frame` recibe el intervalo; `AnimatedNode` pide
+  `LOOP_FRAME_INTERVAL` (33,3 ms) y las transiciones y el resto siguen con `FRAME_INTERVAL`.
+- **Resultado:** 2 000 nodos + spinner 54 → 26,9 % a 29,8–30,3 frames/s; 200 nodos 8,4 → 5,9 %.
+  `cargo test` (83) y clippy limpios.
+
+### Fase 63 — RAM sostenida: fuga de imágenes (2026-11-06)
+
+Paso 2 de 3 de la revisión de lo que drena recursos. El usuario confirmó a ojo que el spinner a 30
+frames/s se ve bien.
+
+- **Prueba:** `benchmarks/churn.mjs` crea y borra cada 200 ms un lote de nodos con estado (Input,
+  Textarea, NumberInput, Select, Slider, Checkbox, DatePicker, TimeField, ColorPicker, Combobox,
+  OtpInput, Calendar, Table, Tree, Chart, List, textos con `transition`, Image con `data`, Icon) y
+  `benchmarks/soak.ps1` imprime la memoria del host cada pocos segundos. Con todo junto, 5
+  minutos: 92 → 161 MB sin estabilizarse (~45 KB por ciclo).
+- **Por grupos** (60 s, 100 nodos por segundo): div, text, transition, icon, los 12 controles de
+  formulario, Table, Chart y List suben al principio y se quedan planos. Crecen sin parar: Image
+  con `data` (69 → 123 MB) y Tree (~2 KB por árbol).
+- **Image:** cada nodo con `data` tiene un archivo propio; al borrarlo se borraba el archivo pero
+  GPUI seguía con la imagen decodificada en su caché (por ruta) y su textura en el atlas de la
+  ventana. Ahora `Store::remove` devuelve la ruta, `forget_image_data` la pone en
+  `image_reloads`, y `reload_images` libera la textura (`fetch_asset` devuelve lo que ya está en
+  la caché, `drop_image`) antes de `remove_asset`. Solo `remove_asset` dejaba la mitad de la
+  fuga: era la textura. Lo mismo vale para las recargas de `src`, que antes también dejaban la
+  textura vieja. Medido: plano en 80,1 MB.
+- **Tree:** fallo de gpui-component 0.9.0: su `Tree` guarda en cada frame, dentro del
+  `TreeState`, un closure que retiene el propio `TreeState` (`context_menu_state = state.clone()`
+  en `gpui_component::tree`, asignado a `render_item` por `gpui_base::Tree`): un ciclo que nunca
+  se libera. Romperlo desde el host exigiría renderizar a mano el `gpui_base::Tree` interno; se
+  deja para reportar río arriba. `churn.mjs` lo excluye por defecto.
+- **Resultado:** todo menos Tree, 150 s: plano en ~92,5 MB. `cargo test` (83, la prueba de
+  `data` ahora espera la liberación al vaciar y al borrar), clippy limpio.
+
+### Fase 64 — Trabajo en el hilo principal (2026-11-06)
+
+Paso 3 de 3 de la revisión de lo que drena recursos. El usuario confirmó que `image-bytes` se ve
+bien tras el arreglo de la fuga (Fase 63).
+
+- **`Image.data`:** decodificar el base64 y escribir el archivo dentro del commit cuesta ~1 ms
+  por MB (release, sin ventana, sin logs: 0,25 MB ~1 ms; 4 MB ~4 ms; 16 MB ~15–18 ms, más ~8 ms
+  de parseo de la línea). Una foto normal cabe en un frame; no se mueve a otro hilo.
+- **Carga con ventana:** 50 000 nodos en un commit tardan lo mismo con ventana (72–75 ms) que sin
+  ella (63–72 ms): el `cx.update` por línea no añade nada. Medido con una petición que el host
+  rechaza al instante (`openDialog` sin archivos ni carpetas). Un primer intento usó `openUrl`
+  con url vacía, que el host no rechaza sino que ejecuta; se avisó al usuario.
+- **stdout:** cada mensaje se escribe y se vacía en el hilo principal. Solo bloquea si el cliente
+  deja de leer y se llena el pipe (64 KB, cientos de eventos): es contrapresión, y moverlo a un
+  hilo cambiaría el bloqueo por memoria sin límite. Se deja así.
+- **Bandeja (arreglado):** cualquier `tray`, aunque solo cambiara el tooltip, leía y decodificaba
+  otra vez el archivo del icono (`image::open` + `thumbnail`) en el hilo principal, contra lo que
+  dice PROTOCOL §11. `TraySpec.icon_revision` sube solo con los mensajes que traen `icon`, y
+  `tray::sync` solo entonces vuelve a cargarlo. El menú sigue reconstruyéndose con cada `tray`
+  (repone las marcas que tiene el cliente, a propósito).
+- **Sin otros bloqueos:** ningún `sleep`, `block_on` (salvo el bucle de `--no-window`), espera ni
+  lectura de archivos en el código del host fuera de lo anterior.
+- **Pruebas:** `cargo test` (84, una nueva de las revisiones de la bandeja), clippy limpio,
+  `examples/tray.ts` en ventana real sin pánicos.

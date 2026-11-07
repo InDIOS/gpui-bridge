@@ -3,7 +3,7 @@
 //! lives in the tree (`value`, `#RRGGBB` or `#RRGGBBAA`), and `sync` makes the state show it.
 //! `palette` lists featured colors. The crate cannot disable either of its color pickers.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::Colorize as _;
 use gpui_kit::component::color_picker::{ColorPickerEvent, ColorPickerState, ColorSelect};
@@ -14,7 +14,7 @@ use super::{prop_str, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct ColorPickerSlot {
     state: Entity<ColorPickerState>,
@@ -32,10 +32,10 @@ pub fn parse(value: &str) -> Option<Hsla> {
     ok.then(|| Hsla::parse_hex(digits).ok()).flatten()
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> ColorPickerSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> ColorPickerSnapshot {
     ColorPickerSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::ColorPicker && members.contains(id))
+        members
+            .of(tree, NodeType::ColorPicker)
             .map(|(id, node)| (id, prop_str(node, "value").map(str::to_owned)))
             .collect(),
     )

@@ -5,7 +5,7 @@
 
 param(
   [int]$Nodes = 20000,
-  [ValidateSet("idle", "spin")][string]$Mode = "spin",
+  [ValidateSet("idle", "spin", "update")][string]$Mode = "spin",
   [int]$Seconds = 5,
   [switch]$Log,
   [string]$HostPath

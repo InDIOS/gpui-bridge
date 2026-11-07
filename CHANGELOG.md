@@ -3,6 +3,41 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## 0.6.0 — 2026-11-06
+
+Apps name themselves on system notifications, and a faster, leaner host; `PROTOCOL_VERSION`
+stays 1.
+
+- `hello` may name the app: `{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}`.
+  Windows shows `name` on the app's system notifications instead of `gpui-bridge`, and `id`
+  groups its windows on the taskbar. The clients take it as an option: `createApp({ app })`
+  (Node, React, txiki), `App(app=...)` (Python), `AppOptions.App` (Go). `PROTOCOL_VERSION`
+  stays 1: an older host ignores the field.
+- `app.icon` (an image file) is the icon on those notifications; the host registers it on
+  Windows next to the name.
+- A `hello` the host cannot read is answered with `invalid_json` and the host exits; before,
+  it was ignored and the client waited until its handshake timeout.
+- Faster commits in a window: after each commit the host walked the window's tree about 25
+  times (once per stateful component type) to keep its Inputs, Selects, dialogs… in step. It
+  now walks it once, and not at all when the commit only changed props other than `class`
+  (live data). With 20 000 nodes that was ~10 ms per commit; it is now ~1 µs for live data on
+  text rows, and 2–5 ms when the commit changes the tree's shape.
+- Faster parsing: each line goes straight to its typed message instead of through a generic JSON
+  value first (the slow path now only explains a line that fails, so errors are unchanged).
+  Applying 50 000 nodes (`benchmarks/tree.mjs`) went from 143–156 ms to 57–71 ms.
+- `animate-spin` and `animate-pulse` loops draw at 30 frames/s instead of 60 (transitions keep
+  60). Every frame of a loop redraws the whole window, so a spinner in a window of 2 000 nodes
+  now costs ~27 % of a core instead of ~54 %.
+- Memory leak fixed: removing an `Image` or `Attachment` with `data` (or emptying its `data`)
+  left the decoded image in GPUI's cache and its texture in the window's atlas, ~9 KB for a small
+  icon and far more for a photo. Both are freed now, as they are when a `src` file is reloaded.
+- A `tray` message without `icon` (a tooltip or menu update) no longer reads and decodes the
+  icon file again on the main thread, as PROTOCOL section 11 already said.
+- New `benchmarks/churn.mjs` + `soak.ps1`: create and remove stateful nodes for minutes while
+  printing the host's memory, which must stay flat.
+- Known issue: each `Tree` node created and removed keeps ~2 KB, inside gpui-component 0.9.0 (its
+  row closure holds its own state). Apps that create and drop many Trees should reuse them.
+
 ## 0.5.0 — 2026-11-06
 
 App icons, icon buttons and a smaller host; `PROTOCOL_VERSION` stays 1.

@@ -42,8 +42,12 @@ type ClientMessage map[string]any
 
 // --- client → host message constructors -------------------------------------
 
-func helloMsg() ClientMessage {
-	return ClientMessage{"op": "hello", "protocol": ProtocolVersion}
+func helloMsg(app *AppIdentity) ClientMessage {
+	msg := ClientMessage{"op": "hello", "protocol": ProtocolVersion}
+	if app != nil {
+		msg["app"] = app
+	}
+	return msg
 }
 
 func commitMsg() ClientMessage {

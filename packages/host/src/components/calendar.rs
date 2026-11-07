@@ -1,7 +1,7 @@
 //! `Calendar` (PROTOCOL.md section 17): one `CalendarState` per node. The chosen day lives in
 //! the tree (`value`, `YYYY-MM-DD`), like a Select's value, and `sync` makes the state show it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chrono::{NaiveDate, Weekday};
 use gpui_kit::component::calendar::{Calendar, CalendarEvent, CalendarState, Date};
@@ -11,7 +11,7 @@ use super::value_chosen;
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct CalendarSlot {
     state: Entity<CalendarState>,
@@ -33,10 +33,10 @@ pub fn parse_date(value: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> CalendarSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> CalendarSnapshot {
     CalendarSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Calendar && members.contains(id))
+        members
+            .of(tree, NodeType::Calendar)
             .map(|(id, node)| {
                 let value = node
                     .props

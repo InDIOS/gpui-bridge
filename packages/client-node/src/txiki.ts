@@ -2,7 +2,7 @@
 // Uses only txiki.js and Web APIs (no Node modules).
 
 import { connect, type App, type HostEvents, type HostExit, type HostTransport } from "./app.js";
-import type { ClientMessage } from "./protocol.js";
+import type { AppIdentity, ClientMessage } from "./protocol.js";
 
 export * from "./app.js";
 export * from "./protocol.js";
@@ -100,6 +100,8 @@ export interface TxikiAppOptions {
   hostPath?: string;
   debug?: boolean;
   headless?: boolean;
+  /** Names the app for the system (`hello`): Windows shows it on system notifications. Default: `gpui-bridge`. */
+  app?: AppIdentity;
 }
 
 function defaultHostPath(): string {
@@ -113,5 +115,5 @@ function defaultHostPath(): string {
 export function createTxikiApp(options: TxikiAppOptions = {}): Promise<App> {
   const path = options.hostPath ?? defaultHostPath();
   const args = options.headless ? ["--no-window"] : [];
-  return connect(path, (events) => new TxikiHost(path, args, options.debug ?? false, events));
+  return connect(path, (events) => new TxikiHost(path, args, options.debug ?? false, events), options.app);
 }

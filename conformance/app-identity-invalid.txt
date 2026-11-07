@@ -1,0 +1,3 @@
+# Section 2: a hello that cannot be read (here an app id with a space) is answered and the host exits.
+> {"op":"hello","protocol":1,"app":{"id":"Acme Notes","name":"Notes"}}
+< {"type":"error","code":"invalid_json","op":"hello"}

@@ -5,7 +5,7 @@
 //! The crate fixes the precision when the state is built, so `seconds` is a prop of its own and
 //! a change rebuilds the state. The crate has no empty field: without `value` it shows `00:00`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chrono::NaiveTime;
 use gpui_kit::component::Disableable;
@@ -17,7 +17,7 @@ use super::{prop_bool, prop_str, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct TimeFieldSlot {
     state: Entity<TimeFieldState>,
@@ -38,10 +38,10 @@ pub fn parse(value: &str, seconds: bool) -> Option<NaiveTime> {
     NaiveTime::parse_from_str(value, format(seconds)).ok()
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> TimeFieldSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> TimeFieldSnapshot {
     TimeFieldSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::TimeField && members.contains(id))
+        members
+            .of(tree, NodeType::TimeField)
             .map(|(id, node)| {
                 let seconds = prop_bool(node, "seconds");
                 let time = prop_str(node, "value")

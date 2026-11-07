@@ -22,7 +22,7 @@ use super::emit;
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 #[derive(Deserialize)]
 struct Item {
@@ -140,9 +140,9 @@ pub struct QuestionnaireSlot {
 }
 
 /// Each Questionnaire among `members` with its `items`.
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> Vec<(NodeId, Value)> {
-    tree.nodes()
-        .filter(|(id, node)| node.node_type == NodeType::Questionnaire && members.contains(id))
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> Vec<(NodeId, Value)> {
+    members
+        .of(tree, NodeType::Questionnaire)
         .map(|(id, node)| (id, node.props.get("items").cloned().unwrap_or_default()))
         .collect()
 }

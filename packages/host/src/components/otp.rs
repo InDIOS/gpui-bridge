@@ -1,7 +1,7 @@
 //! `OtpInput` (PROTOCOL.md section 17): one `OtpState` per node. The code lives in the host,
 //! like an `Input`'s text, and `sync` applies the `value` the client imposes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::Disableable;
 use gpui_kit::component::input::{OtpEvent, OtpInput, OtpState};
@@ -11,7 +11,7 @@ use super::{input_edited, prop_bool, prop_str};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct OtpSlot {
     state: Entity<OtpState>,
@@ -28,10 +28,10 @@ impl OtpSlot {
 /// Each OtpInput among `members`: length, value to show and whether it is masked.
 pub struct OtpSnapshot(Vec<(NodeId, usize, String, bool)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> OtpSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> OtpSnapshot {
     OtpSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::OtpInput && members.contains(id))
+        members
+            .of(tree, NodeType::OtpInput)
             .map(|(id, node)| {
                 let length = node
                     .props

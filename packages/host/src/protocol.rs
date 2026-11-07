@@ -24,6 +24,7 @@ pub type Props = Map<String, Value>;
 pub enum ClientMessage {
     Hello {
         protocol: u32,
+        app: Option<AppIdentity>,
     },
     Window {
         id: Option<WindowId>,
@@ -138,6 +139,28 @@ pub enum ClientMessage {
         system: Option<bool>,
     },
     Commit,
+}
+
+/// The app's own identity (`hello`): Windows shows `name` and `icon` on its system notifications.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct AppIdentity {
+    #[serde(deserialize_with = "app_id")]
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+}
+
+/// The id becomes the process AppUserModelID and a registry key name: Windows allows at most
+/// 128 characters and no spaces, and a `\` would open a subkey.
+fn app_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let id = String::deserialize(deserializer)?;
+    let bad = |c: char| c.is_whitespace() || c.is_control() || c == '\\';
+    if id.is_empty() || id.chars().count() > 128 || id.contains(bad) {
+        return Err(serde::de::Error::custom(
+            "app id must be 1 to 128 characters with no spaces or '\\'",
+        ));
+    }
+    Ok(id)
 }
 
 /// The look of a `notify` toast.
@@ -320,6 +343,11 @@ impl From<ProtocolError> for HostMessage {
 
 /// Parses one line from the client, classifying failures into protocol error codes.
 pub fn parse_client_message(line: &str) -> Result<ClientMessage, ProtocolError> {
+    // Straight to the typed message: about three times faster than through a `Value`. Only a
+    // line that fails takes the slow path, which tells which error it is and for which `op`.
+    if let Ok(message) = serde_json::from_str(line) {
+        return Ok(message);
+    }
     let error = |code, message: String, op: Option<&str>| ProtocolError {
         code,
         message,
@@ -402,12 +430,55 @@ mod tests {
         value.as_object().unwrap().clone()
     }
 
+    /// The direct parse must read every line the way the `Value` path does: same message,
+    /// over every line the conformance fixtures send.
+    #[test]
+    fn direct_parse_matches_the_value_path() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../conformance");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+            for line in text.lines().filter_map(|line| line.strip_prefix("> ")) {
+                let Ok(direct) = serde_json::from_str::<ClientMessage>(line) else {
+                    continue;
+                };
+                let value: Value = serde_json::from_str(line).unwrap();
+                let slow: ClientMessage = serde_json::from_value(value).unwrap();
+                // Debug, since a theme set compares by identity.
+                assert_eq!(format!("{direct:?}"), format!("{slow:?}"), "{line}");
+                checked += 1;
+            }
+        }
+        assert!(checked > 500, "only {checked} lines");
+    }
+
     #[test]
     fn parses_hello() {
         assert_eq!(
             parse(r#"{"op":"hello","protocol":1}"#),
-            ClientMessage::Hello { protocol: 1 }
+            ClientMessage::Hello {
+                protocol: 1,
+                app: None
+            }
         );
+        assert_eq!(
+            parse(r#"{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}"#),
+            ClientMessage::Hello {
+                protocol: 1,
+                app: Some(AppIdentity {
+                    id: "Acme.Notes".into(),
+                    name: "Notes".into(),
+                    icon: None
+                })
+            }
+        );
+        for id in ["", "Acme Notes", r"Acme\Notes", &"a".repeat(129)] {
+            let line = format!(
+                r#"{{"op":"hello","protocol":1,"app":{{"id":"{}","name":"N"}}}}"#,
+                id.replace('\\', r"\\")
+            );
+            assert!(parse_client_message(&line).is_err(), "{id:?} was accepted");
+        }
     }
 
     #[test]

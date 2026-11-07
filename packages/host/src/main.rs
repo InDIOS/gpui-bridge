@@ -60,8 +60,8 @@ fn main() {
         .with_assets(icons::Assets)
         .run(move |cx| {
             gpui_kit::init(cx);
-            // Windows shows system notifications (`notify` with `system`) only for an app with an identity.
-            // shortcut: one fixed identity for every app; let the client name it if apps need their own.
+            // Windows shows system notifications (`notify` with `system`) only for an app with an
+            // identity: this one until the client names its app in `hello`.
             cx.set_app_identity("gpui-bridge", "gpui-bridge");
             // The host decides when to quit: after the user closes the last window (unless there is a tray),
             // after the client removes the tray with no window open, or when stdin ends.
@@ -93,6 +93,7 @@ fn main() {
                     match flow {
                         Flow::Continue => {}
                         Flow::Action(action) => cx.update(|cx| system::run(action, &windows, cx)),
+                        Flow::Identity(app) => cx.update(|cx| system::set_identity(&app, cx)),
                         Flow::Render => cx.update(|cx| {
                             render::reload_images(&session, cx);
                             windows::sync_windows(&session, &windows, cx);
@@ -142,6 +143,8 @@ enum Flow {
     Render,
     /// A system action (PROTOCOL.md section 13), run by the caller with the GPUI app.
     Action(ClientMessage),
+    /// The client named the app in its first `hello` (PROTOCOL.md section 2).
+    Identity(protocol::AppIdentity),
     Exit,
 }
 
@@ -166,12 +169,24 @@ impl Session {
         let message = protocol::parse_client_message(line);
 
         // Until the protocol version is agreed, nothing else can be interpreted safely.
-        if !self.handshake_done && !matches!(message, Ok(ClientMessage::Hello { .. })) {
-            log::warn!("ignoring message received before hello: {line}");
-            return Flow::Continue;
+        if !self.handshake_done {
+            match &message {
+                Ok(ClientMessage::Hello { .. }) => {}
+                // Answered, or the client would wait for `ready` until it times out; it ends
+                // the session like a version mismatch.
+                Err(err) if err.op.as_deref() == Some("hello") => {
+                    transport::send(&HostMessage::from(err.clone()));
+                    return Flow::Exit;
+                }
+                _ => {
+                    log::warn!("ignoring message received before hello: {line}");
+                    return Flow::Continue;
+                }
+            }
         }
 
-        if self.no_window {
+        // `simulate` is not a protocol message, so only a line that failed to parse can be one.
+        if self.no_window && message.is_err() {
             match simulate::handle(line, &mut self.tree) {
                 Some(Ok(simulate::Outcome::Done)) => return Flow::Continue,
                 Some(Ok(simulate::Outcome::Exit)) => return Flow::Exit,
@@ -193,13 +208,19 @@ impl Session {
         };
 
         match message {
-            ClientMessage::Hello { protocol } if protocol == PROTOCOL_VERSION => {
+            ClientMessage::Hello { protocol, app } if protocol == PROTOCOL_VERSION => {
+                let first = !self.handshake_done;
                 self.handshake_done = true;
                 transport::send(&HostMessage::Ready {
                     protocol: PROTOCOL_VERSION,
                 });
+                // Only the first hello names the app: a repeated one comes after windows and
+                // toasts may already carry the identity.
+                if let (true, false, Some(app)) = (first, self.no_window, app) {
+                    return Flow::Identity(app);
+                }
             }
-            ClientMessage::Hello { protocol } => {
+            ClientMessage::Hello { protocol, .. } => {
                 transport::send(&HostMessage::Error {
                     code: ErrorCode::ProtocolMismatch,
                     message: format!(

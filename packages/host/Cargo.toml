@@ -20,6 +20,8 @@ tray-icon = { version = "0.26", default-features = false }
 # `visible` hides a window through its HWND (`windows.rs`); already in the tree through GPUI.
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"
+# The app's notification icon (`IconUri`) sits next to the name GPUI registers; same version as GPUI's.
+windows-registry = "0.6"
 
 # The tray needs one of `tray-icon`'s two Linux backends or it does not compile (see its
 # `compile_error!`). `ksni` talks D-Bus on its own, so Linux needs no GTK or libappindicator;

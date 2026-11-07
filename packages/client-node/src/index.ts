@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connect, type App } from "./app.js";
+import type { AppIdentity } from "./protocol.js";
 import { HostProcess } from "./host-process.js";
 
 export * from "./app.js";
@@ -17,6 +18,8 @@ export interface AppOptions {
   debug?: boolean;
   /** Run the host without a window (`--no-window`), e.g. for tests. */
   headless?: boolean;
+  /** Names the app for the system (`hello`): Windows shows it on system notifications. Default: `gpui-bridge`. */
+  app?: AppIdentity;
 }
 const exe = process.platform === "win32" ? "gpui-bridge-host.exe" : "gpui-bridge-host";
 // dist/index.js -> the package root
@@ -67,5 +70,5 @@ export function defaultHostPath(): string {
 export function createApp(options: AppOptions = {}): Promise<App> {
   const path = options.hostPath ?? defaultHostPath();
   const args = options.headless ? ["--no-window"] : [];
-  return connect(path, (events) => new HostProcess({ path, args, debug: options.debug ?? false, ...events }));
+  return connect(path, (events) => new HostProcess({ path, args, debug: options.debug ?? false, ...events }), options.app);
 }

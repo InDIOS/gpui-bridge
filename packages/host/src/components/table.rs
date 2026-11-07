@@ -2,7 +2,7 @@
 //! props. Cells are text. One retained `TableState` per node; its delegate reads the rows from
 //! the tree when it draws them, so big tables are not copied on every sync.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::table::{
     Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState,
@@ -14,7 +14,7 @@ use super::{chosen, emit, prop_bool};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct Delegate {
     session: Entity<Session>,
@@ -152,10 +152,10 @@ impl TableSlot {
 /// Each Table among `members`: its columns and the row to select (dropped when out of range).
 pub struct TableSnapshot(Vec<(NodeId, Value, Option<usize>)>);
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> TableSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> TableSnapshot {
     TableSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::Table && members.contains(id))
+        members
+            .of(tree, NodeType::Table)
             .map(|(id, node)| {
                 let rows = node
                     .props

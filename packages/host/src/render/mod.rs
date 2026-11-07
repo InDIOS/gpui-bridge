@@ -47,7 +47,7 @@ use crate::protocol::{HostMessage, NodeId, WindowId as ClientWindowId};
 use crate::schema::NodeType;
 use crate::styles::{self, Class, ScrollAxis, StyleCache};
 use crate::transport;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 use gpui_kit::component::input::{InputMode, TextareaMode};
 
 pub struct RootView {
@@ -98,11 +98,15 @@ pub struct RootView {
     /// Divs with `drag` the user moves, and where they were left (see `drag::Drags`).
     drags: Rc<RefCell<drag::Drags>>,
     /// One view per node that keeps moving on its own (an `animate-*` loop, see
-    /// `animated_nodes`), kept up to date by `sync_animated`. A frame redraws those nodes and not
-    /// the whole window: a spinner on a tree of thousands of nodes should not rebuild all of it.
+    /// `animated_nodes`), kept up to date by `sync_animated`. Its frames still redraw the whole
+    /// window (GPUI marks every ancestor view dirty), so they come at `LOOP_FRAME_INTERVAL`.
     animated: HashMap<NodeId, Entity<AnimatedNode>>,
     /// Text content per node, kept between frames (see `RenderCx::text`).
     texts: HashMap<NodeId, SharedString>,
+    /// This window's nodes, walked again only when the tree's `shape` moves past `window_shape`.
+    /// The overlays and focus the sync defers read them too.
+    window_nodes: WindowNodes,
+    window_shape: Option<u64>,
     /// Paces this window's animation frames, shared with the views of its nodes (see `FrameClock`).
     clock: Rc<RefCell<FrameClock>>,
     /// Nodes the last frame produced state for (a transition, or a tracked `hover:`, in any pass).
@@ -181,6 +185,8 @@ impl RootView {
             drags: Rc::default(),
             animated: HashMap::new(),
             texts: HashMap::new(),
+            window_nodes: WindowNodes::default(),
+            window_shape: None,
             clock: Rc::default(),
             stateful: HashSet::new(),
             epoch: Instant::now(),
@@ -307,15 +313,18 @@ impl RootView {
     /// host-side changes (a checkbox click) between commits.
     fn sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tree = &self.session.read(cx).tree;
-        let members = self
-            .root(tree)
-            .map(|root| tree.subtree(root))
-            .unwrap_or_default();
-        // Only a commit can change what loops in `class`, so the extra walk is skipped for the
-        // host's own notifications (a keystroke in an Input, a checkbox click).
-        let loops = (tree.commits() != self.applied_commit).then(|| {
-            self.root(tree)
-                .map(|root| animated_nodes(tree, root))
+        let root = self.root(tree);
+        let reshaped = self.window_shape != Some(tree.shape());
+        if reshaped {
+            self.window_shape = Some(tree.shape());
+            self.window_nodes = root.map(|root| tree.window_nodes(root)).unwrap_or_default();
+        }
+        let members = &self.window_nodes;
+        let committed = tree.commits() != self.applied_commit;
+        // Only a commit can change what loops in `class`; the host's own notifications (a
+        // keystroke in an Input, a checkbox click) keep the views they have.
+        let loops = committed.then(|| {
+            root.map(|root| animated_nodes(tree, root, members))
                 .unwrap_or_default()
         });
         let writes = if tree.commits() == self.applied_commit {
@@ -324,57 +333,55 @@ impl RootView {
             tree.value_writes()
         };
         self.drags.borrow_mut().class_set(writes);
-        let inputs = input::snapshot(tree, NodeType::Input, &members, writes);
-        let textareas = input::snapshot(tree, NodeType::Textarea, &members, writes);
-        let numbers = input::snapshot(tree, NodeType::NumberInput, &members, writes);
-        let groups = input::snapshot(tree, NodeType::InputGroup, &members, writes);
-        let otps = otp::snapshot(tree, &members);
-        let calendars = calendar::snapshot(tree, &members);
-        let selects = select::snapshot(tree, &members);
-        let date_pickers = date_picker::snapshot(tree, &members);
-        let time_fields = time_field::snapshot(tree, &members);
-        let color_pickers = color_picker::snapshot(tree, &members);
-        let combos = combobox::snapshot(tree, &members);
-        let questionnaires = questionnaire::snapshot(tree, &members);
-        let sliders = slider::snapshot(tree, &members);
-        let tables = table::snapshot(tree, &members);
-        let trees = tree::snapshot(tree, &members);
-        let diffs = diff::snapshot(tree, &members);
-        let carousels = carousel::snapshot(tree, &members);
-        let charts = chart::snapshot(tree, &members);
-        let commands = command::snapshot(tree, &members);
-        let list_snapshot = list::snapshot(tree, &members);
-        let dock_snapshot = dock::snapshot(tree, &members);
+        let inputs = input::snapshot(tree, NodeType::Input, members, writes);
+        let textareas = input::snapshot(tree, NodeType::Textarea, members, writes);
+        let numbers = input::snapshot(tree, NodeType::NumberInput, members, writes);
+        let groups = input::snapshot(tree, NodeType::InputGroup, members, writes);
+        let otps = otp::snapshot(tree, members);
+        let calendars = calendar::snapshot(tree, members);
+        let selects = select::snapshot(tree, members);
+        let date_pickers = date_picker::snapshot(tree, members);
+        let time_fields = time_field::snapshot(tree, members);
+        let color_pickers = color_picker::snapshot(tree, members);
+        let combos = combobox::snapshot(tree, members);
+        let questionnaires = questionnaire::snapshot(tree, members);
+        let sliders = slider::snapshot(tree, members);
+        let tables = table::snapshot(tree, members);
+        let trees = tree::snapshot(tree, members);
+        let diffs = diff::snapshot(tree, members);
+        let carousels = carousel::snapshot(tree, members);
+        let charts = chart::snapshot(tree, members);
+        let commands = command::snapshot(tree, members);
+        let list_snapshot = list::snapshot(tree, members);
+        let dock_snapshot = dock::snapshot(tree, members);
         // Only a commit changes the rows of a MessageScroller.
-        let scrollers = (tree.commits() != self.applied_commit).then(|| {
+        let scrollers = committed.then(|| {
             members
-                .iter()
-                .filter_map(|&id| {
-                    tree.node(id)
-                        .filter(|node| node.node_type == NodeType::MessageScroller)
-                        .map(|node| (id, node.children.clone()))
-                })
+                .of(tree, NodeType::MessageScroller)
+                .map(|(id, node)| (id, node.children.clone()))
                 .collect::<Vec<_>>()
         });
         let lists: HashSet<NodeId> = members
-            .iter()
-            .copied()
-            .filter(|&id| {
-                tree.node(id)
-                    .is_some_and(|node| node.node_type == NodeType::VirtualList)
-            })
+            .of(tree, NodeType::VirtualList)
+            .map(|(id, _)| id)
             .collect();
-        let focusable: HashSet<NodeId> = members
-            .iter()
-            .copied()
-            .filter(|&id| {
-                tree.node(id).is_some_and(|node| {
-                    (node.node_type == NodeType::Div && node.events.contains("keyDown"))
-                        || keyboard::takes_stop(node)
-                        || node.node_type == NodeType::AccordionItem
-                })
-            })
-            .collect();
+        let focusable: HashSet<NodeId> = [
+            NodeType::Div,
+            NodeType::Slider,
+            NodeType::Rating,
+            NodeType::Tabs,
+            NodeType::Pagination,
+            NodeType::AccordionItem,
+        ]
+        .into_iter()
+        .flat_map(|node_type| members.of(tree, node_type))
+        .filter(|(_, node)| {
+            (node.node_type == NodeType::Div && node.events.contains("keyDown"))
+                || keyboard::takes_stop(node)
+                || node.node_type == NodeType::AccordionItem
+        })
+        .map(|(id, _)| id)
+        .collect();
         self.applied_commit = tree.commits();
         self.focusables.retain(|id, _| focusable.contains(id));
         for id in focusable {
@@ -388,7 +395,10 @@ impl RootView {
                 .entry(id)
                 .or_insert_with(VirtualListScrollHandle::new);
         }
-        self.texts.retain(|id, _| tree.node(*id).is_some());
+        // Only a change of shape removes nodes.
+        if reshaped {
+            self.texts.retain(|id, _| tree.node(*id).is_some());
+        }
         if let Some(scrollers) = scrollers {
             chat::sync_scrollers(&mut self.scrollers, scrollers, cx);
         }
@@ -489,38 +499,33 @@ impl RootView {
     /// `focus` (after them, so a field inside one can take the focus).
     fn sync_overlays_and_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tree = &self.session.read(cx).tree;
-        let members = self
-            .root(tree)
-            .map(|root| tree.subtree(root))
-            .unwrap_or_default();
-        let focus_request = tree.focus_request().filter(|id| members.contains(id));
-        let open_of = |types: &[NodeType], id: NodeId| {
-            tree.node(id).is_some_and(|node| {
-                types.contains(&node.node_type)
-                    && node.props.get("open") == Some(&Value::Bool(true))
-            })
-        };
+        // The window's nodes as the sync that deferred this call found them.
+        let members = &self.window_nodes;
+        let focus_request = tree.focus_request().filter(|&id| members.contains(id));
+        let open = |(_, node): &(NodeId, &Node)| node.props.get("open") == Some(&Value::Bool(true));
         // One dialog layer per window: an open AlertDialog wins over a Dialog, then the lowest id
         // (PROTOCOL.md section 24), so an alert confirms on top of the dialog that opened it.
         let wanted_dialog = members
-            .iter()
-            .copied()
-            .filter(|&id| open_of(&[NodeType::AlertDialog, NodeType::Dialog], id))
-            .min_by_key(|&id| {
-                let alert = tree
-                    .node(id)
-                    .is_some_and(|node| node.node_type == NodeType::AlertDialog);
-                (!alert, id)
-            });
+            .of(tree, NodeType::AlertDialog)
+            .filter(open)
+            .map(|(id, _)| (false, id))
+            .chain(
+                members
+                    .of(tree, NodeType::Dialog)
+                    .filter(open)
+                    .map(|(id, _)| (true, id)),
+            )
+            .min()
+            .map(|(_, id)| id);
         let alert = wanted_dialog.is_some_and(|id| {
             tree.node(id)
                 .is_some_and(|node| node.node_type == NodeType::AlertDialog)
         });
         // One sheet per window: the open one with the lowest id.
         let wanted_sheet = members
-            .iter()
-            .copied()
-            .filter(|&id| open_of(&[NodeType::Sheet], id))
+            .of(tree, NodeType::Sheet)
+            .filter(open)
+            .map(|(id, _)| id)
             .min();
         // Both layers are read above: from here on the tree is not borrowed again, so the window
         // (and the app it borrows) can be used mutably.
@@ -686,7 +691,9 @@ impl RootView {
         let animating = ctx.animating;
         drop(ctx);
         if animating {
-            self.clock.borrow_mut().next_frame(window, cx, owner);
+            self.clock
+                .borrow_mut()
+                .next_frame(window, cx, owner, FRAME_INTERVAL);
         }
         rows
     }
@@ -738,7 +745,9 @@ impl RootView {
             let animating = ctx.animating;
             drop(ctx);
             if animating {
-                self.clock.borrow_mut().next_frame(window, cx, owner);
+                self.clock
+                    .borrow_mut()
+                    .next_frame(window, cx, owner, FRAME_INTERVAL);
             }
             return footer;
         }
@@ -761,7 +770,9 @@ impl RootView {
         let animating = ctx.animating;
         drop(ctx);
         if animating {
-            self.clock.borrow_mut().next_frame(window, cx, owner);
+            self.clock
+                .borrow_mut()
+                .next_frame(window, cx, owner, FRAME_INTERVAL);
         }
         body.into_any_element()
     }
@@ -774,6 +785,11 @@ mod sheet;
 /// One animation frame every 60th of a second, at most: a spinner or a fade does not need more, and
 /// GPUI asks for the next frame as fast as the loop allows when a frame is cheap.
 const FRAME_INTERVAL: Duration = Duration::from_micros(16_667);
+
+/// The pace of an `animate-*` loop, which runs for as long as the class stays: every frame redraws
+/// the whole window (see `AnimatedNode`), so a spinner at 60 frames/s kept a window of 2 000 nodes
+/// at half a core. At 30 it costs half that and still turns smoothly. Transitions keep 60.
+const LOOP_FRAME_INTERVAL: Duration = Duration::from_micros(33_333);
 
 /// Paces a window's animation frames. GPUI draws again as soon as a view asks
 /// (`request_animation_frame`, which notifies the view that is rendering), so a window whose frames
@@ -794,15 +810,16 @@ struct FrameClock {
 }
 
 impl FrameClock {
-    /// Asks for the next frame of `view`.
-    fn next_frame(&mut self, window: &mut Window, cx: &App, view: EntityId) {
+    /// Asks for the frame of `view` that follows the last one by `interval`. A request that finds
+    /// a frame already scheduled shares it.
+    fn next_frame(&mut self, window: &mut Window, cx: &App, view: EntityId, interval: Duration) {
         self.pending.borrow_mut().insert(view);
         if self.scheduled.replace(true) {
             return;
         }
         let now = Instant::now();
         let due = self.due.unwrap_or(now).max(now);
-        self.due = Some(due + FRAME_INTERVAL);
+        self.due = Some(due + interval);
         let (pending, scheduled) = (self.pending.clone(), self.scheduled.clone());
         window
             .spawn(cx, async move |cx| {
@@ -822,13 +839,13 @@ impl FrameClock {
     }
 }
 
-/// A node whose `animate-*` loop runs until the class goes away, drawn by a view of its own. A frame
-/// it asks for notifies this view (the one rendering), so the next frame rebuilds this node instead
-/// of the whole window.
+/// A node whose `animate-*` loop runs until the class goes away, drawn by a view of its own, which
+/// asks for the loop's frames at `LOOP_FRAME_INTERVAL`.
 ///
-/// Note that GPUI also marks the *ancestors* of a notified view as dirty, so the window's own view
-/// still runs its pass on every frame; what this saves is the work below the node, not the walk
-/// itself (measured in HISTORIAL.md, "Rendimiento: redibujado incremental").
+/// GPUI marks the *ancestors* of a notified view as dirty too, and the window's root view renders
+/// on every frame, so each of these frames still rebuilds, lays out and paints the whole window
+/// (2 000 nodes and one spinner: half a core at 60 frames/s). Drawing the loops in a layer outside
+/// a cached tree would avoid that; HISTORIAL.md, Fase 62.
 struct AnimatedNode {
     view: WeakEntity<RootView>,
     id: NodeId,
@@ -882,7 +899,9 @@ impl Render for AnimatedNode {
             .unwrap_or_else(|_| (div().into_any_element(), false));
         if animating {
             // This view is the innermost one rendering, so the frame goes to it alone.
-            self.clock.borrow_mut().next_frame(window, cx, owner);
+            self.clock
+                .borrow_mut()
+                .next_frame(window, cx, owner, LOOP_FRAME_INTERVAL);
         }
         element
     }
@@ -927,8 +946,8 @@ impl Render for RootView {
         self.hovered.borrow_mut().retain(|id| keep.contains(id));
         let (session, window_id, focus) =
             (self.session.clone(), self.window_id, self.focus.clone());
-        // The nodes that move on their own are drawn by their own views (see `AnimatedNode`), so
-        // what this pass asks for a frame for is only what is left of the tree.
+        // The nodes that move on their own ask for their frames from their own views (see
+        // `AnimatedNode`), at their slower pace; this pass asks only for what is left of the tree.
         let mut ctx = self.render_cx(cx, cx.entity().entity_id());
         let root = ctx
             .tree
@@ -987,7 +1006,7 @@ impl Render for RootView {
             // window is only redrawn when a commit, the pointer or the theme changes it.
             self.clock
                 .borrow_mut()
-                .next_frame(window, cx, cx.entity().entity_id());
+                .next_frame(window, cx, cx.entity().entity_id(), FRAME_INTERVAL);
         }
         element
     }
@@ -2394,26 +2413,32 @@ impl RenderCx<'_> {
 ///
 /// None inside a `windowControl` area: there what a node renders depends on the area around it (see
 /// `blocks` in `RenderCx::node_raw`), and the window's own pass keeps drawing those.
-fn animated_nodes(tree: &Tree, root: NodeId) -> HashSet<NodeId> {
-    fn walk(tree: &Tree, id: NodeId, in_control: bool, out: &mut HashSet<NodeId>) {
-        let Some(node) = tree.node(id) else { return };
-        let control = window_control(node).is_some();
-        let class = node
-            .props
-            .get("class")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if !in_control && !control && loops(node, class) {
-            out.insert(id);
+fn animated_nodes(tree: &Tree, root: NodeId, members: &WindowNodes) -> HashSet<NodeId> {
+    // The node or one of its ancestors up to the window's root is a window control.
+    let in_control = |mut id: NodeId| loop {
+        let Some(node) = tree.node(id) else {
+            return false;
+        };
+        if window_control(node).is_some() {
+            return true;
         }
-        let in_control = in_control || control;
-        for &child in &node.children {
-            walk(tree, child, in_control, out);
+        match node.parent {
+            Some(parent) if id != root => id = parent,
+            _ => return false,
         }
-    }
-    let mut out = HashSet::new();
-    walk(tree, root, false, &mut out);
-    out
+    };
+    // Only the few nodes with an `animate-*` class, not a walk of the whole window.
+    members
+        .animated
+        .iter()
+        .copied()
+        .filter(|&id| {
+            tree.node(id).is_some_and(|node| {
+                let class = node.props.get("class").and_then(Value::as_str);
+                loops(node, class.unwrap_or(""))
+            }) && !in_control(id)
+        })
+        .collect()
 }
 
 /// Whether `class` asks for a loop: `animate-pulse` on any node, `animate-spin` (which only turns
@@ -2489,10 +2514,17 @@ fn drag_area(element: Div, id: NodeId, pressed: &Rc<Cell<Option<NodeId>>>) -> Di
         })
 }
 
-/// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read again.
+/// Drops the image files the last commit sent from GPUI's cache, so a file changed on disk is read
+/// again and the image of a removed node is freed. The texture it took in each window's atlas goes
+/// too: forgetting the cache entry alone leaves it there.
 pub fn reload_images(session: &Entity<Session>, cx: &mut App) {
     for path in session.update(cx, |session, _| session.tree.take_image_reloads()) {
-        ImageSource::from(path).remove_asset(cx);
+        let resource = Resource::from(path);
+        // Returns what is cached; one never drawn starts a load that `remove_asset` then drops.
+        if let Some(Ok(image)) = cx.fetch_asset::<ImgResourceLoader>(&resource) {
+            cx.drop_image(image, None);
+        }
+        cx.remove_asset::<ImgResourceLoader>(&resource);
     }
 }
 
@@ -2579,7 +2611,9 @@ mod tests {
             ],
             &[(1, 2), (1, 3), (1, 4), (1, 5), (1, 6)],
         );
-        let mut animated: Vec<NodeId> = animated_nodes(&tree, 1).into_iter().collect();
+        let mut animated: Vec<NodeId> = animated_nodes(&tree, 1, &tree.window_nodes(1))
+            .into_iter()
+            .collect();
         animated.sort_unstable();
         // A spinning Icon and a pulsing div. Not the text (only an Icon can spin), not a still
         // Icon, and not the `transition` div: a transition is drawn by the window's own pass.
@@ -2608,7 +2642,9 @@ mod tests {
         // What a node renders inside a title bar area depends on the area, so only node 4, which
         // is outside it, gets a view of its own.
         assert_eq!(
-            animated_nodes(&tree, 1).into_iter().collect::<Vec<_>>(),
+            animated_nodes(&tree, 1, &tree.window_nodes(1))
+                .into_iter()
+                .collect::<Vec<_>>(),
             vec![4]
         );
     }

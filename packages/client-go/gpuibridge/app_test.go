@@ -46,6 +46,24 @@ func TestHandshakeCompletes(t *testing.T) {
 	}
 }
 
+func TestHelloNamesTheAppAndABadIDFailsTheHandshake(t *testing.T) {
+	hostPath, ok := findHost(t)
+	if !ok {
+		t.Skip("gpui-bridge host not available (build it with `cargo build -p gpui-bridge-host`)")
+	}
+	app, err := NewApp(AppOptions{HostPath: hostPath, Headless: true, App: &AppIdentity{ID: "Acme.Notes", Name: "Notes"}})
+	if err != nil {
+		t.Fatalf("NewApp: %v", err)
+	}
+	if exit := app.Close(); exit.Code == nil || *exit.Code != 0 {
+		t.Fatalf("the host exited with code %v, want 0", exit.Code)
+	}
+	_, err = NewApp(AppOptions{HostPath: hostPath, Headless: true, App: &AppIdentity{ID: "Acme Notes", Name: "Notes"}})
+	if err == nil || !strings.Contains(err.Error(), "invalid_json") {
+		t.Fatalf("a bad app id gave %v, want a handshake error", err)
+	}
+}
+
 func TestValidTreeCommitsWithoutErrors(t *testing.T) {
 	app := mustApp(t)
 	var errors []HostError

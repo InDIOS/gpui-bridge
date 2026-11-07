@@ -35,6 +35,25 @@ The host answers:
 If the version is not supported, the host answers
 `{"type":"error","code":"protocol_mismatch","op":"hello",...}` and exits.
 
+`hello` may name the app, which otherwise runs as `gpui-bridge`:
+
+```json
+{"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes","icon":"C:\\app\\notes.png"}}
+```
+
+- `name` is what Windows shows on the app's system notifications (section 14).
+- `icon` (optional): an image file (PNG, ICO) shown with that name. A relative path is taken
+  from the host's working directory; the host stores the absolute one in `HKCU` under the id
+  (`IconUri`), so the file must stay where it is. A missing file is a warning on stderr. Without
+  `icon`, an icon stored by an earlier run is removed.
+- `id` is the Windows AppUserModelID: it also groups the app's windows on the taskbar. 1 to 128
+  characters, no spaces or `\`; a dotted name such as `Company.App` is the convention. Keep it
+  the same across runs: Windows remembers notification settings per id.
+- Only the first `hello` names the app; `app` in a repeated one is ignored. With `--no-window`
+  it is validated and nothing is applied.
+- A `hello` the host cannot read (a bad `app`, a missing `protocol`) is answered with
+  `{"type":"error","code":"invalid_json","op":"hello",...}` and the host exits.
+
 Before the handshake, the host ignores everything that is not `hello` and does not answer
 (it only logs a warning to stderr). Until the version is agreed, no other message can be
 interpreted safely.
@@ -465,8 +484,9 @@ warning on stderr (once per class).
 - **Animations** (loop while the class is present): `animate-spin` turns an `Icon` once per
   second (it is ignored on other node types, which cannot rotate); `animate-pulse` takes any
   node's opacity from 1 to 0.5 and back every 2 seconds. The host only redraws while
-  something moves, at most 60 times a second, and a node that loops is drawn by a pass of its
-  own, so it does not rebuild the nodes around it on every frame.
+  something moves: a loop at 30 frames a second, a `transition` at up to 60. Each of those
+  frames redraws the whole window, so a loop in a window of thousands of nodes costs CPU for as
+  long as it runs (2 000 nodes and one spinner: about a quarter of a core).
 - **Theme colors** (gpui-component theme colors, not the Tailwind palette): `bg-{color}`,
   `text-{color}` and `border-{color}`, where `{color}` is one of `background`, `foreground`,
   `primary`, `primary-foreground`, `secondary`, `secondary-foreground`, `muted`,
@@ -771,7 +791,7 @@ where the `Dialog` sits in the tree. Put the `Dialog` anywhere in its window's t
 - `id`: a click on the toast sends `{"type":"notification","id":...,"window":...}`, and a new
   toast with the same `id` replaces the previous one.
 - `system: true` also posts it to the Windows notification center, where it shows under the
-  app name `gpui-bridge` (the host registers that identity; apps cannot name it yet). With no
+  app name set by `hello` (section 2), `gpui-bridge` if it set none. With no
   window open (a tray app), it goes to the notification center only; a click on it is not
   reported, and the host removes it from the center when it exits. With a window open, each
   one logs a few `RefCell already borrowed` errors on stderr: the Windows toast call delivers

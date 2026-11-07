@@ -114,9 +114,18 @@ export interface ThemeConfig {
 /** Node props on the wire. In `setProps`, a `null` value removes the prop. */
 export type Props = Record<string, unknown>;
 
+/** The app's own name for the system (`hello`): Windows shows `name` and `icon` on system notifications. */
+export interface AppIdentity {
+  /** Windows AppUserModelID: up to 128 characters, no spaces or `\`, e.g. `"Acme.Notes"`. */
+  id: string;
+  name: string;
+  /** Image file shown on the app's system notifications (PNG, ICO…). */
+  icon?: string;
+}
+
 /** Messages from the client (host stdin). */
 export type ClientMessage =
-  | { op: "hello"; protocol: number }
+  | { op: "hello"; protocol: number; app?: AppIdentity }
   | {
       op: "window";
       id?: WindowId;

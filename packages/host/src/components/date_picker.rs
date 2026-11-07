@@ -5,7 +5,7 @@
 //! The crate fixes the mode when the state is built, so `range` is a prop of its own and a
 //! change rebuilds the state. A range is reported once both ends are picked.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::component::Disableable;
 use gpui_kit::component::calendar::Date;
@@ -18,7 +18,7 @@ use super::{prop_bool, prop_str, value_chosen};
 use crate::Session;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 pub struct DatePickerSlot {
     state: Entity<DatePickerState>,
@@ -40,10 +40,10 @@ pub fn parse(value: &str, range: bool) -> Option<Date> {
     (start <= end).then_some(Date::Range(Some(start), Some(end)))
 }
 
-pub fn snapshot(tree: &Tree, members: &HashSet<NodeId>) -> DatePickerSnapshot {
+pub fn snapshot(tree: &Tree, members: &WindowNodes) -> DatePickerSnapshot {
     DatePickerSnapshot(
-        tree.nodes()
-            .filter(|(id, node)| node.node_type == NodeType::DatePicker && members.contains(id))
+        members
+            .of(tree, NodeType::DatePicker)
             .map(|(id, node)| {
                 let range = prop_bool(node, "range");
                 let empty = if range {

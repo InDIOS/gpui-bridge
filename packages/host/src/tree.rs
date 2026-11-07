@@ -12,6 +12,36 @@ use crate::protocol::{
 };
 use crate::schema::NodeType;
 
+/// One window's nodes from a single walk of its tree: which belong to it, those of each type, and
+/// those whose `class` names an animation. A window builds it once per sync, so each component
+/// reads only its own type instead of scanning the whole tree.
+#[derive(Debug, Default)]
+pub struct WindowNodes {
+    members: HashSet<NodeId>,
+    by_type: HashMap<NodeType, Vec<NodeId>>,
+    /// Nodes with an `animate-*` class, in no order.
+    pub animated: Vec<NodeId>,
+}
+
+impl WindowNodes {
+    pub fn contains(&self, id: NodeId) -> bool {
+        self.members.contains(&id)
+    }
+
+    /// This window's nodes of one type, in no order.
+    pub fn of<'a>(
+        &'a self,
+        tree: &'a Tree,
+        node_type: NodeType,
+    ) -> impl Iterator<Item = (NodeId, &'a Node)> + 'a {
+        self.by_type
+            .get(&node_type)
+            .into_iter()
+            .flatten()
+            .filter_map(|&id| Some((id, tree.node(id)?)))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub node_type: NodeType,
@@ -52,13 +82,15 @@ pub struct WindowSpec {
 }
 
 /// The system tray icon (PROTOCOL.md section 11). `revision` grows with every `tray` message,
-/// so the host applies it again even when nothing changed (the icon file or a native check mark may have).
+/// so the host applies it again even when nothing changed (a native check mark may have);
+/// `icon_revision` only with those that carry `icon`, the only ones that read the file again.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TraySpec {
     pub icon: Option<String>,
     pub tooltip: Option<String>,
     pub menu: Option<Value>,
     pub revision: u64,
+    pub icon_revision: u64,
 }
 
 /// The theme is app-wide in gpui-component: any `window` message sets it for every window.
@@ -86,6 +118,9 @@ pub struct Tree {
     pending: Vec<ClientMessage>,
     /// Number of commits applied, so each window view applies `value_writes` once.
     commits: u64,
+    /// Bumped by every change that may alter what `window_nodes` returns, so a window walks its
+    /// tree again only then. Live data (a `setProps` that leaves `class` alone) does not bump it.
+    shape: u64,
     /// Input nodes whose `value` the client imposed in the last commit (PROTOCOL.md section 7),
     /// and divs whose `class` it set (a dragged div goes back to its classes, section 8).
     value_writes: Vec<NodeId>,
@@ -101,10 +136,6 @@ pub struct Tree {
 impl Tree {
     pub fn node(&self, id: NodeId) -> Option<&Node> {
         self.nodes.get(&id)
-    }
-
-    pub fn nodes(&self) -> impl Iterator<Item = (NodeId, &Node)> {
-        self.nodes.iter().map(|(&id, node)| (id, node))
     }
 
     pub fn windows(&self) -> &BTreeMap<WindowId, WindowSpec> {
@@ -166,6 +197,10 @@ impl Tree {
         self.commits
     }
 
+    pub fn shape(&self) -> u64 {
+        self.shape
+    }
+
     /// Forgets a window; `false` if it did not exist.
     pub fn close_window(&mut self, id: WindowId) -> bool {
         self.windows.remove(&id).is_some()
@@ -181,6 +216,24 @@ impl Tree {
             }
         }
         ids
+    }
+
+    /// One walk over the node and its descendants (see `WindowNodes`).
+    pub fn window_nodes(&self, root: NodeId) -> WindowNodes {
+        let mut nodes = WindowNodes::default();
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(&id).filter(|_| nodes.members.insert(id)) else {
+                continue;
+            };
+            nodes.by_type.entry(node.node_type).or_default().push(id);
+            let class = node.props.get("class").and_then(Value::as_str);
+            if class.is_some_and(|class| class.contains("animate-")) {
+                nodes.animated.push(id);
+            }
+            stack.extend(&node.children);
+        }
+        nodes
     }
 
     /// Whether the node subscribed to `event` (events are opt-in).
@@ -239,6 +292,9 @@ impl Tree {
 
     /// Updates a prop from host-side interaction (e.g. a checkbox toggled by the user).
     pub fn set_host_prop(&mut self, id: NodeId, key: &str, value: Value) {
+        if key == "class" {
+            self.shape += 1;
+        }
         if let Some(node) = self.nodes.get_mut(&id) {
             node.props.insert(key.into(), value);
         }
@@ -290,6 +346,12 @@ impl Tree {
         }
     }
 
+    /// Removes the node's `data` file, and the image GPUI decoded from it: each node has a path of
+    /// its own, so nothing else would ever drop that image from GPUI's cache.
+    fn forget_image_data(&mut self, id: NodeId) {
+        self.image_reloads.extend(self.image_data.remove(id));
+    }
+
     /// Decodes an `Image`'s or `Attachment`'s `data` into its own file, or removes that file when
     /// `data` is `null` or empty. The value is checked to be a string before this runs; base64 is
     /// checked here so an invalid payload never reaches the error message (it can be megabytes
@@ -303,13 +365,9 @@ impl Tree {
         let Some(value) = props.get("data") else {
             return Ok(());
         };
-        if value.is_null() {
-            self.image_data.remove(id);
-            return Ok(());
-        }
         let encoded = value.as_str().unwrap_or_default();
         if encoded.is_empty() {
-            self.image_data.remove(id);
+            self.forget_image_data(id);
             return Ok(());
         }
         let bytes = image_data::decode(encoded).map_err(|_| {
@@ -327,6 +385,9 @@ impl Tree {
     }
 
     fn apply(&mut self, op: ClientMessage) -> Result<(), ProtocolError> {
+        if !matches!(&op, ClientMessage::SetProps { props, .. } if !props.contains_key("class")) {
+            self.shape += 1;
+        }
         let op_name = op.op_name();
         let fail = |code, message: String| ProtocolError {
             code,
@@ -437,6 +498,7 @@ impl Tree {
                     log::warn!("Tray icon not found: {icon}");
                 }
                 let tray = self.tray.get_or_insert_default();
+                tray.icon_revision += u64::from(icon.is_some());
                 tray.icon = icon.or(tray.icon.take());
                 tray.tooltip = tooltip.or(tray.tooltip.take());
                 tray.menu = menu.or(tray.menu.take());
@@ -646,7 +708,7 @@ impl Tree {
                     self.closed_panels.remove(&id);
                     if let Some(node) = self.nodes.remove(&id) {
                         if node.node_type.takes_image() {
-                            self.image_data.remove(id);
+                            self.forget_image_data(id);
                         }
                         stack.extend(node.children);
                     }
@@ -820,6 +882,81 @@ mod tests {
 
     fn children(tree: &Tree, id: NodeId) -> Vec<NodeId> {
         tree.node(id).unwrap().children.clone()
+    }
+
+    #[test]
+    fn window_nodes_holds_one_subtree_by_type() {
+        let mut tree = Tree::default();
+        let errors = run(
+            &mut tree,
+            vec![
+                create(1, "div"),
+                create(2, "Input"),
+                json!({"op": "create", "id": 3, "type": "div", "props": {"class": "animate-pulse"}}),
+                create(4, "Input"),
+                create(5, "div"),
+                append(1, 2),
+                append(1, 3),
+                append(3, 4),
+                // Not under 1: another window's nodes.
+                create(6, "Input"),
+                append(5, 6),
+            ],
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+        let nodes = tree.window_nodes(1);
+        let mut inputs: Vec<NodeId> = nodes.of(&tree, NodeType::Input).map(|(id, _)| id).collect();
+        inputs.sort();
+        assert_eq!(inputs, [2, 4]);
+        assert_eq!(nodes.of(&tree, NodeType::Select).count(), 0);
+        assert!(nodes.contains(4) && !nodes.contains(5) && !nodes.contains(6));
+        assert_eq!(nodes.animated, [3]);
+    }
+
+    #[test]
+    fn only_a_tray_message_with_an_icon_reads_the_file_again() {
+        let mut tree = Tree::default();
+        let tray = |tree: &mut Tree, props: serde_json::Value| {
+            let mut op = json!({"op": "tray"});
+            op.as_object_mut()
+                .unwrap()
+                .extend(props.as_object().unwrap().clone());
+            run(tree, vec![op]);
+            let spec = tree.tray().unwrap();
+            (spec.revision, spec.icon_revision)
+        };
+        assert_eq!(
+            tray(&mut tree, json!({"icon": "a.png", "tooltip": "x"})),
+            (1, 1)
+        );
+        // The tooltip changes and the icon stays: applied again, the file not read.
+        assert_eq!(tray(&mut tree, json!({"tooltip": "y"})), (2, 1));
+        assert_eq!(tree.tray().unwrap().icon.as_deref(), Some("a.png"));
+        // The same path again: read again, the file may have changed.
+        assert_eq!(tray(&mut tree, json!({"icon": "a.png"})), (3, 2));
+    }
+
+    #[test]
+    fn shape_moves_unless_a_set_props_leaves_class_alone() {
+        let mut tree = Tree::default();
+        run(
+            &mut tree,
+            vec![create(1, "div"), create(2, "text"), append(1, 2)],
+        );
+        let shape = tree.shape();
+        run(
+            &mut tree,
+            vec![json!({"op": "setProps", "id": 2, "props": {"content": "tick"}})],
+        );
+        assert_eq!(tree.shape(), shape, "live data keeps the window's walk");
+        run(
+            &mut tree,
+            vec![json!({"op": "setProps", "id": 2, "props": {"class": "animate-pulse"}})],
+        );
+        assert!(tree.shape() > shape, "a class can start a loop");
+        let shape = tree.shape();
+        run(&mut tree, vec![json!({"op": "remove", "id": 2})]);
+        assert!(tree.shape() > shape);
     }
 
     #[test]
@@ -1166,14 +1303,15 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"world");
         assert_eq!(tree.take_image_reloads(), vec![path.clone()]);
 
-        // Empty or null `data` goes back to `src` (if any) and removes the file.
+        // Empty or null `data` goes back to `src` (if any), removes the file and drops the image
+        // GPUI decoded from it.
         run(
             &mut tree,
             vec![json!({"op": "setProps", "id": 1, "props": {"data": null}})],
         );
         assert!(!path.exists());
         assert_eq!(tree.image_path(1), None);
-        assert_eq!(tree.take_image_reloads(), Vec::<PathBuf>::new());
+        assert_eq!(tree.take_image_reloads(), vec![path.clone()]);
 
         // Removing the node removes its file too.
         run(
@@ -1183,6 +1321,7 @@ mod tests {
         let path = tree.image_path(1).expect("the node has a file again");
         run(&mut tree, vec![json!({"op": "remove", "id": 1})]);
         assert!(!path.exists());
+        assert_eq!(tree.take_image_reloads(), vec![path]);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Text inputs keep their content in the host (PROTOCOL.md section 7): one retained state per
 //! `Input` (single line) or `Textarea` (multi-line) node, synced after each commit.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gpui_kit::base::input::{InputBaseState, InputModeKind};
 use gpui_kit::component::Disableable;
@@ -16,7 +16,7 @@ use crate::Session;
 use crate::a11y;
 use crate::protocol::NodeId;
 use crate::schema::NodeType;
-use crate::tree::{Node, Tree};
+use crate::tree::{Node, Tree, WindowNodes};
 
 /// How the state of a text node of mode `M` is created.
 pub trait TextKind: InputModeKind {
@@ -67,19 +67,18 @@ pub struct InputSnapshot {
 pub fn snapshot(
     tree: &Tree,
     node_type: NodeType,
-    members: &HashSet<NodeId>,
+    members: &WindowNodes,
     value_writes: &[NodeId],
 ) -> InputSnapshot {
     let text = |node: &Node, key| prop_str(node, key).unwrap_or("").to_owned();
     InputSnapshot {
-        inputs: tree
-            .nodes()
-            .filter(|(id, node)| node.node_type == node_type && members.contains(id))
+        inputs: members
+            .of(tree, node_type)
             .map(|(id, node)| (id, text(node, "placeholder"), text(node, "value")))
             .collect(),
         values: value_writes
             .iter()
-            .filter(|id| members.contains(id))
+            .filter(|&&id| members.contains(id))
             .filter_map(|&id| {
                 tree.node(id)
                     .filter(|node| node.node_type == node_type)

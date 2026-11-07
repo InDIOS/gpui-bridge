@@ -1,0 +1,5 @@
+# Section 2: hello may name the app; a repeated hello may carry another name, which is ignored.
+> {"op":"hello","protocol":1,"app":{"id":"Acme.Notes","name":"Notes"}}
+< {"type":"ready","protocol":1}
+> {"op":"hello","protocol":1,"app":{"id":"Acme.Other","name":"Other"}}
+< {"type":"ready","protocol":1}
