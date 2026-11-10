@@ -40,7 +40,9 @@ window only on Windows so far.
 
 `class` is a Python keyword: write `class_="..."`, and the client strips the trailing underscore.
 Props and events are keyword arguments, and every node has `append`, `insert_before`, `set`,
-`remove`, `on` and `off`.
+`remove`, `on` and `off`. `app.create("Badge", label="New")` makes a node of any host type,
+including one newer than this client; a type the host does not know comes back to `on_error`
+as `unknown_type`.
 
 ## Host lookup
 

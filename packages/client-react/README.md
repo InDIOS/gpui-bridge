@@ -33,6 +33,10 @@ package for the machine installing it (Windows x64, macOS arm64 or Linux x64 tod
 Host lookup is the one from `gpui-bridge`: `createApp` options, `$GPUI_BRIDGE_HOST`, the asset of
 the platform package, then a Cargo build in a checkout. `render` accepts the same host options.
 
+A host type newer than this package works as a string element,
+`createElement("Badge", { label: "New" })`; a type the host does not know comes back as an
+`error` event with code `unknown_type`, not as a throw.
+
 ## Links
 
 - [gpui-bridge](https://www.npmjs.com/package/gpui-bridge), the underlying client.

@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { useState } from "react";
+import { createElement, useState } from "react";
 import type { App, ClientMessage, DiffSelection, HostError, QuestionnaireAnswer } from "gpui-bridge";
 import { Accordion, AccordionItem, Alert, AlertDialog, Attachment, Badge, Bubble, Button, Calendar, Canvas, Carousel, Chart, Checkbox, Clipboard, Collapsible, ColorPicker, Combobox, Command, DatePicker, DescriptionList, Dialog, DialogFooter, Diff, Div, Dock, DockPanel, DropdownButton, Empty, Field, Form, GroupBox, HoverCard, Icon, Image, Input, InputGroup, Kbd, Label, List, ListItem, Marker, MenuBar, Message, MessageFooter, MessageHeader, MessageScroller, NumberInput, Pagination, Popover, Progress, Questionnaire, RadioGroup, Rating, render, Resizable, Select, Settings, Sheet, Shimmer, Sidebar, Skeleton, Slider, Spinner, StatusBar, StatusBarLeft, StatusBarRight, Stepper, Switch, Table, Tab, Tabs, Tag, Text, Textarea, TimeField, Toggle, Toolbar, Tray, Tree, VirtualList, Window } from "../src/index.js";
 
@@ -31,6 +31,14 @@ function created(sent: ClientMessage[], type: string) {
 function emit(app: App, message: { id: number; event: string; value?: string | number | null | string[] | QuestionnaireAnswer | QuestionnaireAnswer[] | { column: string; direction: "asc" | "desc" | "none" } | { x: number; y: number } | { key: string; value: boolean | string | number }; checked?: boolean }) {
   app.handleMessage({ type: "event", ...message });
 }
+
+test("an element type this client does not list goes to the host as is", async () => {
+  const { app, sent, errors } = await renderRecorded(<Div>{createElement("Future", { label: "x" })}</Div>);
+  assert.deepEqual(created(sent, "Future")[0].props, { label: "x" });
+  await app.close();
+  // The append of the rejected node adds an unknown_node after it.
+  assert.equal(errors[0]?.code, "unknown_type");
+});
 
 test("Image takes a path or base64 bytes", async () => {
   const { app, sent, errors } = await renderRecorded(
