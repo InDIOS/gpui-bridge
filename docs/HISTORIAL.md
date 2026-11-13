@@ -2659,3 +2659,26 @@ bien tras el arreglo de la fuga (Fase 63).
   lectura de archivos en el código del host fuera de lo anterior.
 - **Pruebas:** `cargo test` (84, una nueva de las revisiones de la bandeja), clippy limpio,
   `examples/tray.ts` en ventana real sin pánicos.
+
+### Fase 65 — gpui-kit 0.9.1 (2026-11-12)
+
+Parche de gpui-kit (<https://github.com/longbridge/gpui-kit/releases/tag/v0.9.1>). Hecho en `dev`,
+sin rama aparte.
+
+- **Subida:** gpui-kit, gpui-component y gpui-base 0.9.0 → 0.9.1, gpui-pre 0.3.11 → 0.3.12. Solo
+  `Cargo.toml` y el lockfile; compiló sin cambios de código.
+- **Atajos del host, ninguno se quita** (leída la fuente de 0.9.1): `highlight_ranges` sigue
+  buscando con los offsets del texto en minúsculas y cortando el original (K de Kelvin); `Tree`
+  sigue reteniendo su `TreeState` en el closure de cada fila (Fase 63); el Slider de 0.9.1 ya no
+  divide por cero con rango vacío, pero la guarda `max > min` sigue porque el `clamp` del host
+  entra en pánico sin ella; la Table del host no nombraba filas a mano. Solo cambiaron
+  comentarios (`basic.rs`, `slider.rs`, `churn.mjs`, `benchmarks/README.md`).
+- **Ventana real** (host debug, capturas con PrintWindow, teclas por UI Automation, clics
+  guionizados): Input multilínea con Enter y el cursor en su sitio, Slider por teclado, Table
+  (orden y selección), menú de barra y contextual, y el chat (streaming pegado al final, relleno
+  arriba y abajo de la lista, botón «al final»). Sin pánicos ni errores en el log. Aparte: los
+  botones de la barra de menú no exponen ningún patrón UIA (no se miró si ya pasaba con 0.9.0).
+- **Fuera:** las APIs nuevas de 0.9.1 (GridLayout, `ColumnFixed::Right`, `Toolbar::axis`…) quedan
+  para M22, cuando una app las pida.
+- **Pruebas:** host 84 + `conformance` + `no_window`, clippy limpio; Node 33, React 30, Python 34,
+  Go en verde. `PROTOCOL_VERSION` sigue en 1.

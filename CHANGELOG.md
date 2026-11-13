@@ -3,6 +3,10 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
+## Unreleased
+
+- gpui-kit 0.9.1 (gpui-pre 0.3.12), with no change in behaviour.
+
 ## 0.6.0 — 2026-11-06
 
 Apps name themselves on system notifications, and a faster, leaner host; `PROTOCOL_VERSION`
