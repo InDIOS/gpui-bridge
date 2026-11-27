@@ -3,11 +3,17 @@
 Versions are lockstep across the host and the three clients; the protocol has its own version
 (`PROTOCOL_VERSION`, currently 1).
 
-## Unreleased
+## 0.7.0 — 2026-11-27
 
-- gpui-kit 0.9.1 (gpui-pre 0.3.12), with no change in behaviour.
-- gpui-kit 0.11.0 (gpui-pre 0.3.14). The host uses `jiff` instead of `chrono` for dates and
-  times; the wire formats (`YYYY-MM-DD`, `HH:MM`, `HH:MM:SS`) do not change.
+The host moves to gpui-kit 0.11.0, and Python and React create any node type the host knows;
+`PROTOCOL_VERSION` stays 1.
+
+- Python has a public `app.create(type, /, **props)`, and React builds any string element with
+  `app.create`, so a node type the host adds later works from both without a client update (Node
+  and Go already could). An element type the host does not know comes back as an `unknown_type`
+  error instead of a client exception.
+- gpui-kit 0.11.0 (from 0.9.0, gpui-pre 0.3.14). The host uses `jiff` instead of `chrono` for
+  dates and times; the wire formats (`YYYY-MM-DD`, `HH:MM`, `HH:MM:SS`) do not change.
 - `Slider` and `Tabs` take gpui-kit's own Tab stop and keys instead of the host's, which left
   them with two stops. In `Tabs` the arrow keys now move the focus and Enter or Space chooses
   the tab (before, an arrow chose it); `Slider` also takes PageUp and PageDown. The `a11y.label`
@@ -15,6 +21,8 @@ Versions are lockstep across the host and the three clients; the protocol has it
 - A `Table` no longer scrolls to a `selected` row set by the app (arrow keys still do).
 - On quit the host waits for gpui to remove the system notifications shown with no window open
   (gpui-pre 0.3.14 makes that removal a task, which other platforms may run later).
+- Known issue, unchanged in gpui-component 0.11.0: each `Tree` node created and removed keeps
+  ~2 KB. Apps that create and drop many Trees should reuse them.
 
 ## 0.6.0 — 2026-11-06
 
