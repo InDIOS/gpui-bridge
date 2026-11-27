@@ -232,6 +232,11 @@ class App:
         self._write([hello])
         self._handshake()
 
+    def create(self, type: str, /, **props) -> Node:
+        """A node of any host type, including ones newer than this client. A type the host
+        does not know comes back through `on_error` as `unknown_type`."""
+        return self._create(type, props)
+
     def div(self, **props) -> Node:
         return self._create("div", props)
 

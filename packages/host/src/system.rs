@@ -72,10 +72,15 @@ fn notify_without_window(id: Option<String>, title: Option<String>, message: Str
         // A toast still held when GPUI tears down crashes the host (0xC0000005); a window's own
         // toasts are retracted when it closes, these ones when the app quits.
         cx.on_app_quit(|cx| {
-            for tag in std::mem::take(&mut cx.global_mut::<WindowlessToasts>().tags) {
-                cx.dismiss_system_notification(&tag);
+            let dismissals: Vec<_> = std::mem::take(&mut cx.global_mut::<WindowlessToasts>().tags)
+                .iter()
+                .map(|tag| cx.dismiss_system_notification(tag))
+                .collect();
+            async move {
+                for dismissal in dismissals {
+                    dismissal.await;
+                }
             }
-            async {}
         })
         .detach();
     }

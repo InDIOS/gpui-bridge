@@ -68,7 +68,7 @@ Tables, Lists, Charts, data Images…) is created and removed every 200 ms for N
 host's working set and private memory printed every few seconds. After the first seconds the
 numbers must stay flat; a steady climb is a leak. A third argument picks the node types
 (`input,image`), which is how a leak is narrowed down. Measured 2026-11-06: ~92 MB flat over
-2.5 minutes for every type but `Tree` (gpui-component 0.9.0 never frees a `TreeState`).
+2.5 minutes for every type but `Tree` (gpui-component 0.9.0, and still 0.11.0, never frees a `TreeState`).
 
 **`payload.mjs` + `run.ps1`** — one large value in one protocol line, and the host's working set and
 peak working set after it was applied:

@@ -3,9 +3,9 @@
 
 use std::collections::HashMap;
 
-use chrono::{NaiveDate, Weekday};
 use gpui_kit::component::calendar::{Calendar, CalendarEvent, CalendarState, Date};
 use gpui_kit::*;
+use jiff::civil::{Date as Day, Weekday};
 
 use super::value_chosen;
 use crate::Session;
@@ -26,11 +26,11 @@ impl CalendarSlot {
 }
 
 /// Each Calendar among `members`: the day to show and how many months.
-pub struct CalendarSnapshot(Vec<(NodeId, Option<NaiveDate>, usize)>);
+pub struct CalendarSnapshot(Vec<(NodeId, Option<Day>, usize)>);
 
 /// A `value` of the form `YYYY-MM-DD`; anything else is no day.
-pub fn parse_date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
+pub fn parse_date(value: &str) -> Option<Day> {
+    Day::strptime("%Y-%m-%d", value).ok()
 }
 
 pub fn snapshot(tree: &Tree, members: &WindowNodes) -> CalendarSnapshot {
@@ -122,8 +122,8 @@ pub fn build(node: &Node, slot: &CalendarSlot) -> Calendar {
         .get("weekStartsOn")
         .and_then(serde_json::Value::as_str)
     {
-        Some("monday") => Weekday::Mon,
-        _ => Weekday::Sun,
+        Some("monday") => Weekday::Monday,
+        _ => Weekday::Sunday,
     };
     Calendar::new(&slot.state)
         .number_of_months(months)

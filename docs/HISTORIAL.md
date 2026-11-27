@@ -2659,3 +2659,66 @@ bien tras el arreglo de la fuga (Fase 63).
   lectura de archivos en el código del host fuera de lo anterior.
 - **Pruebas:** `cargo test` (84, una nueva de las revisiones de la bandeja), clippy limpio,
   `examples/tray.ts` en ventana real sin pánicos.
+
+### Fase 65 — gpui-kit 0.9.1 (2026-11-12)
+
+Parche de gpui-kit (<https://github.com/longbridge/gpui-kit/releases/tag/v0.9.1>). Hecho en `dev`,
+sin rama aparte.
+
+- **Subida:** gpui-kit, gpui-component y gpui-base 0.9.0 → 0.9.1, gpui-pre 0.3.11 → 0.3.12. Solo
+  `Cargo.toml` y el lockfile; compiló sin cambios de código.
+- **Atajos del host, ninguno se quita** (leída la fuente de 0.9.1): `highlight_ranges` sigue
+  buscando con los offsets del texto en minúsculas y cortando el original (K de Kelvin); `Tree`
+  sigue reteniendo su `TreeState` en el closure de cada fila (Fase 63); el Slider de 0.9.1 ya no
+  divide por cero con rango vacío, pero la guarda `max > min` sigue porque el `clamp` del host
+  entra en pánico sin ella; la Table del host no nombraba filas a mano. Solo cambiaron
+  comentarios (`basic.rs`, `slider.rs`, `churn.mjs`, `benchmarks/README.md`).
+- **Ventana real** (host debug, capturas con PrintWindow, teclas por UI Automation, clics
+  guionizados): Input multilínea con Enter y el cursor en su sitio, Slider por teclado, Table
+  (orden y selección), menú de barra y contextual, y el chat (streaming pegado al final, relleno
+  arriba y abajo de la lista, botón «al final»). Sin pánicos ni errores en el log. Aparte: los
+  botones de la barra de menú no exponen ningún patrón UIA (no se miró si ya pasaba con 0.9.0).
+- **Fuera:** las APIs nuevas de 0.9.1 (GridLayout, `ColumnFixed::Right`, `Toolbar::axis`…) quedan
+  para M22, cuando una app las pida.
+- **Pruebas:** host 84 + `conformance` + `no_window`, clippy limpio; Node 33, React 30, Python 34,
+  Go en verde. `PROTOCOL_VERSION` sigue en 1.
+
+### Fase 66 — gpui-kit 0.11.0 (2026-11-27)
+
+Dos versiones menores con cambios incompatibles
+(<https://github.com/longbridge/gpui-kit/releases/tag/v0.10.0>,
+<https://github.com/longbridge/gpui-kit/releases/tag/v0.11.0>). Hecho en `dev`, sin rama aparte
+(M23).
+
+- **Subida:** gpui-kit, gpui-component y gpui-base 0.9.1 → 0.11.0, gpui-pre 0.3.12 → 0.3.14.
+  `gpui-fast` entra al lockfile como backend opcional y no se compila.
+- **Arreglos de compilación:** Calendar, DatePicker y TimeField toman `jiff::civil::Date`/`Time`
+  en lugar de chrono, así que el host cambia `chrono` por `jiff = "1.0"` (mismas cadenas de
+  formato con `strptime`/`strftime`; `Weekday::Monday`/`Sunday`). `WindowBounds::centered` pide
+  la pantalla (`None`). `dismiss_system_notification` devuelve un `Task`: el cierre de la app
+  espera las retiradas de las notificaciones sin ventana en lugar de soltarlas (en Windows ya
+  eran síncronas; en otros sistemas soltar el `Task` podía cancelarlas).
+- **Slider y Tabs vuelven al crate:** desde 0.10 traen su propia parada de Tab y teclas, y con
+  las del host (Fase 43) cada uno quedaba con dos paradas y dos nodos para el lector.
+  `components/keyboard.rs` queda solo para Rating y Pagination. Cambios visibles: en Tabs las
+  flechas mueven el foco y Enter/Espacio eligen (antes las flechas elegían), Home/End van a la
+  primera y la última pestaña habilitada; el Slider gana PageUp/PageDown (diez pasos); el
+  `a11y.label` de un Tabs nombra un `group` alrededor de la barra. PROTOCOL §16 y el párrafo de
+  Tabs reescritos.
+- **Revisado y sin cambios:** Table ya no desplaza a la vista la fila de un `selected` puesto por
+  el cliente (las flechas sí); PROTOCOL nunca lo prometió. Button expone `expanded` solo si se
+  pide, y el host no lo pide. Siguen los atajos de la Fase 65: Kelvin en `highlight_ranges` y la
+  fuga de `TreeState` (comentarios a 0.11.0), y la guarda `max > min` del Slider.
+- **Ventana real** (host debug, UIA y teclas/clics por PostMessage sin tocar el mouse, capturas
+  con PrintWindow): `forms` (Slider con una parada y sus teclas, TimeField y DatePicker devuelven
+  `10:32` y `2024-08-14`), `components` (Tabs con una parada, flechas y Enter; Calendar con lunes
+  primero; Rating y Pagination con las teclas del host), `data` (Table: orden y selección),
+  `menus` (barra y contextual), `chat` (envío y streaming). Logs sin errores. El usuario
+  confirmó Narrator en Slider y Tabs, y que una notificación del sistema enviada sin ventana
+  desaparece del centro de actividades al salir. Aparte, de antes: un DatePicker/TimeField con
+  `a11y.label` sin `role` no se nombra en UIA (§16 ya pide `group`).
+- **Fuera:** las APIs nuevas de 0.10/0.11 (RTL, movimiento reducido, `highlight_matches`,
+  `TableRow::hover`, `Checkbox::indeterminate`, sugerencias en Input…) quedan para cuando una app
+  las pida, como M22.
+- **Pruebas:** host 84 + `conformance` + `no_window`, clippy limpio; Node 33, React 30, Python 34,
+  Go en verde. `PROTOCOL_VERSION` sigue en 1.

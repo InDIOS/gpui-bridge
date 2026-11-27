@@ -367,9 +367,7 @@ impl RootView {
             .collect();
         let focusable: HashSet<NodeId> = [
             NodeType::Div,
-            NodeType::Slider,
             NodeType::Rating,
-            NodeType::Tabs,
             NodeType::Pagination,
             NodeType::AccordionItem,
         ]
@@ -1259,9 +1257,7 @@ impl RenderCx<'_> {
         // button) and an InputGroup (a named group), so a wrapper would repeat them.
         let accessibility = match node.node_type {
             NodeType::Slider | NodeType::Clipboard | NodeType::InputGroup => None,
-            NodeType::Rating | NodeType::Pagination => {
-                Some(keyboard::spec(self.tree, node, accessibility))
-            }
+            NodeType::Rating | NodeType::Pagination => Some(keyboard::spec(node, accessibility)),
             _ => accessibility,
         };
         match accessibility {
@@ -1326,12 +1322,10 @@ impl RenderCx<'_> {
         client: Option<a11y::A11y>,
     ) -> AnyElement {
         let element = match node.node_type {
-            NodeType::Slider => self.slider_node(id, node, &[]),
-            NodeType::Tabs => self.tabs_node(id, node, &[], None),
             NodeType::Rating => self.component(id, basic::rating(id, node, self.session), &[]),
             _ => self.component(id, basic::pagination(id, node, self.session), &[]),
         };
-        let spec = keyboard::spec(self.tree, node, client);
+        let spec = keyboard::spec(node, client);
         let wrapper = if self.in_control {
             div().occlude()
         } else {
@@ -1347,7 +1341,7 @@ impl RenderCx<'_> {
         )
         .focus(move |style| style.shadow(vec![ring]))
         .on_key_down(move |event: &KeyDownEvent, window, cx| {
-            // A key bubbling from a focused button inside (Pagination's, a Tab's) is that button's:
+            // A key bubbling from a focused button inside (Pagination's) is that button's:
             // taking it would rebuild the buttons and drop the focus to the window.
             if !own.is_focused(window) {
                 return;

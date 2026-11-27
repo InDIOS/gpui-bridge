@@ -90,6 +90,20 @@ class ClientTest(unittest.TestCase):
             ],
         )
 
+    def test_create_takes_any_type_and_the_host_judges_it(self):
+        app = App(headless=True)
+        errors = []
+        app.on_error = errors.append
+
+        badge = app.create("Badge", label="New")
+        app.create("Future", type="x")  # `type` stays a prop
+        app.commit()
+
+        app.close()
+        self.assertEqual(badge.type, "Badge")
+        self.assertEqual([e.code for e in errors], ["unknown_type"])
+        self.assertIn("Future", errors[0].message)
+
     def test_events_are_dispatched_with_payloads(self):
         app = App(headless=True)
         seen = []

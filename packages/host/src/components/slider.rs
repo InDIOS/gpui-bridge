@@ -30,7 +30,7 @@ pub fn snapshot(tree: &Tree, members: &WindowNodes) -> SliderSnapshot {
             .of(tree, NodeType::Slider)
             .map(|(id, node)| {
                 let min = prop_f32(node, "min").unwrap_or(0.);
-                // A `max` not above `min` would divide by zero in the thumb position.
+                // `max` above `min`, or the `clamp` below panics.
                 let max = prop_f32(node, "max")
                     .unwrap_or(100.)
                     .max(min + f32::EPSILON);
