@@ -7,10 +7,10 @@
 
 use std::collections::HashMap;
 
-use chrono::NaiveTime;
 use gpui_kit::component::Disableable;
 use gpui_kit::component::time_field::{TimeField, TimeFieldEvent, TimeFieldState, TimePrecision};
 use gpui_kit::*;
+use jiff::civil::Time;
 use serde_json::Value;
 
 use super::{prop_bool, prop_str, value_chosen};
@@ -27,15 +27,15 @@ pub struct TimeFieldSlot {
 }
 
 /// Each TimeField among `members`: the time to show and the precision.
-pub struct TimeFieldSnapshot(Vec<(NodeId, NaiveTime, bool)>);
+pub struct TimeFieldSnapshot(Vec<(NodeId, Time, bool)>);
 
 fn format(seconds: bool) -> &'static str {
     if seconds { "%H:%M:%S" } else { "%H:%M" }
 }
 
 /// `HH:MM`, or with `seconds` `HH:MM:SS`.
-pub fn parse(value: &str, seconds: bool) -> Option<NaiveTime> {
-    NaiveTime::parse_from_str(value, format(seconds)).ok()
+pub fn parse(value: &str, seconds: bool) -> Option<Time> {
+    Time::strptime(format(seconds), value).ok()
 }
 
 pub fn snapshot(tree: &Tree, members: &WindowNodes) -> TimeFieldSnapshot {
@@ -77,7 +77,7 @@ pub fn sync<V: 'static>(
                 window,
                 move |_, _, event: &TimeFieldEvent, _, cx| {
                     let TimeFieldEvent::Change(chosen) = event;
-                    let value = chosen.format(format(seconds)).to_string();
+                    let value = chosen.strftime(format(seconds)).to_string();
                     session.update(cx, |session, cx| {
                         let current = session
                             .tree

@@ -211,7 +211,7 @@ fn size_of(spec: &WindowSpec) -> Size<Pixels> {
 fn bounds_of(spec: &WindowSpec, cx: &mut App) -> WindowBounds {
     let size = size_of(spec);
     match (spec.x, spec.y) {
-        (None, None) => WindowBounds::centered(size, cx),
+        (None, None) => WindowBounds::centered(None, size, cx),
         (x, y) => WindowBounds::Windowed(Bounds {
             origin: point(px(x.unwrap_or(0.0)), px(y.unwrap_or(0.0))),
             size,

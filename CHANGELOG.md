@@ -6,6 +6,15 @@ Versions are lockstep across the host and the three clients; the protocol has it
 ## Unreleased
 
 - gpui-kit 0.9.1 (gpui-pre 0.3.12), with no change in behaviour.
+- gpui-kit 0.11.0 (gpui-pre 0.3.14). The host uses `jiff` instead of `chrono` for dates and
+  times; the wire formats (`YYYY-MM-DD`, `HH:MM`, `HH:MM:SS`) do not change.
+- `Slider` and `Tabs` take gpui-kit's own Tab stop and keys instead of the host's, which left
+  them with two stops. In `Tabs` the arrow keys now move the focus and Enter or Space chooses
+  the tab (before, an arrow chose it); `Slider` also takes PageUp and PageDown. The `a11y.label`
+  of a `Tabs` names a group around the bar.
+- A `Table` no longer scrolls to a `selected` row set by the app (arrow keys still do).
+- On quit the host waits for gpui to remove the system notifications shown with no window open
+  (gpui-pre 0.3.14 makes that removal a task, which other platforms may run later).
 
 ## 0.6.0 — 2026-11-06
 

@@ -5,10 +5,10 @@ edition.workspace = true
 
 [dependencies]
 base64 = "0.22"
-chrono = "0.4"
+jiff = "1.0"
 env_logger = "0.11.11"
 futures = "0.3"
-gpui-kit = "0.9.1"
+gpui-kit = "0.11.0"
 image = { version = "0.25", default-features = false }
 log = "0.4.34"
 serde = { version = "1.0.229", features = ["derive"] }

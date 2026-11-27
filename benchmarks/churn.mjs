@@ -39,7 +39,7 @@ const makers = {
   icon: () => app.icon({ name: "loader-circle", class: "size-4" }),
   div: () => app.div({ class: "p-1" }),
 };
-// `tree` is left out by default: gpui-component (0.9.0, still in 0.9.1) never frees a TreeState (its row closure
+// `tree` is left out by default: gpui-component (0.9.0, still in 0.11.0) never frees a TreeState (its row closure
 // holds the state itself), ~2 KB per Tree created and removed. Name it to see that climb.
 const only = (process.argv[4] ?? Object.keys(makers).filter((k) => k !== "div" && k !== "tree").join(",")).split(",");
 function batch() {

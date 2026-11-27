@@ -886,9 +886,8 @@ after the row instead, at its own size (a close button). Its `class` styles the 
 `Input`, `Select`, `Slider`, a `div` with `click`…) keeps its own click: it does not choose the
 tab.
 
-The bar is a `tablist` and every chip a `tab` already. The host wraps the bar in one Tab stop that
-reads as the chosen tab and moves with the arrows (section 16); the `a11y.label` of a `Tabs`
-becomes that stop's description. The nodes of a chip
+The bar is a `tablist` and every chip a `tab` already, and the bar is one Tab stop with the
+keys of section 16; the `a11y.label` of a `Tabs` names a `group` around the bar. The nodes of a chip
 are not the chip itself: the tab is announced as a tab, with the `a11y.label` of the `Tab` node,
 or with its `label` when there is none. Three cases are the client's own
 mistake and the host only draws around them: a `Tab` outside a `Tabs` is not drawn, a child of a
@@ -960,16 +959,19 @@ Roles (ARIA's names): `alert`, `alertdialog`, `article`, `banner`, `button`, `ce
   `placeholder`, so `a11y.role: "textbox"` makes the reader find it twice. To name a component
   that has no label of its own (a `Select`, a `RadioGroup`, a `Progress`), give `a11y` the
   `group` role and a `label`.
-- The host gives `Slider`, `Rating`, `Tabs` and `Pagination` a Tab stop (none when `disabled`)
-  and keys: ←/↓ and →/↑ move one `step` (one star, one page, the previous or next enabled tab),
-  Home and End go to the first and last. A key sends the same `change` a click would, in both
-  synced and controlled modes (a controlled `Slider` that rounds the value should have the
-  `step` it rounds to, or an arrow proposes a value the app takes back). The stop reports its own role and value — `slider` (Slider,
-  Rating), `spinbutton` (Pagination) or the chosen `tab` (Tabs) — so their `a11y` only gives the
-  `id`, `label`, `description` and `keyshortcuts`; its `role` and value are ignored. A `Tabs`
-  reads as its chosen tab, and its `a11y.label` becomes the description.
-  Without a stop (`disabled`) they read the same way. gpui-kit already reports a `Slider` as a
-  slider, so its `a11y.label` names that one too.
+- The host gives `Rating` and `Pagination` a Tab stop (none when `disabled`) and keys: ←/↓ and
+  →/↑ move one star or one page, Home and End go to the first and last. A key sends the same
+  `change` a click would, in both synced and controlled modes. The stop reports its own role and
+  value — `slider` (Rating) or `spinbutton` (Pagination) — so their `a11y` only gives the `id`,
+  `label`, `description` and `keyshortcuts`; its `role` and value are ignored. Without a stop
+  (`disabled`) they read the same way.
+- gpui-kit gives `Slider` and `Tabs` their own Tab stop and keys (none when `disabled`). A
+  `Slider`: ←/↓ and →/↑ move one `step`, PageUp and PageDown ten, Home and End go to `min` and
+  `max`; it reports itself as a slider, and its `a11y.label` names it. A controlled `Slider` that
+  rounds the value should have the `step` it rounds to, or a key proposes a value the app takes
+  back. A `Tabs`: Tab enters on the chosen tab, ←/→ (and Home/End) move the focus between the
+  enabled tabs without choosing, and Enter or Space chooses the focused one with the `change` a
+  click sends.
 - An `Accordion` section's title reads as its name. The title of each enabled `AccordionItem`
   (none when it or its `Accordion` is `disabled`) is a Tab stop that reads as a button with its
   open state; Enter and Space open and close it with the same `change` a click sends. Sections
